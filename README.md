@@ -48,18 +48,27 @@ Colors, typography, spacing, and radii follow the handoff spec and live in
 
 ## Data & API
 
-The screens currently render **mock data** in `src/data/catalog.ts`, shaped to
-match the Mobix API so the swap to live data is a drop-in:
+Vehicle listings are **live from the Mobix API** (`src/lib/mobix.ts`):
 
-- `POST /daftar-produk` → catalog grid (`ProductListItem[]`)
-- `POST /detail-produk` → unit detail (`ProductDetail`)
+- `POST /daftar-produk` → catalog grid (`ProductListItem[]`) — Katalog, Beranda, Hot Deals
+- `POST /detail-produk` → unit detail (`ProductDetail`) — Unit Detail, Share Sheet
 - `GET /unit-file-serve?path=…` → unit photos (public)
 
-Base API: `https://mobix.motovax.com` (tenant `mobix`). Those POST endpoints
-require a **bearer token** — for a public site it must be proxied via a thin
-server-side BFF (token in a server env var), never embedded in client JS. The
-`Photo` component already supports a real `src` with a hatch loading/`onError`
-fallback; car photos render as the design's diagonal hatch until wired.
+Base API: `https://mobix.motovax.com` (tenant `mobix`). The POST endpoints
+require a **bearer token** which must stay server-side, never in client JS.
+
+- **Local dev:** the Vite dev server proxies `/api/mobix/*` → the Mobix API and
+  injects `Authorization: Bearer <MOBIX_API_KEY>` from `.env` (gitignored). See
+  `vite.config.ts`. Copy `.env.example` → `.env` and set `MOBIX_API_KEY`.
+- **Production:** this is a static SPA, so you must run an equivalent reverse
+  proxy / serverless function that injects the token for `/api/mobix/*` and
+  forwards `/unit-file-serve`. Do **not** embed the token in the bundle.
+
+Only `UNIT READY` units are returned (server-filtered). The catalog API has **no
+commission field** — `Komisi` shown in the agent UI is an estimate
+(`estimateKomisi`, ~3.4% of price). Testimonials and the branch directory
+(`src/data/catalog.ts`) are static program content with no API source. Cards use
+loading skeletons + image `onError` fallback to the design's hatch placeholder.
 
 The installment calculator (`src/lib/installment.ts`) is a marketing simulation
 calibrated to the design defaults (price 165jt, DP 20%, tenor 60 → ~Rp 3.428.000
