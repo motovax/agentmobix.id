@@ -111,6 +111,32 @@ async function post<T>(path: string, body: unknown): Promise<ApiEnvelope<T>> {
   return json;
 }
 
+async function get<T>(path: string): Promise<ApiEnvelope<T>> {
+  const res = await fetch(`${PROXY}${path}`);
+  if (!res.ok) throw new Error(`Mobix API ${res.status}`);
+  const json = (await res.json()) as ApiEnvelope<T>;
+  if (json.status === "failure") {
+    throw new Error(json.error || json.message || "Mobix API error");
+  }
+  return json;
+}
+
+/** Live filter values (GET endpoints, see /docs). */
+export async function fetchCategories(): Promise<string[]> {
+  return (await get<string[]>("/daftar-kategori")).data ?? [];
+}
+export async function fetchBrands(): Promise<string[]> {
+  return (await get<string[]>("/daftar-merek")).data ?? [];
+}
+
+const CATEGORY_ACRONYMS = new Set(["MPV", "SUV", "LCGC"]);
+
+/** Display label for a category code, keeping acronyms upper-cased. */
+export function prettyCategory(c: string): string {
+  const up = c.toUpperCase();
+  return CATEGORY_ACRONYMS.has(up) ? up : titleCase(c);
+}
+
 export interface ListResult {
   items: ProductListItem[];
   total: number;

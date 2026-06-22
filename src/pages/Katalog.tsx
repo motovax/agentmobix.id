@@ -4,23 +4,24 @@ import { AppShell } from "../components/AppShell";
 import { UnitRow } from "../components/UnitRow";
 import { SkeletonRow } from "../components/ui";
 import { ChevronLeft, Search, Sliders } from "../components/icons";
-import { fetchUnits, toCardUnit, type CardUnit } from "../lib/mobix";
+import {
+  fetchUnits,
+  fetchCategories,
+  prettyCategory,
+  toCardUnit,
+  type CardUnit,
+} from "../lib/mobix";
+import { useAsync } from "../lib/useAsync";
 
 const LIMIT = 12;
 
-const CHIPS: { label: string; kategori?: string }[] = [
-  { label: "Semua" },
-  { label: "MPV", kategori: "mpv" },
-  { label: "LCGC", kategori: "lcgc" },
-  { label: "SUV", kategori: "suv" },
-  { label: "Sedan", kategori: "sedan" },
-  { label: "Hatchback", kategori: "hatchback" },
-];
-
 export function Katalog() {
-  const [activeChip, setActiveChip] = useState("Semua");
+  // "" = Semua; otherwise a live category code from /daftar-kategori
+  const [activeCat, setActiveCat] = useState("");
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
+
+  const categories = useAsync(fetchCategories, []);
 
   const [items, setItems] = useState<CardUnit[]>([]);
   const [total, setTotal] = useState(0);
@@ -36,7 +37,7 @@ export function Katalog() {
     return () => window.clearTimeout(t);
   }, [query]);
 
-  const kategori = CHIPS.find((c) => c.label === activeChip)?.kategori;
+  const kategori = activeCat || undefined;
 
   // initial / filter-changed load (page 1)
   useEffect(() => {
@@ -114,12 +115,12 @@ export function Katalog() {
           </div>
         </div>
         <div className="scroll-x flex gap-1.5 overflow-x-auto">
-          {CHIPS.map((c) => {
-            const isActive = c.label === activeChip;
+          {[{ value: "", label: "Semua" }, ...(categories.data ?? []).map((c) => ({ value: c, label: prettyCategory(c) }))].map((c) => {
+            const isActive = c.value === activeCat;
             return (
               <button
-                key={c.label}
-                onClick={() => setActiveChip(c.label)}
+                key={c.value || "all"}
+                onClick={() => setActiveCat(c.value)}
                 className={`whitespace-nowrap rounded-full px-3 py-[7px] text-[12px] font-semibold ${
                   isActive
                     ? "bg-ink text-surface"
@@ -127,7 +128,7 @@ export function Katalog() {
                 }`}
               >
                 {c.label}
-                {c.label === "Semua" && total ? ` · ${total}` : ""}
+                {c.value === "" && total ? ` · ${total}` : ""}
               </button>
             );
           })}
