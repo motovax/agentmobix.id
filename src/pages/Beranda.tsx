@@ -62,7 +62,7 @@ const STEPS = [
   },
   {
     title: "Komisi cair ke rekening",
-    caption: "Tiga hari kerja setelah BPKB diserahkan ke pembeli.",
+    caption: "Tiga hari kerja setelah unit terjual.",
     icon: (
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
         <path d="M2 9h14M11 5l5 4-5 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
