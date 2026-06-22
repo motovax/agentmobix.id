@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+    color: #0e1b1e;
+    background: #e9ecef;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  /* horizontal snap scrollers without visible scrollbar */
+  .scroll-x {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scroll-x::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
