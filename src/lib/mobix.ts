@@ -5,7 +5,15 @@
 // server-side — see vite.config.ts. The browser never sees the token. Images go
 // through `/unit-file-serve` (public), also proxied to keep a single origin.
 
-const PROXY = "/api/mobix";
+// In dev, calls go to the Vite proxy ("/api/mobix") which injects the token.
+// In production (static GitHub Pages), set VITE_MOBIX_PROXY to the Cloudflare
+// Worker URL that holds the token + adds CORS. See worker/ and README.
+const PROXY = import.meta.env.VITE_MOBIX_PROXY || "/api/mobix";
+
+// Image base. Photos are public and load cross-origin via <img> without CORS,
+// so in production point this at the API origin; in dev leave empty to use the
+// Vite "/unit-file-serve" proxy.
+const IMG_BASE = import.meta.env.VITE_MOBIX_IMAGE_BASE || "";
 
 /* ---- raw API shapes (from /openapi.json) ---- */
 
@@ -168,11 +176,11 @@ export async function fetchUnitDetail(slug: string): Promise<ProductDetail> {
   return data;
 }
 
-/** Resolve an image path/url to a same-origin (proxied) src. */
+/** Resolve an image path/url to a loadable src (absolute in prod, proxied in dev). */
 export function mobixImage(pathOrUrl: string | undefined): string | undefined {
   if (!pathOrUrl) return undefined;
   if (/^https?:\/\//.test(pathOrUrl)) return pathOrUrl;
-  return pathOrUrl; // "/unit-file-serve?path=..." — proxied in dev
+  return `${IMG_BASE}${pathOrUrl}`; // "/unit-file-serve?path=..."
 }
 
 /* ---- agent-program derivations (not present in the catalog API) ---- */

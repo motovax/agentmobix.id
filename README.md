@@ -74,6 +74,42 @@ The installment calculator (`src/lib/installment.ts`) is a marketing simulation
 calibrated to the design defaults (price 165jt, DP 20%, tenor 60 → ~Rp 3.428.000
 / bln). Real quotes come from the leasing partner.
 
+## Deployment — GitHub Pages + Cloudflare Worker
+
+The app is a static SPA deployed to **GitHub Pages** (`.github/workflows/deploy.yml`,
+on push to `main`). Because Pages is static and the Mobix API has no CORS, the
+authed API is fronted by a tiny **Cloudflare Worker** (`worker/`) that holds the
+token as a secret and adds CORS. Images load directly (public, no CORS needed).
+
+**One-time setup:**
+
+1. **Deploy the Worker** (holds the token):
+   ```bash
+   cd worker
+   npx wrangler secret put MOBIX_API_KEY   # paste the Mobix bearer token
+   npx wrangler deploy
+   ```
+   Note the deployed URL (e.g. `https://agentmobix-api.<sub>.workers.dev`), or
+   bind a custom domain like `api.agentmobix.id` in the Cloudflare dashboard.
+
+2. **Point the build at the Worker** — in the GitHub repo:
+   _Settings → Secrets and variables → Actions → Variables_, add
+   `VITE_MOBIX_PROXY = <your Worker URL>`.
+   (Optionally `VITE_MOBIX_IMAGE_BASE`; defaults to `https://mobix.motovax.com`.)
+
+3. **Enable Pages** — _Settings → Pages → Build and deployment → Source:
+   **GitHub Actions**_. The custom domain `agentmobix.id` is set via the
+   committed `public/CNAME`.
+
+4. **DNS for `agentmobix.id`** — at your registrar, point the apex domain at
+   GitHub Pages:
+   - `A` → `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`
+   - `AAAA` → `2606:50c0:8000::153`, `:8001::153`, `:8002::153`, `:8003::153`
+   - (or an `ALIAS`/`ANAME` to `motovax.github.io`)
+
+   Re-run the workflow (or push to `main`) to deploy. Pages issues HTTPS once DNS
+   resolves; tick "Enforce HTTPS" in Settings → Pages.
+
 ## License
 
 © PT Mobix Mobil Indonesia. All rights reserved.
