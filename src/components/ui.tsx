@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { UnitBadge } from "../data/catalog";
+import type { UnitBadge } from "../lib/mobix";
 
 /**
  * Hatched photo placeholder. The design renders car photos as a diagonal hatch;
@@ -39,12 +39,46 @@ export function Photo({
   );
 }
 
+/** Shimmer skeleton block. */
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-xl bg-[#E6EAEC] ${className}`} />;
+}
+
+/** Loading placeholder shaped like a catalog list row. */
+export function SkeletonRow() {
+  return (
+    <div className="flex gap-3 rounded-2xl border border-line bg-surface p-2.5">
+      <Skeleton className="aspect-[4/3] w-[118px] flex-shrink-0" />
+      <div className="flex-1 space-y-2 py-1">
+        <Skeleton className="h-2.5 w-20" />
+        <Skeleton className="h-3.5 w-40" />
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-2.5 w-44" />
+        <Skeleton className="h-5 w-28 rounded-md" />
+      </div>
+    </div>
+  );
+}
+
+/** Loading placeholder shaped like a horizontal unit card. */
+export function SkeletonCard() {
+  return (
+    <div className="flex-[0_0_200px] overflow-hidden rounded-2xl border border-line bg-surface-3">
+      <Skeleton className="aspect-[4/3] rounded-none" />
+      <div className="space-y-2 p-3">
+        <Skeleton className="h-2.5 w-24" />
+        <Skeleton className="h-3 w-36" />
+        <Skeleton className="h-4 w-20" />
+      </div>
+    </div>
+  );
+}
+
 /** Corner status badge used on cards. */
 export function Badge({ kind }: { kind: UnitBadge }) {
   if (!kind) return null;
   const styles: Record<NonNullable<UnitBadge>, string> = {
     "Baru masuk": "bg-surface text-teal-deep border border-teal-tint-border",
-    "Turun harga": "bg-surface text-danger border border-danger-border",
     Premium: "bg-ink text-teal",
   };
   return (
@@ -63,10 +97,6 @@ export function ThumbBadge({ kind }: { kind: UnitBadge }) {
     "Baru masuk": {
       label: "Baru",
       cls: "bg-surface text-teal-deep border border-teal-tint-border",
-    },
-    "Turun harga": {
-      label: "Turun",
-      cls: "bg-surface text-danger border border-danger-border",
     },
     Premium: { label: "Premium", cls: "bg-ink text-teal" },
   };

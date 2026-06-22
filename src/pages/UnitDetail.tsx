@@ -1,9 +1,19 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "wouter";
 import { AppShell } from "../components/AppShell";
-import { Photo } from "../components/ui";
-import { ChevronLeft, ShareArrow, Chat } from "../components/icons";
-import { findUnit, CATALOG } from "../data/catalog";
+import { AppBar } from "../components/AppBar";
+import { Photo, Skeleton } from "../components/ui";
+import { UnitRow } from "../components/UnitRow";
+import { ChevronLeft, ShareArrow, Chat, Check, Close } from "../components/icons";
+import {
+  fetchUnitDetail,
+  mobixImage,
+  estimateKomisi,
+  titleCase,
+  toCardUnit,
+  deriveBadge,
+} from "../lib/mobix";
+import { useAsync } from "../lib/useAsync";
 import { formatRupiah, formatRpJt, formatOdometer } from "../lib/format";
 import {
   TENOR_OPTIONS,
@@ -14,35 +24,89 @@ import {
 
 export function UnitDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const unit = findUnit(slug) ?? CATALOG[0];
+  const { data: unit, loading, error } = useAsync(
+    () => fetchUnitDetail(slug),
+    [slug],
+  );
 
   const [dpPercent, setDpPercent] = useState(20);
   const [tenor, setTenor] = useState<Tenor>(60);
   const [activeThumb, setActiveThumb] = useState(0);
 
-  const dp = downPayment(unit.price, dpPercent);
+  const price = unit?.harga ?? 0;
+  const dp = downPayment(price, dpPercent);
   const monthly = useMemo(
-    () => monthlyInstallment(unit.price, dpPercent, tenor),
-    [unit.price, dpPercent, tenor],
+    () => monthlyInstallment(price, dpPercent, tenor),
+    [price, dpPercent, tenor],
   );
 
-  const specs = [
-    { label: "Transmisi", value: unit.transmission },
-    { label: "Kilometer", value: formatOdometer(unit.km) },
-    { label: "Bahan bakar", value: unit.fuel },
+  if (loading) {
+    return (
+      <AppShell bg="bg-surface">
+        <AppBar title="Memuat unit…" />
+        <div className="space-y-4 p-4">
+          <Skeleton className="aspect-[4/3] w-full" />
+          <Skeleton className="h-6 w-3/4" />
+          <Skeleton className="h-8 w-1/2" />
+          <div className="grid grid-cols-3 gap-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-16" />
+            ))}
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (error || !unit) {
+    return (
+      <AppShell bg="bg-surface">
+        <AppBar title="Unit tidak ditemukan" back="/katalog" />
+        <div className="flex flex-col items-center gap-3 px-6 py-20 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-danger-bg text-danger">
+            <Close size={20} />
+          </div>
+          <div className="text-[14px] font-bold text-ink">
+            Unit ini tidak tersedia
+          </div>
+          <div className="text-[13px] text-muted">
+            {error ?? "Mungkin sudah terjual atau tautannya berubah."}
+          </div>
+          <Link
+            href="/katalog"
+            className="mt-2 rounded-[14px] bg-ink px-5 py-3 text-[14px] font-bold text-surface no-underline"
+          >
+            Lihat katalog
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
+
+  const gallery = unit.galeri ?? [];
+  const heroSrc = mobixImage(gallery[activeThumb]?.url);
+  const komisi = estimateKomisi(price);
+  const badge = deriveBadge({ odometer: unit.odometer, harga: price });
+  const thumbCount = Math.min(4, gallery.length);
+
+  const topSpecs = [
+    { label: "Transmisi", value: titleCase(unit.transmisi || "-") },
+    { label: "Kilometer", value: formatOdometer(unit.odometer) },
+    { label: "Kategori", value: titleCase(unit.category || "-") },
     { label: "Tahun", value: String(unit.year) },
-    { label: "Pajak", value: unit.tax },
-    { label: "Plat", value: unit.plate },
+    { label: "Warna", value: titleCase(unit.color || "-") },
+    { label: "Plat", value: unit.plate_no || "-" },
   ];
 
-  const thumbCount = Math.min(4, unit.photos);
+  const docs = Object.entries(unit.kelengkapan_dokumen ?? {});
+  const similar = (unit.harga_sejenis ?? []).slice(0, 5).map(toCardUnit);
 
   return (
     <AppShell bg="bg-surface">
-      <main className="min-h-screen overflow-y-auto pb-0 sm:min-h-0">
+      <main className="min-h-screen overflow-y-auto sm:min-h-0">
         {/* GALLERY */}
         <div className="relative">
-          <Photo large className="aspect-[4/3]" />
+          <Photo large className="aspect-[4/3]" src={heroSrc} alt={unit.nama} />
           <Link
             href="/katalog"
             aria-label="Kembali"
@@ -58,47 +122,56 @@ export function UnitDetail() {
             <ShareArrow size={17} />
           </Link>
           <span className="absolute bottom-3.5 left-3.5 rounded-lg bg-teal px-2.5 py-1 text-[11px] font-bold text-ink">
-            {unit.badge ?? "Tersedia"} · ID {unit.code}
+            {badge ?? "Tersedia"} · {unit.plate_no}
           </span>
-          <div className="absolute bottom-3.5 right-3.5 rounded-lg bg-ink/80 px-2.5 py-[3px] text-[11px] font-semibold text-surface">
-            {activeThumb + 1} / {unit.photos}
-          </div>
-        </div>
-
-        {/* THUMB STRIP */}
-        <div className="scroll-x flex gap-2 overflow-x-auto px-4 py-3">
-          {Array.from({ length: thumbCount }).map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setActiveThumb(i)}
-              className={`h-12 flex-[0_0_64px] rounded-lg bg-hatch ${
-                i === activeThumb ? "border-2 border-ink" : ""
-              }`}
-            />
-          ))}
-          {unit.photos > thumbCount && (
-            <div className="flex h-12 flex-[0_0_64px] items-center justify-center rounded-lg bg-ink text-[12px] font-bold text-surface">
-              +{unit.photos - thumbCount}
+          {gallery.length > 0 && (
+            <div className="absolute bottom-3.5 right-3.5 rounded-lg bg-ink/80 px-2.5 py-[3px] text-[11px] font-semibold text-surface">
+              {activeThumb + 1} / {gallery.length}
             </div>
           )}
         </div>
 
+        {/* THUMB STRIP */}
+        {gallery.length > 1 && (
+          <div className="scroll-x flex gap-2 overflow-x-auto px-4 py-3">
+            {gallery.slice(0, thumbCount).map((g, i) => (
+              <button
+                key={g.id}
+                onClick={() => setActiveThumb(i)}
+                className={`h-12 flex-[0_0_64px] overflow-hidden rounded-lg ${
+                  i === activeThumb ? "ring-2 ring-ink" : ""
+                }`}
+              >
+                <Photo className="h-full w-full" src={mobixImage(g.url)} alt="" />
+              </button>
+            ))}
+            {gallery.length > thumbCount && (
+              <button
+                onClick={() => setActiveThumb(thumbCount)}
+                className="flex h-12 flex-[0_0_64px] items-center justify-center rounded-lg bg-ink text-[12px] font-bold text-surface"
+              >
+                +{gallery.length - thumbCount}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* TITLE BLOCK */}
         <div className="px-[18px] pt-1">
           <div className="text-[12px] text-muted">
-            Siap di cabang {unit.branch} · {unit.branchArea}
+            Siap di cabang {titleCase(unit.lokasi || "Mobix")}
           </div>
           <h1 className="m-0 mt-1 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2]">
-            {unit.title}
+            {unit.nama}
           </h1>
           <div className="mt-2.5 flex items-center justify-between">
             <div className="-tracking-[0.02em] text-[24px] font-extrabold">
-              {formatRupiah(unit.price)}
+              {price ? formatRupiah(price) : "Hubungi kami"}
             </div>
             <div className="text-right">
               <div className="text-[10px] text-muted">Komisi kamu</div>
               <div className="text-[16px] font-extrabold text-teal-deep">
-                {formatRpJt(unit.komisi)}
+                {formatRpJt(komisi)}
               </div>
             </div>
           </div>
@@ -107,10 +180,10 @@ export function UnitDetail() {
         {/* SPEC GRID */}
         <div className="px-[18px] py-4">
           <div className="grid grid-cols-3 gap-2">
-            {specs.map((s) => (
+            {topSpecs.map((s) => (
               <div key={s.label} className="rounded-xl bg-field p-3 text-center">
                 <div className="text-[11px] text-muted">{s.label}</div>
-                <div className="mt-0.5 text-[13px] font-bold">{s.value}</div>
+                <div className="mt-0.5 truncate text-[13px] font-bold">{s.value}</div>
               </div>
             ))}
           </div>
@@ -128,7 +201,6 @@ export function UnitDetail() {
               </span>
             </div>
 
-            {/* DP */}
             <div className="mb-3.5">
               <div className="mb-2 flex justify-between text-[12px] font-semibold text-mid">
                 <span>Uang muka · {dpPercent}%</span>
@@ -146,7 +218,6 @@ export function UnitDetail() {
               />
             </div>
 
-            {/* TENOR */}
             <div className="mb-3.5">
               <div className="mb-2 text-[12px] font-semibold text-mid">Tenor (bulan)</div>
               <div className="grid grid-cols-5 gap-1.5">
@@ -169,7 +240,6 @@ export function UnitDetail() {
               </div>
             </div>
 
-            {/* RESULT */}
             <div className="rounded-[14px] bg-ink p-4 text-surface">
               <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
                 CICILAN PER BULAN
@@ -182,28 +252,62 @@ export function UnitDetail() {
               </div>
             </div>
             <p className="m-0 mt-2 text-[11px] text-muted">
-              Simulasi, syarat &amp; ketentuan berlaku.
+              Simulasi, syarat &amp; ketentuan berlaku. Komisi bersifat estimasi.
             </p>
           </div>
         </div>
 
-        {/* DESKRIPSI */}
-        <div className="px-[18px] pb-4">
-          <div className="mb-2 -tracking-[0.01em] text-[15px] font-extrabold">
-            Deskripsi unit
+        {/* KELENGKAPAN DOKUMEN */}
+        {docs.length > 0 && (
+          <div className="px-[18px] pb-4">
+            <div className="mb-2 -tracking-[0.01em] text-[15px] font-extrabold">
+              Kelengkapan dokumen
+            </div>
+            <div className="flex flex-col gap-2">
+              {docs.map(([k, v]) => {
+                const ada = /ada/i.test(v) && !/tidak/i.test(v);
+                return (
+                  <div
+                    key={k}
+                    className="flex items-center gap-2.5 rounded-xl bg-field px-3.5 py-2.5"
+                  >
+                    <span
+                      className={`flex h-5 w-5 items-center justify-center rounded-full ${
+                        ada ? "bg-teal text-ink" : "bg-danger-bg text-danger"
+                      }`}
+                    >
+                      {ada ? <Check size={11} /> : <Close size={10} />}
+                    </span>
+                    <span className="text-[13px] font-semibold uppercase text-ink">{k}</span>
+                    <span className="ml-auto text-[12px] text-muted">{v}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <p className="m-0 text-[13px] leading-[1.6] text-mid">{unit.description}</p>
-        </div>
+        )}
+
+        {/* DESKRIPSI */}
+        {unit.deskripsi && (
+          <div className="px-[18px] pb-4">
+            <div className="mb-2 -tracking-[0.01em] text-[15px] font-extrabold">
+              Deskripsi unit
+            </div>
+            <p className="m-0 whitespace-pre-line text-[13px] leading-[1.6] text-mid">
+              {unit.deskripsi}
+            </p>
+          </div>
+        )}
 
         {/* PIC */}
         <div className="px-[18px] pb-4">
           <div className="flex items-center gap-3 rounded-2xl bg-field p-3.5">
             <div className="flex h-[42px] w-[42px] items-center justify-center rounded-full bg-gradient-to-br from-teal to-teal-deep text-[13px] font-extrabold text-ink">
-              {unit.pic.initials}
+              {(titleCase(unit.lokasi || "MB").slice(0, 2)).toUpperCase()}
             </div>
             <div className="flex-1">
               <div className="text-[13px] font-bold">
-                {unit.pic.name} · {unit.pic.branchLabel}
+                Tim Cabang {titleCase(unit.lokasi || "Mobix")}
               </div>
               <div className="text-[11px] text-muted">
                 Pegang unit ini · biasanya balas cepat
@@ -218,6 +322,20 @@ export function UnitDetail() {
             </Link>
           </div>
         </div>
+
+        {/* UNIT SEJENIS */}
+        {similar.length > 0 && (
+          <div className="px-[18px] pb-4">
+            <div className="mb-2 -tracking-[0.01em] text-[15px] font-extrabold">
+              Rekomendasi lain
+            </div>
+            <div className="flex flex-col gap-2.5">
+              {similar.map((u) => (
+                <UnitRow key={u.id} unit={u} />
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="h-[96px]" />
       </main>

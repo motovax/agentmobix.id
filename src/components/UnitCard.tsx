@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import type { Unit } from "../data/catalog";
+import type { CardUnit } from "../lib/mobix";
 import { formatJt } from "../lib/format";
 import { Photo, Badge } from "./ui";
 import { ShareArrow } from "./icons";
@@ -9,7 +9,7 @@ import { ShareArrow } from "./icons";
  * card body opens the detail; the Share button opens the share sheet without
  * also triggering card navigation.
  */
-export function UnitCard({ unit }: { unit: Unit }) {
+export function UnitCard({ unit }: { unit: CardUnit }) {
   return (
     <article className="relative flex-[0_0_200px] snap-start overflow-hidden rounded-2xl border border-line bg-surface-3">
       {/* full-card overlay link → detail */}
@@ -18,14 +18,14 @@ export function UnitCard({ unit }: { unit: Unit }) {
         aria-label={`Lihat detail ${unit.title}`}
         className="absolute inset-0 z-[1]"
       />
-      <Photo className="aspect-[4/3]">
+      <Photo className="aspect-[4/3]" src={unit.thumbnail} alt={unit.title}>
         <div className="absolute left-2 top-2">
           <Badge kind={unit.badge} />
         </div>
       </Photo>
       <div className="px-3 pb-3 pt-2.5">
         <div className="text-[11px] text-muted">Siap di cabang {unit.branch}</div>
-        <div className="mt-0.5 text-[13px] font-bold leading-[1.3] text-ink">
+        <div className="mt-0.5 line-clamp-1 text-[13px] font-bold leading-[1.3] text-ink">
           {unit.title}
         </div>
         <div className="mt-1.5 flex items-baseline gap-[5px]">

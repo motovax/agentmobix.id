@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
-import { Photo } from "../components/ui";
+import { Photo, Skeleton } from "../components/ui";
 import {
   Close,
   WhatsAppSolid,
@@ -11,22 +11,27 @@ import {
   Copy,
   Download,
 } from "../components/icons";
-import { findUnit, CATALOG } from "../data/catalog";
+import { fetchUnitDetail, mobixImage, titleCase } from "../lib/mobix";
+import { useAsync } from "../lib/useAsync";
 import { formatJt, formatRupiah } from "../lib/format";
 
 export function ShareSheet() {
   const search = useSearch();
   const slug = new URLSearchParams(search).get("u") ?? "";
-  const unit = findUnit(slug) ?? CATALOG[0];
-
-  const link = `mobix.id/u/${unit.code}`;
-  const caption = `${unit.title} tangan pertama, KM ${Math.round(
-    unit.km / 1000,
-  )}rb, pajak hidup. Cukup TDP ${formatJt(unit.tdp)}, cicilan ${formatJt(
-    unit.cicilan,
-  )}/bln. Unit ready, bisa cek langsung. Chat saya ya 🙌`;
+  const { data: unit, loading } = useAsync(() => fetchUnitDetail(slug), [slug]);
 
   const [copied, setCopied] = useState<"" | "caption" | "link">("");
+
+  const link = unit ? `mobix.id/u/${unit.plate_no}` : "mobix.id";
+  const caption = unit
+    ? `${unit.nama} tangan pertama, KM ${Math.round(
+        unit.odometer / 1000,
+      )}rb. Cukup TDP ${formatJt(unit.tdp)}, cicilan ${formatJt(
+        unit.cicilan,
+      )}/bln. Unit ready di cabang ${titleCase(
+        unit.lokasi || "Mobix",
+      )}, bisa cek langsung. Chat saya ya 🙌`
+    : "";
 
   async function copy(what: "caption" | "link", text: string) {
     try {
@@ -49,31 +54,21 @@ export function ShareSheet() {
       return;
     }
     if (navigator.share) {
-      void navigator.share({ title: unit.title, text, url: `https://${link}` });
+      void navigator.share({ title: unit?.nama, text, url: `https://${link}` });
       return;
     }
     void copy("link", `https://${link}`);
   }
 
   const channels = [
-    {
-      key: "wa" as const,
-      label: "WhatsApp",
-      cls: "bg-whatsapp text-surface",
-      icon: <WhatsAppSolid />,
-    },
+    { key: "wa" as const, label: "WhatsApp", cls: "bg-whatsapp text-surface", icon: <WhatsAppSolid /> },
     {
       key: "ig" as const,
       label: "IG Story",
       cls: "bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#8134AF] text-surface",
       icon: <InstagramSolid />,
     },
-    {
-      key: "fb" as const,
-      label: "Facebook",
-      cls: "bg-[#1877F2] text-surface",
-      icon: <FacebookSolid />,
-    },
+    { key: "fb" as const, label: "Facebook", cls: "bg-[#1877F2] text-surface", icon: <FacebookSolid /> },
     {
       key: "mp" as const,
       label: "Marketplace",
@@ -82,12 +77,14 @@ export function ShareSheet() {
     },
   ];
 
+  const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
+
   return (
     <AppShell bg="bg-ink">
       {/* backdrop hint */}
       <div className="pt-10 text-center">
         <Link
-          href={`/unit/${unit.slug}`}
+          href={backHref}
           aria-label="Tutup"
           className="mb-[18px] inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.12] text-surface no-underline"
         >
@@ -102,10 +99,17 @@ export function ShareSheet() {
 
         {/* shareable preview */}
         <div className="mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
-          <Photo large className="aspect-video">
-            <div className="absolute bottom-3 left-3 rounded-lg bg-ink/85 px-2.5 py-[5px] text-[12px] font-bold text-surface">
-              Rp {formatJt(unit.price)} · TDP {formatJt(unit.tdp)}
-            </div>
+          <Photo
+            large
+            className="aspect-video"
+            src={mobixImage(unit?.galeri?.[0]?.url)}
+            alt={unit?.nama}
+          >
+            {unit && (
+              <div className="absolute bottom-3 left-3 rounded-lg bg-ink/85 px-2.5 py-[5px] text-[12px] font-bold text-surface">
+                Rp {formatJt(unit.harga)} · TDP {formatJt(unit.tdp)}
+              </div>
+            )}
             <img
               src="/mobix-logo.png"
               alt="Mobix"
@@ -113,10 +117,20 @@ export function ShareSheet() {
             />
           </Photo>
           <div className="px-3.5 py-3">
-            <div className="text-[14px] font-bold">{unit.title}</div>
-            <div className="mt-0.5 text-[12px] text-muted">
-              Cicilan dari {formatRupiah(unit.cicilan)}/bln · 60 bln · {unit.branch}
-            </div>
+            {loading || !unit ? (
+              <div className="space-y-2">
+                <Skeleton className="h-3.5 w-48" />
+                <Skeleton className="h-3 w-40" />
+              </div>
+            ) : (
+              <>
+                <div className="text-[14px] font-bold">{unit.nama}</div>
+                <div className="mt-0.5 text-[12px] text-muted">
+                  Cicilan dari {formatRupiah(unit.cicilan)}/bln · 60 bln ·{" "}
+                  {titleCase(unit.lokasi || "Mobix")}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -128,12 +142,20 @@ export function ShareSheet() {
             </span>
             <button
               onClick={() => copy("caption", caption)}
-              className="text-[11px] font-bold text-teal-deep"
+              disabled={!unit}
+              className="text-[11px] font-bold text-teal-deep disabled:opacity-40"
             >
               {copied === "caption" ? "Tersalin ✓" : "Salin"}
             </button>
           </div>
-          <p className="m-0 text-[12px] leading-[1.55] text-mid">{caption}</p>
+          {loading || !unit ? (
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-2/3" />
+            </div>
+          ) : (
+            <p className="m-0 text-[12px] leading-[1.55] text-mid">{caption}</p>
+          )}
         </div>
 
         {/* channels */}
@@ -142,7 +164,8 @@ export function ShareSheet() {
             <button
               key={c.key}
               onClick={() => shareTo(c.key)}
-              className="flex flex-col items-center gap-[7px]"
+              disabled={!unit}
+              className="flex flex-col items-center gap-[7px] disabled:opacity-50"
             >
               <div className={`flex h-14 w-14 items-center justify-center rounded-[18px] ${c.cls}`}>
                 {c.icon}
@@ -156,7 +179,8 @@ export function ShareSheet() {
         <div className="flex flex-col gap-2">
           <button
             onClick={() => copy("link", `https://${link}`)}
-            className="flex items-center gap-3 rounded-[14px] border border-line bg-surface p-3.5 text-ink"
+            disabled={!unit}
+            className="flex items-center gap-3 rounded-[14px] border border-line bg-surface p-3.5 text-ink disabled:opacity-50"
           >
             <Copy className="text-ink" />
             <span className="flex-1 text-left text-[14px] font-semibold">
@@ -166,7 +190,10 @@ export function ShareSheet() {
               {copied === "link" ? "Tersalin ✓" : link}
             </span>
           </button>
-          <button className="flex items-center gap-3 rounded-[14px] border border-line bg-surface p-3.5 text-ink">
+          <button
+            disabled={!unit}
+            className="flex items-center gap-3 rounded-[14px] border border-line bg-surface p-3.5 text-ink disabled:opacity-50"
+          >
             <Download className="text-ink" />
             <span className="flex-1 text-left text-[14px] font-semibold">
               Download gambar siap-posting

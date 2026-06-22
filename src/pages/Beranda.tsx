@@ -12,7 +12,10 @@ import {
   YouTube,
   TikTok,
 } from "../components/icons";
-import { CATALOG, TESTIMONIALS } from "../data/catalog";
+import { SkeletonCard } from "../components/ui";
+import { TESTIMONIALS } from "../data/catalog";
+import { fetchUnits, toCardUnit } from "../lib/mobix";
+import { useAsync } from "../lib/useAsync";
 
 const WA_LINK = "https://wa.me/6285211000000";
 
@@ -70,7 +73,10 @@ const STEPS = [
 ];
 
 export function Beranda() {
-  const featured = CATALOG.slice(0, 4);
+  const featured = useAsync(
+    () => fetchUnits({ limit: 8 }).then((r) => r.items.map(toCardUnit)),
+    [],
+  );
 
   return (
     <AppShell>
@@ -175,9 +181,22 @@ export function Beranda() {
             </Link>
           </div>
           <div className="scroll-x flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18px] pb-1.5 pt-1">
-            {featured.map((u) => (
-              <UnitCard key={u.id} unit={u} />
-            ))}
+            {featured.loading &&
+              Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
+            {!featured.loading &&
+              (featured.data ?? []).map((u) => <UnitCard key={u.id} unit={u} />)}
+            {!featured.loading && featured.error && (
+              <div className="flex-1 py-6 text-center text-[12px] text-muted">
+                Gagal memuat unit. Coba lagi nanti.
+              </div>
+            )}
+            {!featured.loading &&
+              !featured.error &&
+              (featured.data ?? []).length === 0 && (
+                <div className="flex-1 py-6 text-center text-[12px] text-muted">
+                  Belum ada unit ready.
+                </div>
+              )}
           </div>
         </section>
 

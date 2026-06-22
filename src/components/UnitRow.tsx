@@ -1,16 +1,20 @@
 import { Link } from "wouter";
-import type { Unit } from "../data/catalog";
+import type { CardUnit } from "../lib/mobix";
 import { formatJt, formatKm } from "../lib/format";
 import { Photo, ThumbBadge } from "./ui";
 
 /** Catalog list row — whole row links to the unit detail. */
-export function UnitRow({ unit }: { unit: Unit }) {
+export function UnitRow({ unit }: { unit: CardUnit }) {
   return (
     <Link
       href={`/unit/${unit.slug}`}
       className="flex gap-3 rounded-2xl border border-line bg-surface p-2.5 text-inherit no-underline"
     >
-      <Photo className="aspect-[4/3] w-[118px] flex-shrink-0 rounded-xl">
+      <Photo
+        className="aspect-[4/3] w-[118px] flex-shrink-0 rounded-xl"
+        src={unit.thumbnail}
+        alt={unit.title}
+      >
         <ThumbBadge kind={unit.badge} />
       </Photo>
       <div className="min-w-0 flex-1">
