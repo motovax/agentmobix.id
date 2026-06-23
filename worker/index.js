@@ -16,8 +16,8 @@
 const API_BASE = "https://mobix.motovax.com";
 
 const ALLOWED_ORIGINS = [
-  "https://agentmobix.id",
-  "https://www.agentmobix.id",
+  "https://agenmobix.id",
+  "https://www.agenmobix.id",
   "http://localhost:5173",
   "http://localhost:4173",
 ];
