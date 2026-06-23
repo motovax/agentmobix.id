@@ -1,6 +1,7 @@
 name = "agentmobix-api"
 main = "index.js"
 compatibility_date = "2024-11-01"
+workers_dev = true
 
 # The Mobix bearer token is stored as a secret, NOT here:
 #   npx wrangler secret put MOBIX_API_KEY
