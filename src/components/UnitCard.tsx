@@ -54,7 +54,7 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
           <div>
             <div className="text-[10px] text-muted">Komisi</div>
             <div className="text-[12px] font-bold text-teal-deep">
-              Mulai dari 2jt
+              {unit.komisiLabel}
             </div>
           </div>
           <Link

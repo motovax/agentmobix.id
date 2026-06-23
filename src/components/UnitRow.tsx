@@ -43,7 +43,7 @@ export function UnitRow({ unit }: { unit: CardUnit }) {
         </div>
         <div className="mt-1.5">
           <div className="text-[10px] text-muted">Komisi</div>
-          <div className="text-[12px] font-bold text-teal-deep">Mulai dari 2jt</div>
+          <div className="text-[12px] font-bold text-teal-deep">{unit.komisiLabel}</div>
         </div>
       </div>
     </Link>

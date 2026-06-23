@@ -37,6 +37,7 @@ export interface ProductListItem {
   odometer: number;
   cabang: string;
   posisi: string;
+  aging: number;
   stnk_expiry: string;
   notes_unit: string;
 }
@@ -69,6 +70,7 @@ export interface ProductDetail {
   category: string;
   odometer: number;
   transmisi: string;
+  aging: number;
 }
 
 export interface ApiEnvelope<T> {
@@ -284,6 +286,7 @@ export interface CardUnit {
   km: number;
   badge: UnitBadge;
   thumbnail: string | undefined;
+  komisiLabel: string;
 }
 
 export function toCardUnit(item: ProductListItem): CardUnit {
@@ -302,5 +305,6 @@ export function toCardUnit(item: ProductListItem): CardUnit {
     km: item.odometer,
     badge: deriveBadge(item),
     thumbnail: mobixImage(item.thumbnail),
+    komisiLabel: (item.aging ?? 0) > 60 ? "+2jt" : "Mulai dari 2jt",
   };
 }
