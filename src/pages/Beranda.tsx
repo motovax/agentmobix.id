@@ -5,8 +5,8 @@ import { UnitCard } from "../components/UnitCard";
 import {
   Search,
   Moon,
-  ArrowRight,
   WhatsApp,
+  WhatsAppSolid,
   Instagram,
   Facebook,
   YouTube,
@@ -128,13 +128,6 @@ export function Beranda() {
             Tanpa modal stok. Akses katalog unit yang siap jual, share ke jaringan
             kamu, dibantu AI Mobix dari foto sampai follow-up ke calon pembeli.
           </p>
-          <Link
-            href="/daftar"
-            className="flex items-center justify-center gap-2 rounded-[14px] bg-ink px-3.5 py-3.5 text-[15px] font-bold text-surface no-underline"
-          >
-            Daftar gratis sebagai agen
-            <ArrowRight />
-          </Link>
           <div className="mt-3 flex items-center gap-2.5">
             <div className="flex">
               <span className="inline-block h-[22px] w-[22px] rounded-full border-2 border-surface bg-gradient-to-br from-teal to-teal-deep" />
@@ -396,13 +389,15 @@ export function Beranda() {
 
       </main>
 
-      <Link
-        href="/ai"
-        className="fixed bottom-24 left-1/2 z-20 -translate-x-1/2 inline-flex items-center gap-1.5 whitespace-nowrap rounded-2xl bg-ink px-5 py-3 text-[13px] font-bold text-surface no-underline shadow-[0_4px_20px_rgba(0,0,0,0.25)]"
+      <a
+        href={`https://wa.me/6285701959826?text=${encodeURIComponent("Halo, saya tertarik untuk mendaftarkan diri sebagai agen Mobix. Boleh saya mendapatkan info lebih lanjut? 🙏")}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-[120px] z-20 inline-flex items-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3 text-[13px] font-bold text-white no-underline shadow-[0_6px_24px_rgba(37,211,102,0.4)] right-[max(14px,calc((100%-384px)/2))]"
       >
-        Chat
-        <ArrowRight size={12} />
-      </Link>
+        <WhatsAppSolid size={20} className="text-white" />
+        Daftar Jadi Agen
+      </a>
 
       <BottomNav active="beranda" />
     </AppShell>
