@@ -230,10 +230,11 @@ export async function fetchUnitDetail(slug: string): Promise<ProductDetail> {
 }
 
 /** Resolve an image path/url to a loadable src (absolute in prod, proxied in dev). */
-export function mobixImage(pathOrUrl: string | undefined): string | undefined {
+export function mobixImage(pathOrUrl: string | undefined, width?: number): string | undefined {
   if (!pathOrUrl) return undefined;
   if (/^https?:\/\//.test(pathOrUrl)) return pathOrUrl;
-  return `${IMG_BASE}${pathOrUrl}`; // "/unit-file-serve?path=..."
+  const url = `${IMG_BASE}${pathOrUrl}`;
+  return width ? `${url}&w=${width}` : url;
 }
 
 /* ---- agent-program derivations (not present in the catalog API) ---- */
