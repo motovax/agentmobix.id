@@ -18,7 +18,15 @@ export function UnitRow({ unit }: { unit: CardUnit }) {
         <ThumbBadge kind={unit.badge} />
       </Photo>
       <div className="min-w-0 flex-1">
-        <div className="text-[11px] text-muted">Cabang {unit.branch}</div>
+        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+          <span>Cabang {unit.branch}</span>
+          {unit.plateNo && (
+            <>
+              <span className="h-[3px] w-[3px] rounded-full bg-muted/50" />
+              <span className="font-medium text-ink">{unit.plateNo}</span>
+            </>
+          )}
+        </div>
         <div className="mt-px text-[14px] font-bold leading-[1.25]">{unit.title}</div>
         <div className="mt-1 flex items-baseline gap-[5px]">
           <div className="-tracking-[0.01em] text-[16px] font-extrabold">
@@ -33,8 +41,9 @@ export function UnitRow({ unit }: { unit: CardUnit }) {
         <div className="mt-px text-[11px] text-muted">
           TDP {formatJt(unit.tdp)} · {formatJt(unit.cicilan)}/bln · {formatKm(unit.km)}
         </div>
-        <div className="mt-1.5 inline-flex items-center gap-1 rounded-[7px] bg-teal-tint px-2 py-[3px] text-[11px] font-bold text-teal-deep">
-          Komisi Rp {formatJt(unit.komisi)}
+        <div className="mt-1.5">
+          <div className="text-[10px] text-muted">Komisi</div>
+          <div className="text-[12px] font-bold text-teal-deep">Mulai dari 2jt</div>
         </div>
       </div>
     </Link>

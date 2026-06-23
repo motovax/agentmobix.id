@@ -158,8 +158,15 @@ export function UnitDetail() {
 
         {/* TITLE BLOCK */}
         <div className="px-[18px] pt-1">
-          <div className="text-[12px] text-muted">
-            Siap di cabang {titleCase(unit.lokasi || "Mobix")}
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            <span className="rounded-md bg-field px-1.5 py-0.5 text-[11px] font-medium text-muted">
+              🏢 Cabang: {titleCase(unit.lokasi || "Mobix")}
+            </span>
+            {unit.posisi && titleCase(unit.posisi) !== titleCase(unit.lokasi || "") && (
+              <span className="rounded-md bg-field px-1.5 py-0.5 text-[11px] font-medium text-muted">
+                📍 Posisi: {titleCase(unit.posisi)}
+              </span>
+            )}
           </div>
           <h1 className="m-0 mt-1 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2]">
             {unit.nama}

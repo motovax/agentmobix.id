@@ -26,7 +26,7 @@ const ITEMS: NavItem[] = [
 /** Floating sticky bottom tab bar (only shown on Beranda, per the design). */
 export function BottomNav({ active }: { active: string }) {
   return (
-    <nav className="sticky bottom-3.5 z-30 mx-3.5 mb-4 grid grid-cols-5 gap-1 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
+    <nav className="fixed bottom-9 left-1/2 z-30 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-5 gap-1 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
       {ITEMS.map(({ href, label, Icon, key }) => {
         const isActive = key === active;
         return (

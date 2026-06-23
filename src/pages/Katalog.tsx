@@ -9,6 +9,7 @@ import {
   fetchCategories,
   prettyCategory,
   toCardUnit,
+  classifyQuery,
   type CardUnit,
 } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
@@ -38,6 +39,18 @@ export function Katalog() {
   }, [query]);
 
   const kategori = activeCat || undefined;
+  const classification = debounced ? classifyQuery(debounced) : null;
+
+  function buildSearchParams() {
+    if (!classification) return {};
+    return {
+      judul:       classification.param === "judul"       ? classification.value : undefined,
+      merek:       classification.param === "merek"       ? classification.value : undefined,
+      bahan_bakar: classification.param === "bahan_bakar" ? classification.value : undefined,
+      transmisi:   classification.param === "transmisi"   ? classification.value : undefined,
+      plate_no:    classification.param === "plate_no"    ? classification.value : undefined,
+    };
+  }
 
   // initial / filter-changed load (page 1)
   useEffect(() => {
@@ -47,7 +60,7 @@ export function Katalog() {
     fetchUnits({
       limit: LIMIT,
       page: 1,
-      judul: debounced ? [debounced] : undefined,
+      ...buildSearchParams(),
       kategori: kategori ? [kategori] : undefined,
     })
       .then((res) => {
@@ -75,7 +88,7 @@ export function Katalog() {
     fetchUnits({
       limit: LIMIT,
       page: next,
-      judul: debounced ? [debounced] : undefined,
+      ...buildSearchParams(),
       kategori: kategori ? [kategori] : undefined,
     })
       .then((res) => {
@@ -108,7 +121,7 @@ export function Katalog() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Cari merek atau tipe…"
+              placeholder="Cari merek, tipe, atau nopol…"
               className="min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-placeholder"
             />
             <Sliders className="text-muted" />

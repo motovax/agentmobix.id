@@ -81,30 +81,30 @@ export function Beranda() {
   return (
     <AppShell>
       {/* SEARCH HEADER */}
-      <div className="flex items-center gap-2.5 border-b border-line-2 bg-surface-2 px-[18px] pb-3 pt-3.5">
+      <div className="hidden items-center gap-2.5 border-b border-line-2 bg-surface-2 px-[18px] pb-3 pt-3.5">
         <Link
           href="/katalog"
-          className="flex flex-1 items-center gap-2 rounded-full border border-line bg-surface px-4 py-[11px] no-underline"
+          className="hidden flex-1 items-center gap-2 rounded-full border border-line bg-surface px-4 py-[11px] no-underline"
         >
           <Search className="text-muted" />
           <span className="text-[14px] text-placeholder">Cari di Mobix . . .</span>
         </Link>
         <button
           aria-label="Mode gelap"
-          className="flex h-9 w-9 items-center justify-center text-ink"
+          className="hidden h-9 w-9 items-center justify-center text-ink"
         >
           <Moon />
         </button>
         <Link
           href="/katalog"
-          className="flex-shrink-0 whitespace-nowrap rounded-full bg-teal-soft px-[18px] py-[11px] text-[14px] font-semibold text-surface no-underline"
+          className="hidden flex-shrink-0 whitespace-nowrap rounded-full bg-teal-soft px-[18px] py-[11px] text-[14px] font-semibold text-surface no-underline"
         >
           Jual Mobil
         </Link>
       </div>
 
       {/* CONTENT */}
-      <main className="flex flex-col gap-3.5 p-3.5">
+      <main className="flex flex-col gap-3.5 p-3.5 pb-[180px]">
         {/* HERO */}
         <section className="rounded-[22px] border border-line bg-surface p-[18px]">
           <div className="mb-3.5 flex items-start justify-between gap-3.5">
@@ -254,7 +254,7 @@ export function Beranda() {
               calon pembeli ke PIC cabang yang menyimpan mobilnya. Semuanya lewat
               satu chat.
             </p>
-            <div className="mb-4 flex flex-col gap-2">
+            <div className="flex flex-col gap-2">
               <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-[12px] text-[#C7DEE0]">
                 "Tolong fotoin Avanza A-10428 dari sisi kanan & dashboard ya"
               </div>
@@ -262,13 +262,6 @@ export function Beranda() {
                 Siap. Diteruskan ke tim cabang BSD — estimasi 20 menit.
               </div>
             </div>
-            <Link
-              href="/ai"
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-surface px-[18px] py-[11px] text-[13px] font-bold text-ink no-underline"
-            >
-              Buka chat AI Mobix
-              <ArrowRight size={12} />
-            </Link>
           </div>
         </section>
 
@@ -385,7 +378,7 @@ export function Beranda() {
               Customer Care
             </a>
           </div>
-          <div className="flex items-center justify-center gap-[18px] text-muted">
+          <div className="mt-6 flex items-center justify-center gap-[18px] text-muted">
             <a href="#" aria-label="Instagram" className="text-muted">
               <Instagram />
             </a>
@@ -401,8 +394,15 @@ export function Beranda() {
           </div>
         </footer>
 
-        <div className="h-[60px]" />
       </main>
+
+      <Link
+        href="/ai"
+        className="fixed bottom-24 left-1/2 z-20 -translate-x-1/2 inline-flex items-center gap-1.5 whitespace-nowrap rounded-2xl bg-ink px-5 py-3 text-[13px] font-bold text-surface no-underline shadow-[0_4px_20px_rgba(0,0,0,0.25)]"
+      >
+        Chat
+        <ArrowRight size={12} />
+      </Link>
 
       <BottomNav active="beranda" />
     </AppShell>

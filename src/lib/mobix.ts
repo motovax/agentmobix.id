@@ -36,6 +36,7 @@ export interface ProductListItem {
   category: string;
   odometer: number;
   cabang: string;
+  posisi: string;
   stnk_expiry: string;
   notes_unit: string;
 }
@@ -55,6 +56,7 @@ export interface ProductDetail {
   tdp: number;
   cicilan: number;
   lokasi: string;
+  posisi: string;
   galeri: GalleryItem[];
   kelengkapan_dokumen: Record<string, string>;
   deskripsi: string;
@@ -100,6 +102,57 @@ export interface ListRequest {
   sort?: string[];
   page?: number;
   limit?: number;
+  plate_no?: string;
+}
+
+/** Returns true if the query looks like an Indonesian plate number (e.g. B2697FOD, D 1234 ABC). */
+export function isPlateQuery(q: string): boolean {
+  return /^[A-Z]{1,2}\s*\d{1,4}\s*[A-Z]{1,3}$/i.test(q.trim());
+}
+
+const BAHAN_BAKAR_MAP: Record<string, string> = {
+  bensin: "bensin",
+  bbm: "bensin",
+  solar: "diesel",
+  diesel: "diesel",
+  hybrid: "hybrid",
+  listrik: "listrik",
+  electric: "listrik",
+  ev: "listrik",
+};
+
+const TRANSMISI_MAP: Record<string, string> = {
+  manual: "MANUAL",
+  mt: "MANUAL",
+  matic: "AUTOMATIC",
+  automatic: "AUTOMATIC",
+  at: "AUTOMATIC",
+  otomatis: "AUTOMATIC",
+};
+
+const KNOWN_BRANDS = [
+  "toyota", "honda", "suzuki", "daihatsu", "mitsubishi", "nissan", "isuzu",
+  "wuling", "chery", "byd", "hyundai", "kia", "bmw", "mercedes", "audi",
+  "mazda", "ford", "chevrolet", "jeep", "lexus", "subaru", "volkswagen",
+  "peugeot", "renault", "volvo", "landrover", "land rover", "porsche",
+];
+
+export type QueryClassification =
+  | { param: "plate_no"; value: string }
+  | { param: "bahan_bakar"; value: string[] }
+  | { param: "transmisi"; value: string[] }
+  | { param: "merek"; value: string[] }
+  | { param: "judul"; value: string[] };
+
+export function classifyQuery(q: string): QueryClassification {
+  const trimmed = q.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (isPlateQuery(trimmed)) return { param: "plate_no", value: trimmed };
+  if (BAHAN_BAKAR_MAP[lower]) return { param: "bahan_bakar", value: [BAHAN_BAKAR_MAP[lower]] };
+  if (TRANSMISI_MAP[lower]) return { param: "transmisi", value: [TRANSMISI_MAP[lower]] };
+  if (KNOWN_BRANDS.includes(lower)) return { param: "merek", value: [trimmed] };
+  return { param: "judul", value: [trimmed] };
 }
 
 async function post<T>(path: string, body: unknown): Promise<ApiEnvelope<T>> {
@@ -154,7 +207,7 @@ export interface ListResult {
 
 export async function fetchUnits(req: ListRequest = {}): Promise<ListResult> {
   const env = await post<ProductListItem[]>("/daftar-produk", {
-    ada_foto: true,
+    ...(req.plate_no ? {} : { ada_foto: true }),
     page: 1,
     limit: 12,
     ...req,
@@ -220,6 +273,8 @@ export interface CardUnit {
   slug: string;
   title: string;
   branch: string;
+  posisi: string;
+  plateNo: string;
   price: number;
   oldPrice: number | null;
   tdp: number;
@@ -236,6 +291,8 @@ export function toCardUnit(item: ProductListItem): CardUnit {
     slug: item.slug,
     title: item.nama,
     branch: titleCase(item.cabang || "Mobix"),
+    posisi: titleCase(item.posisi || item.cabang || "Mobix"),
+    plateNo: item.plate_no || "",
     price: item.harga,
     oldPrice: null,
     tdp: item.tdp,

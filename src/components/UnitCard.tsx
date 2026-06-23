@@ -24,7 +24,6 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
         </div>
       </Photo>
       <div className="px-3 pb-3 pt-2.5">
-        <div className="text-[11px] text-muted">Siap di cabang {unit.branch}</div>
         <div className="mt-0.5 line-clamp-1 text-[13px] font-bold leading-[1.3] text-ink">
           {unit.title}
         </div>
@@ -41,11 +40,21 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
         <div className="mt-0.5 text-[11px] text-muted">
           TDP {formatJt(unit.tdp)} · {formatJt(unit.cicilan)}/bln
         </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          {unit.posisi !== unit.branch && (
+            <span className="rounded-md bg-field px-1.5 py-0.5 text-[10px] font-medium text-muted">
+              📍 Posisi: {unit.posisi}
+            </span>
+          )}
+          <span className="rounded-md bg-field px-1.5 py-0.5 text-[10px] font-medium text-muted">
+            🏢 Cabang: {unit.branch}
+          </span>
+        </div>
         <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-[#EEF2F3] pt-2.5">
           <div>
             <div className="text-[10px] text-muted">Komisi</div>
             <div className="text-[12px] font-bold text-teal-deep">
-              Rp {formatJt(unit.komisi)}
+              Mulai dari 2jt
             </div>
           </div>
           <Link
