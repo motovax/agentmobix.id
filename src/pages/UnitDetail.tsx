@@ -32,6 +32,7 @@ export function UnitDetail() {
   const [dpPercent, setDpPercent] = useState(20);
   const [tenor, setTenor] = useState<Tenor>(60);
   const [activeThumb, setActiveThumb] = useState(0);
+  const [showAllThumbs, setShowAllThumbs] = useState(false);
 
   const price = unit?.harga ?? 0;
   const dp = downPayment(price, dpPercent);
@@ -134,7 +135,7 @@ export function UnitDetail() {
         {/* THUMB STRIP */}
         {gallery.length > 1 && (
           <div className="scroll-x flex gap-2 overflow-x-auto px-4 py-3">
-            {gallery.slice(0, thumbCount).map((g, i) => (
+            {gallery.slice(0, showAllThumbs ? gallery.length : thumbCount).map((g, i) => (
               <button
                 key={g.id}
                 onClick={() => setActiveThumb(i)}
@@ -145,9 +146,9 @@ export function UnitDetail() {
                 <Photo className="h-full w-full" src={mobixImage(g.url, 800)} alt="" />
               </button>
             ))}
-            {gallery.length > thumbCount && (
+            {!showAllThumbs && gallery.length > thumbCount && (
               <button
-                onClick={() => setActiveThumb(thumbCount)}
+                onClick={() => { setShowAllThumbs(true); setActiveThumb(thumbCount); }}
                 className="flex h-12 flex-[0_0_64px] items-center justify-center rounded-lg bg-ink text-[12px] font-bold text-surface"
               >
                 +{gallery.length - thumbCount}
