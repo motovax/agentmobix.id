@@ -121,7 +121,7 @@ export function UnitDetail() {
           >
             <ShareArrow size={17} />
           </Link>
-          <span className="absolute bottom-3.5 left-3.5 rounded-lg bg-teal px-2.5 py-1 text-[11px] font-bold text-ink">
+          <span className="absolute bottom-3.5 left-3.5 rounded-lg bg-teal px-2.5 py-1 text-[16px] font-bold text-ink">
             {badge ?? "Tersedia"} · {unit.plate_no}
           </span>
           {gallery.length > 0 && (
@@ -168,7 +168,10 @@ export function UnitDetail() {
               </span>
             )}
           </div>
-          <h1 className="m-0 mt-1 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2]">
+          <div className="mt-2 text-[18px] font-bold tracking-widest text-[#3a3a3a]">
+            {unit.plate_no}
+          </div>
+          <h1 className="m-0 mt-0.5 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2]">
             {unit.nama}
           </h1>
           <div className="mt-2.5 flex items-center justify-between">
