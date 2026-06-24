@@ -7,6 +7,9 @@ import {
   ShareArrow,
   Copy,
   Download,
+  WhatsAppSolid,
+  Telegram,
+  XTwitter,
 } from "../components/icons";
 import { fetchUnitDetail, mobixImage, mobixImageFetchable, titleCase } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
@@ -18,20 +21,25 @@ export function ShareSheet() {
   const { data: unit, loading } = useAsync(() => fetchUnitDetail(slug), [slug]);
 
   const [copied, setCopied] = useState<"" | "caption" | "link">("");
+  const [showChannels, setShowChannels] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState(0);
 
-  // Pre-fetch image blob so navigator.share({ files }) can be called synchronously
-  // from user gesture (browsers block share with files if called after await).
-  // Uses the CORS-enabled API proxy (not the CDN origin which has no CORS headers).
+  const gallery = unit?.galeri ?? [];
+  const activeImg = gallery[selectedIdx] ?? gallery[0];
+
+  // Pre-fetch selected image blob so navigator.share({ files }) can be called
+  // synchronously from a user gesture (browsers block share with files after await).
   useEffect(() => {
-    if (!unit) return;
-    const src = mobixImageFetchable(unit.galeri?.[0]?.url);
+    if (!unit || !activeImg) return;
+    setImageFile(null);
+    const src = mobixImageFetchable(activeImg.url);
     if (!src) return;
     fetch(src)
       .then((r) => r.ok ? r.blob() : Promise.reject())
       .then((blob) => setImageFile(new File([blob], "unit.jpg", { type: blob.type || "image/jpeg" })))
       .catch(() => { /* proxy unavailable — share without image */ });
-  }, [unit]);
+  }, [unit, activeImg?.url]);
 
   const link = unit ? `mobix.id/u/${unit.plate_no}` : "mobix.id";
   const caption = unit
@@ -66,11 +74,23 @@ export function ShareSheet() {
       void navigator.share(shareData);
       return;
     }
-    // Desktop fallback: open WA with caption
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+    // Desktop: toggle channel picker
+    setShowChannels((v) => !v);
+  }
+
+  function shareVia(channel: "wa" | "tg" | "x") {
+    const text = `${caption}\nhttps://${link}`;
+    const urls: Record<string, string> = {
+      wa: `https://wa.me/?text=${encodeURIComponent(text)}`,
+      tg: `https://t.me/share/url?url=${encodeURIComponent(`https://${link}`)}&text=${encodeURIComponent(caption)}`,
+      x: `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`,
+    };
+    window.open(urls[channel], "_blank", "noopener");
+    setShowChannels(false);
   }
 
   const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
+  const activeUrl = mobixImage(activeImg?.url);
 
   return (
     <AppShell bg="bg-ink">
@@ -95,7 +115,7 @@ export function ShareSheet() {
           <Photo
             large
             className="aspect-video"
-            src={mobixImage(unit?.galeri?.[0]?.url)}
+            src={activeUrl}
             alt={unit?.nama}
           >
             {unit && (
@@ -127,6 +147,28 @@ export function ShareSheet() {
           </div>
         </div>
 
+        {/* gallery picker */}
+        {gallery.length > 1 && (
+          <div className="mb-[18px]">
+            <div className="mb-2 text-[11px] font-bold text-muted">Pilih foto yang akan dishare</div>
+            <div className="scroll-x flex gap-2 overflow-x-auto pb-1">
+              {gallery.map((g, i) => (
+                <button
+                  key={g.id}
+                  onClick={() => setSelectedIdx(i)}
+                  className={`h-[60px] flex-[0_0_80px] overflow-hidden rounded-[10px] border-2 transition-all ${
+                    i === selectedIdx
+                      ? "border-teal-deep shadow-sm"
+                      : "border-transparent opacity-60"
+                  }`}
+                >
+                  <Photo className="h-full w-full" src={mobixImage(g.url, 200)} alt="" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* caption preview */}
         <div className="mb-[18px] rounded-[14px] border border-line bg-surface px-3.5 py-3">
           <div className="mb-1.5 flex items-center justify-between">
@@ -152,14 +194,59 @@ export function ShareSheet() {
         </div>
 
         {/* share button */}
-        <button
-          onClick={handleShare}
-          disabled={!unit}
-          className="mb-[18px] flex w-full items-center justify-center gap-2.5 rounded-[18px] bg-teal-deep py-4 text-[15px] font-bold text-surface disabled:opacity-50"
-        >
-          <ShareArrow size={18} />
-          Bagikan Sekarang
-        </button>
+        <div className="relative mb-[18px]">
+          {showChannels && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setShowChannels(false)}
+              />
+              <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
+                <div className="border-b border-line px-4 py-3 text-center text-[11px] font-bold text-muted">
+                  Bagikan via
+                </div>
+                <div className="grid grid-cols-4 divide-x divide-line">
+                  <button
+                    onClick={() => shareVia("wa")}
+                    className="flex flex-col items-center gap-1.5 py-4 text-[#25D366] transition-colors hover:bg-[#25D366]/10"
+                  >
+                    <WhatsAppSolid size={24} />
+                    <span className="text-[10px] font-semibold text-ink">WhatsApp</span>
+                  </button>
+                  <button
+                    onClick={() => shareVia("tg")}
+                    className="flex flex-col items-center gap-1.5 py-4 text-[#229ED9] transition-colors hover:bg-[#229ED9]/10"
+                  >
+                    <Telegram size={24} />
+                    <span className="text-[10px] font-semibold text-ink">Telegram</span>
+                  </button>
+                  <button
+                    onClick={() => shareVia("x")}
+                    className="flex flex-col items-center gap-1.5 py-4 text-ink transition-colors hover:bg-ink/10"
+                  >
+                    <XTwitter size={24} />
+                    <span className="text-[10px] font-semibold text-ink">X / Twitter</span>
+                  </button>
+                  <button
+                    onClick={() => { void copy("link", `https://${link}`); setShowChannels(false); }}
+                    className="flex flex-col items-center gap-1.5 py-4 text-teal-deep transition-colors hover:bg-teal-deep/10"
+                  >
+                    <Copy size={24} />
+                    <span className="text-[10px] font-semibold text-ink">Salin Link</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+          <button
+            onClick={handleShare}
+            disabled={!unit}
+            className="flex w-full items-center justify-center gap-2.5 rounded-[18px] bg-teal-deep py-4 text-[15px] font-bold text-surface disabled:opacity-50"
+          >
+            <ShareArrow size={18} />
+            Bagikan Sekarang
+          </button>
+        </div>
 
         {/* secondary actions */}
         <div className="flex flex-col gap-2">

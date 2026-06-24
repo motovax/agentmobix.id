@@ -354,11 +354,11 @@ export function UnitDetail() {
       {/* STICKY ACTIONS */}
       <div className="fixed bottom-9 left-1/2 z-30 flex w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
         <Link
-          href="/ai"
+          href={`/share?u=${unit.slug}`}
           className="flex flex-[0_0_auto] items-center gap-1.5 rounded-2xl border border-line bg-field px-4 py-3 text-[13px] font-bold text-ink no-underline"
         >
           <Chat size={16} />
-          Minta foto
+          Ganti Foto
         </Link>
         <Link
           href={`/share?u=${unit.slug}`}
