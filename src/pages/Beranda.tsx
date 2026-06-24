@@ -6,7 +6,7 @@ import {
   Search,
   Moon,
   WhatsApp,
-  WhatsAppSolid,
+  Chat,
   Instagram,
   Facebook,
   YouTube,
@@ -390,13 +390,13 @@ export function Beranda() {
       </main>
 
       <a
-        href={`https://wa.me/6285701959826?text=${encodeURIComponent("Halo, saya tertarik untuk mendaftarkan diri sebagai agen Mobix. Boleh saya mendapatkan info lebih lanjut? 🙏")}`}
+        href={`https://wa.me/6285701959826?text=${encodeURIComponent("Halo Admin, mau tanya-tanya soal program agen Mobix dulu boleh? 🙏")}`}
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-[120px] z-20 inline-flex items-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3 text-[13px] font-bold text-white no-underline shadow-[0_6px_24px_rgba(37,211,102,0.4)] right-[max(14px,calc((100%-384px)/2))]"
       >
-        <WhatsAppSolid size={20} className="text-white" />
-        Daftar Jadi Agen
+        <Chat size={20} className="text-white" />
+        Tanya Admin
       </a>
 
       <BottomNav active="beranda" />
