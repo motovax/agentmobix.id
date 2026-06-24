@@ -6,7 +6,7 @@ import { fetchUnits, toCardUnit, type CardUnit } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
 import { formatJt, formatKm } from "../lib/format";
 
-const EXTRA = 1_000_000; // program promo: +Rp 1 juta komisi tiap closing
+const EXTRA = 2_000_000; // program promo: +Rp 2 juta komisi tiap closing
 
 export function HotDeals() {
   // The catalog API has no discount/price-drop data, so "hot deals" here are
@@ -25,12 +25,9 @@ export function HotDeals() {
         <div className="relative overflow-hidden rounded-[18px] bg-gradient-to-br from-danger to-[#E2622E] p-[18px] text-surface">
           <div className="absolute -right-5 -top-10 h-[150px] w-[150px] rounded-full bg-white/[0.12]" />
           <div className="relative">
-            <div className="text-[12px] font-bold tracking-[0.04em] opacity-90">
-              PEKAN INI
-            </div>
             <div className="mt-1 text-[22px] font-extrabold leading-[1.15]">
               Komisi ekstra{" "}
-              <span className="font-serif font-medium italic">+Rp 1 juta</span> tiap
+              <span className="font-serif font-medium italic">+Rp 2 juta</span> tiap
               closing unit hot deal.
             </div>
           </div>
