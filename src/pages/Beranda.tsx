@@ -249,7 +249,7 @@ export function Beranda() {
                 "Tolong fotoin Avanza A-10428 dari sisi kanan & dashboard ya"
               </div>
               <div className="rounded-xl bg-teal px-3 py-2.5 text-[12px] font-semibold text-ink">
-                Siap. Diteruskan ke tim cabang BSD — estimasi 20 menit.
+                Siap. Diteruskan ke tim cabang Pondok Bambu — estimasi 20 menit.
               </div>
             </div>
           </div>
