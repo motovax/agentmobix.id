@@ -68,7 +68,7 @@ export function Lokasi() {
         }
       />
 
-      <div className="h-[220px] w-full">
+      <div className="relative z-0 h-[220px] w-full">
         <MapContainer
           center={[-6.25, 106.85]}
           zoom={10}
