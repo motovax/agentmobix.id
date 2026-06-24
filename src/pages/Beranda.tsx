@@ -337,7 +337,7 @@ export function Beranda() {
         {/* FOOTER */}
         <footer className="px-3.5 pb-1 pt-[18px] text-center">
           <p className="m-0 mb-3.5 text-[12px] leading-[1.5] text-muted">
-            Hak Cipta © by PT Mobix Mobil Indonesia.
+            Hak Cipta © by PT Digital Sumber Sejahtera Motor.
             <br />
             Semua hak cipta dilindungi.
           </p>
