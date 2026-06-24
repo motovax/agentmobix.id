@@ -254,6 +254,19 @@ export function mobixImage(pathOrUrl: string | undefined, width?: number): strin
   return width ? `${url}&w=${width}` : url;
 }
 
+/**
+ * Image URL routed through the API proxy (CF Worker in prod, Vite proxy in dev).
+ * The proxy adds CORS headers, so fetch() can read the blob for navigator.share({ files }).
+ * mobixImage() goes to the CDN origin directly which works for <img> but blocks fetch().
+ */
+export function mobixImageFetchable(pathOrUrl: string | undefined): string | undefined {
+  if (!pathOrUrl) return undefined;
+  const path = /^https?:\/\//.test(pathOrUrl)
+    ? new URL(pathOrUrl).pathname + new URL(pathOrUrl).search
+    : pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
+  return `${PROXY}${path}`;
+}
+
 /* ---- agent-program derivations (not present in the catalog API) ---- */
 
 /**

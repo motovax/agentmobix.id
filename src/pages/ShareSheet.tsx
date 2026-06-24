@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { Photo, Skeleton } from "../components/ui";
@@ -7,11 +7,11 @@ import {
   WhatsAppSolid,
   InstagramSolid,
   FacebookSolid,
-  Marketplace,
+  TikTokSolid,
   Copy,
   Download,
 } from "../components/icons";
-import { fetchUnitDetail, mobixImage, titleCase } from "../lib/mobix";
+import { fetchUnitDetail, mobixImage, mobixImageFetchable, titleCase } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
 import { formatJt, formatRupiah } from "../lib/format";
 
@@ -21,6 +21,20 @@ export function ShareSheet() {
   const { data: unit, loading } = useAsync(() => fetchUnitDetail(slug), [slug]);
 
   const [copied, setCopied] = useState<"" | "caption" | "link">("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+
+  // Pre-fetch image blob so navigator.share({ files }) can be called synchronously
+  // from user gesture (browsers block share with files if called after await).
+  // Uses the CORS-enabled API proxy (not the CDN origin which has no CORS headers).
+  useEffect(() => {
+    if (!unit) return;
+    const src = mobixImageFetchable(unit.galeri?.[0]?.url);
+    if (!src) return;
+    fetch(src)
+      .then((r) => r.ok ? r.blob() : Promise.reject())
+      .then((blob) => setImageFile(new File([blob], "unit.jpg", { type: blob.type || "image/jpeg" })))
+      .catch(() => { /* proxy unavailable — share without image */ });
+  }, [unit]);
 
   const link = unit ? `mobix.id/u/${unit.plate_no}` : "mobix.id";
   const caption = unit
@@ -43,21 +57,43 @@ export function ShareSheet() {
     }
   }
 
-  function shareTo(channel: "wa" | "ig" | "fb" | "mp") {
+  function shareTo(channel: "wa" | "ig" | "fb" | "tt") {
     const text = `${caption}\nhttps://${link}`;
+    const pageUrl = `https://${link}`;
+    const canShareFiles = !!imageFile && !!navigator.canShare?.({ files: [imageFile] });
+    const shareData: ShareData = canShareFiles
+      ? { files: [imageFile!], text, url: pageUrl }
+      : { text, url: pageUrl };
+
     if (channel === "wa") {
-      window.open(
-        `https://wa.me/?text=${encodeURIComponent(text)}`,
-        "_blank",
-        "noopener",
-      );
+      if (canShareFiles && navigator.share) {
+        void navigator.share(shareData);
+      } else {
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+      }
       return;
     }
+
+    if (channel === "fb") {
+      if (canShareFiles && navigator.share) {
+        void navigator.share(shareData);
+      } else {
+        window.open(
+          `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}`,
+          "_blank",
+          "noopener",
+        );
+      }
+      return;
+    }
+
+    // ig, tt — native share sheet only (no universal URL scheme)
     if (navigator.share) {
-      void navigator.share({ title: unit?.nama, text, url: `https://${link}` });
+      void navigator.share(shareData);
       return;
     }
-    void copy("link", `https://${link}`);
+    // Desktop fallback: copy full caption + link so user can paste manually
+    void copy("caption", text);
   }
 
   const channels = [
@@ -69,12 +105,7 @@ export function ShareSheet() {
       icon: <InstagramSolid />,
     },
     { key: "fb" as const, label: "Facebook", cls: "bg-[#1877F2] text-surface", icon: <FacebookSolid /> },
-    {
-      key: "mp" as const,
-      label: "Marketplace",
-      cls: "border border-line bg-surface text-ink",
-      icon: <Marketplace />,
-    },
+    { key: "tt" as const, label: "TikTok", cls: "bg-[#010101] text-surface", icon: <TikTokSolid /> },
   ];
 
   const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
