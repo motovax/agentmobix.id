@@ -31,7 +31,10 @@ export interface HotDeal {
   slug: string;
   thumbnail?: StrapiMedia | null;
   deskripsi?: string | null;
-  konten?: string | null;
+  syarat_ketentuan?: string | null;
+  toggle_periode?: boolean;
+  periode_by_text?: string | null;
+  periode_by_date?: string | null;
 }
 
 /** Resolve a Strapi media object to a full URL. size "thumb" uses the small/thumbnail format. */

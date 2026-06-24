@@ -5,6 +5,9 @@ import { Skeleton } from "../components/ui";
 import { fetchHotDealDetail, cmsImageUrl } from "../lib/cms";
 import { useAsync } from "../lib/useAsync";
 
+const htmlCls =
+  "text-[14px] leading-[1.7] text-ink [&_p]:mt-3 [&_p:first-child]:mt-0 [&_ul]:mt-3 [&_ul]:pl-5 [&_ul]:list-disc [&_ol]:mt-3 [&_ol]:pl-5 [&_ol]:list-decimal [&_li]:mt-1 [&_strong]:font-semibold [&_a]:text-teal-deep [&_a]:underline";
+
 export function PromoDetail() {
   const [, params] = useRoute("/promo/:slug");
   const slug = params?.slug ?? "";
@@ -60,22 +63,41 @@ export function PromoDetail() {
               </div>
             )}
 
-            <div className="p-[18px]">
-              <h1 className="m-0 mb-2 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2] text-ink">
+            <div className="flex flex-col gap-4 p-[18px]">
+              <h1 className="m-0 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2] text-ink">
                 {data.judul}
               </h1>
 
-              {data.deskripsi && (
-                <p className="m-0 mb-4 text-[14px] leading-[1.6] text-muted">
-                  {data.deskripsi}
-                </p>
+              {/* Periode */}
+              {data.toggle_periode && (data.periode_by_text || data.periode_by_date) && (
+                <div className="flex items-center gap-2 rounded-[14px] bg-teal-tint px-3.5 py-2.5">
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" className="flex-shrink-0 text-teal-deep">
+                    <rect x="1" y="2.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.3" />
+                    <path d="M5 1v3M10 1v3M1 6h13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                  </svg>
+                  <span className="text-[12px] font-medium text-teal-deep">
+                    {data.periode_by_text ?? data.periode_by_date}
+                  </span>
+                </div>
               )}
 
-              {data.konten && (
+              {/* Deskripsi — HTML dari Strapi */}
+              {data.deskripsi && (
                 <div
-                  className="prose-sm prose-neutral max-w-none text-[14px] leading-[1.7] text-ink [&_h2]:mt-6 [&_h2]:text-[17px] [&_h2]:font-bold [&_img]:w-full [&_img]:rounded-[14px] [&_p]:mt-3 [&_ul]:mt-3 [&_ul]:pl-5"
-                  dangerouslySetInnerHTML={{ __html: data.konten }}
+                  className={htmlCls}
+                  dangerouslySetInnerHTML={{ __html: data.deskripsi }}
                 />
+              )}
+
+              {/* Syarat & Ketentuan */}
+              {data.syarat_ketentuan && (
+                <div className="rounded-[18px] border border-line bg-surface-2 p-[18px]">
+                  <div className="mb-2.5 text-[13px] font-bold text-ink">Syarat & Ketentuan</div>
+                  <div
+                    className={htmlCls}
+                    dangerouslySetInnerHTML={{ __html: data.syarat_ketentuan }}
+                  />
+                </div>
               )}
             </div>
           </>
