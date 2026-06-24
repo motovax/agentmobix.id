@@ -1,44 +1,97 @@
+import { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
 import { MapPin } from "../components/icons";
 import { fetchCabang, type CabangDetail } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
 
+function branchIcon(active: boolean) {
+  const fill = active ? "#0E1B1E" : "#1ECFCB";
+  return L.divIcon({
+    className: "",
+    html: `<svg width="24" height="32" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 8.25 12 20 12 20S24 20.25 24 12C24 5.373 18.627 0 12 0z" fill="${fill}"/>
+      <circle cx="12" cy="12" r="4.5" fill="white"/>
+    </svg>`,
+    iconSize: [24, 32],
+    iconAnchor: [12, 32],
+    popupAnchor: [0, -32],
+  });
+}
+
+function MapController({
+  branches,
+  selected,
+}: {
+  branches: CabangDetail[];
+  selected: string | null;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (branches.length === 0) return;
+    if (branches.length === 1) {
+      map.setView([branches[0].lat, branches[0].lng], 13);
+    } else {
+      const bounds = L.latLngBounds(
+        branches.map((b) => [b.lat, b.lng] as [number, number]),
+      );
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [branches.length]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const b = branches.find((b) => b.nama === selected);
+    if (b) map.flyTo([b.lat, b.lng], 15, { duration: 0.8 });
+  }, [selected]);
+
+  return null;
+}
+
 export function Lokasi() {
   const { data, loading, error } = useAsync(fetchCabang, []);
   const cabang = data ?? [];
+  const [selected, setSelected] = useState<string | null>(null);
 
   return (
     <AppShell>
       <AppBar
         title="Cabang Mobix"
         subtitle={
-          loading ? "Memuat cabang…" : `${cabang.length} cabang · stok bisa lintas cabang`
+          loading
+            ? "Memuat cabang…"
+            : `${cabang.length} cabang · stok bisa lintas cabang`
         }
       />
 
-      {/* faux map — replace with a real map SDK in production */}
-      <div className="relative h-[170px] overflow-hidden bg-gradient-to-br from-[#DCE7E6] to-[#C7D8D7]">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.5) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.5) 1px,transparent 1px)",
-            backgroundSize: "28px 28px",
-          }}
-        />
-        <div className="absolute left-[30%] top-[40%] -translate-x-1/2 -translate-y-full">
-          <svg width="28" height="28" viewBox="0 0 22 22" fill="none">
-            <path d="M11 21s-6-5-6-10a6 6 0 1 1 12 0c0 5-6 10-6 10z" fill="#0E1B1E" />
-            <circle cx="11" cy="9" r="2.4" fill="#1ECFCB" />
-          </svg>
-        </div>
-        <div className="absolute left-[62%] top-[58%] -translate-x-1/2 -translate-y-full">
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-            <path d="M11 21s-6-5-6-10a6 6 0 1 1 12 0c0 5-6 10-6 10z" fill="#0FA8A4" />
-            <circle cx="11" cy="9" r="2.2" fill="#FFFFFF" />
-          </svg>
-        </div>
+      <div className="h-[220px] w-full">
+        <MapContainer
+          center={[-6.25, 106.85]}
+          zoom={10}
+          style={{ height: "100%", width: "100%" }}
+          zoomControl={false}
+          scrollWheelZoom={false}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          {cabang.map((b) => (
+            <Marker
+              key={b.nama}
+              position={[b.lat, b.lng]}
+              icon={branchIcon(selected === b.nama)}
+              eventHandlers={{ click: () => setSelected(b.nama) }}
+            >
+              <Popup>{b.nama}</Popup>
+            </Marker>
+          ))}
+          <MapController branches={cabang} selected={selected} />
+        </MapContainer>
       </div>
 
       <main className="flex flex-col gap-2.5 p-3.5">
@@ -58,9 +111,23 @@ export function Lokasi() {
           cabang.map((b: CabangDetail) => (
             <div
               key={b.nama}
-              className="flex gap-3 rounded-2xl border border-line bg-surface p-3.5"
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelected(b.nama)}
+              onKeyDown={(e) => e.key === "Enter" && setSelected(b.nama)}
+              className={`flex cursor-pointer gap-3 rounded-2xl border p-3.5 transition-colors ${
+                selected === b.nama
+                  ? "border-teal-deep bg-teal-tint"
+                  : "border-line bg-surface active:bg-surface-2"
+              }`}
             >
-              <div className="flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-xl bg-teal-tint text-teal-deep">
+              <div
+                className={`flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-xl transition-colors ${
+                  selected === b.nama
+                    ? "bg-ink text-surface"
+                    : "bg-teal-tint text-teal-deep"
+                }`}
+              >
                 <MapPin />
               </div>
               <div className="flex-1">
@@ -77,7 +144,11 @@ export function Lokasi() {
                 </div>
                 <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold text-teal-deep">
                   {b.telepon && (
-                    <a href={`tel:${b.telepon}`} className="no-underline text-teal-deep">
+                    <a
+                      href={`tel:${b.telepon}`}
+                      className="no-underline text-teal-deep"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {b.telepon}
                     </a>
                   )}
