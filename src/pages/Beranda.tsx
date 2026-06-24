@@ -20,8 +20,8 @@ import { useAsync } from "../lib/useAsync";
 const WA_LINK = "https://wa.me/6285211000000";
 
 const STATS = [
-  { label: "Komisi/unit", value: "Rp 4–14jt" },
-  { label: "Stok ready", value: "187 unit" },
+  { label: "Komisi/unit", value: "Mulai dari 2jt" },
+  { label: "Stok ready", value: "185 unit" },
   { label: "Cair dalam", value: "3 hari" },
 ];
 
