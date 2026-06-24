@@ -106,8 +106,8 @@ export function Katalog() {
 
   return (
     <AppShell>
-      {/* sticky app bar + search + chips */}
-      <div className="sticky top-0 z-30 border-b border-line-2 bg-surface-2/90 px-3.5 pb-3 pt-1.5 backdrop-blur-md">
+      {/* fixed header: search + chips + stats */}
+      <div className="fixed left-1/2 top-0 z-[9999] w-full max-w-[412px] -translate-x-1/2 border-b border-line-2 bg-surface-2/90 px-3.5 pb-2 pt-1.5 backdrop-blur-md">
         <div className="mb-3 flex items-center gap-2.5">
           <Link
             href="/"
@@ -146,15 +146,16 @@ export function Katalog() {
             );
           })}
         </div>
-      </div>
-
-      <main className="flex flex-col gap-2.5 p-3.5">
-        <div className="flex items-center justify-between px-0.5">
+        <div className="mt-2 flex items-center justify-between px-0.5">
           <span className="text-[12px] text-muted">
             {total ? `${total} unit ready` : "Memuat stok…"} · langsung dari cabang
           </span>
           <span className="text-[12px] font-semibold text-teal-deep">Stok live</span>
         </div>
+      </div>
+      <div className="h-[130px]" aria-hidden />
+
+      <main className="flex flex-col gap-2.5 p-3.5">
 
         {loading &&
           Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)}
