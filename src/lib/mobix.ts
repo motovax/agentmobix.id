@@ -102,6 +102,8 @@ export interface ListRequest {
   harga_akhir?: number;
   ada_foto?: boolean;
   sort?: string[];
+  aging_awal?: number;
+  aging_akhir?: number;
   page?: number;
   limit?: number;
   plate_no?: string;
