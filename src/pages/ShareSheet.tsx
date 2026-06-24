@@ -4,10 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { Photo, Skeleton } from "../components/ui";
 import {
   Close,
-  WhatsAppSolid,
-  InstagramSolid,
-  FacebookSolid,
-  TikTokSolid,
+  ShareArrow,
   Copy,
   Download,
 } from "../components/icons";
@@ -57,7 +54,7 @@ export function ShareSheet() {
     }
   }
 
-  function shareTo(channel: "wa" | "ig" | "fb" | "tt") {
+  function handleShare() {
     const text = `${caption}\nhttps://${link}`;
     const pageUrl = `https://${link}`;
     const canShareFiles = !!imageFile && !!navigator.canShare?.({ files: [imageFile] });
@@ -65,48 +62,13 @@ export function ShareSheet() {
       ? { files: [imageFile!], text, url: pageUrl }
       : { text, url: pageUrl };
 
-    if (channel === "wa") {
-      if (canShareFiles && navigator.share) {
-        void navigator.share(shareData);
-      } else {
-        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
-      }
-      return;
-    }
-
-    if (channel === "fb") {
-      if (canShareFiles && navigator.share) {
-        void navigator.share(shareData);
-      } else {
-        window.open(
-          `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}`,
-          "_blank",
-          "noopener",
-        );
-      }
-      return;
-    }
-
-    // ig, tt — native share sheet only (no universal URL scheme)
     if (navigator.share) {
       void navigator.share(shareData);
       return;
     }
-    // Desktop fallback: copy full caption + link so user can paste manually
-    void copy("caption", text);
+    // Desktop fallback: open WA with caption
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
   }
-
-  const channels = [
-    { key: "wa" as const, label: "WhatsApp", cls: "bg-whatsapp text-surface", icon: <WhatsAppSolid /> },
-    {
-      key: "ig" as const,
-      label: "IG Story",
-      cls: "bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#8134AF] text-surface",
-      icon: <InstagramSolid />,
-    },
-    { key: "fb" as const, label: "Facebook", cls: "bg-[#1877F2] text-surface", icon: <FacebookSolid /> },
-    { key: "tt" as const, label: "TikTok", cls: "bg-[#010101] text-surface", icon: <TikTokSolid /> },
-  ];
 
   const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
 
@@ -189,22 +151,15 @@ export function ShareSheet() {
           )}
         </div>
 
-        {/* channels */}
-        <div className="mb-[18px] grid grid-cols-4 gap-3">
-          {channels.map((c) => (
-            <button
-              key={c.key}
-              onClick={() => shareTo(c.key)}
-              disabled={!unit}
-              className="flex flex-col items-center gap-[7px] disabled:opacity-50"
-            >
-              <div className={`flex h-14 w-14 items-center justify-center rounded-[18px] ${c.cls}`}>
-                {c.icon}
-              </div>
-              <span className="text-[11px] font-semibold text-mid">{c.label}</span>
-            </button>
-          ))}
-        </div>
+        {/* share button */}
+        <button
+          onClick={handleShare}
+          disabled={!unit}
+          className="mb-[18px] flex w-full items-center justify-center gap-2.5 rounded-[18px] bg-teal-deep py-4 text-[15px] font-bold text-surface disabled:opacity-50"
+        >
+          <ShareArrow size={18} />
+          Bagikan Sekarang
+        </button>
 
         {/* secondary actions */}
         <div className="flex flex-col gap-2">
