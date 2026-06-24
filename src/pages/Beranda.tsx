@@ -5,7 +5,6 @@ import { UnitCard } from "../components/UnitCard";
 import {
   Search,
   Moon,
-  WhatsApp,
   Chat,
   Instagram,
   Facebook,
@@ -16,8 +15,6 @@ import { SkeletonCard } from "../components/ui";
 import { TESTIMONIALS } from "../data/catalog";
 import { fetchUnits, toCardUnit } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
-
-const WA_LINK = "https://wa.me/6285211000000";
 
 const STATS = [
   { label: "Komisi/unit", value: "Mulai dari 2jt" },
@@ -290,25 +287,6 @@ export function Beranda() {
               </article>
             ))}
           </div>
-        </section>
-
-        {/* BUTUH INFORMASI / WA CTA */}
-        <section className="rounded-[22px] border border-line bg-surface px-[18px] py-5 text-center">
-          <h2 className="m-0 mb-3.5 text-[18px] font-extrabold text-ink">
-            Butuh informasi lebih lanjut?
-          </h2>
-          <a
-            href={WA_LINK}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center justify-center gap-2 rounded-[14px] bg-whatsapp-cta px-3.5 py-3.5 text-[15px] font-bold text-surface no-underline shadow-wa"
-          >
-            <WhatsApp />
-            Hubungi Kami
-          </a>
-          <p className="m-0 mt-3 text-[12px] leading-[1.5] text-muted">
-            Tim Mobix siap menjawab via WhatsApp setiap hari, 08.00–20.00 WIB.
-          </p>
         </section>
 
         {/* PENAWARAN / PROMO */}
