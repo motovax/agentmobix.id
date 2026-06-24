@@ -5,7 +5,9 @@
 
 const PROXY_BASE = import.meta.env.VITE_MOBIX_PROXY ?? "";
 const CMS = PROXY_BASE ? `${PROXY_BASE}/api/cms` : "/api/cms";
-const CMS_IMG_BASE = "https://api.mobixbydss.id";
+// In prod, images are routed through CF Worker (/cms-img) for edge caching.
+// In dev, fetched directly from the CMS origin (img tags have no CORS restriction).
+const CMS_IMG_BASE = PROXY_BASE ? `${PROXY_BASE}/cms-img` : "https://api.mobixbydss.id";
 
 interface StrapiMediaFormat {
   url: string;

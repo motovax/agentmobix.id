@@ -43,6 +43,21 @@ export default {
     }
 
     const url = new URL(request.url);
+
+    // CMS image proxy — no auth, cached at CF edge for 24 h.
+    if (url.pathname.startsWith("/cms-img/")) {
+      const imgPath = url.pathname.slice("/cms-img".length); // "/uploads/..."
+      const target = CMS_BASE + imgPath + url.search;
+      const upstream = await fetch(target, {
+        cf: { cacheEverything: true, cacheTtl: 86400 },
+      });
+      const respHeaders = new Headers(corsHeaders(origin));
+      const ct = upstream.headers.get("Content-Type");
+      if (ct) respHeaders.set("Content-Type", ct);
+      respHeaders.set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+      return new Response(upstream.body, { status: upstream.status, headers: respHeaders });
+    }
+
     const isCms = url.pathname.startsWith("/api/cms/");
 
     if (isCms) {
