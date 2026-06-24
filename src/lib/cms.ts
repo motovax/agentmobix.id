@@ -5,21 +5,51 @@
 
 const PROXY_BASE = import.meta.env.VITE_MOBIX_PROXY ?? "";
 const CMS = PROXY_BASE ? `${PROXY_BASE}/api/cms` : "/api/cms";
+const CMS_IMG_BASE = "https://api.mobixbydss.id";
+
+interface StrapiMediaFormat {
+  url: string;
+  width: number;
+  height: number;
+}
+
+export interface StrapiMedia {
+  url: string;
+  formats?: {
+    thumbnail?: StrapiMediaFormat;
+    small?: StrapiMediaFormat;
+    medium?: StrapiMediaFormat;
+    large?: StrapiMediaFormat;
+  };
+}
 
 export interface HotDeal {
   id: number | string;
   judul: string;
   slug: string;
-  thumbnail?: string | null;
+  thumbnail?: StrapiMedia | null;
   deskripsi?: string | null;
   konten?: string | null;
 }
 
-interface CmsEnvelope<T> {
-  status: string;
+/** Resolve a Strapi media object to a full URL. size "thumb" uses the small/thumbnail format. */
+export function cmsImageUrl(
+  media: StrapiMedia | null | undefined,
+  size: "thumb" | "full" = "thumb",
+): string | undefined {
+  if (!media) return undefined;
+  const path =
+    size === "full"
+      ? (media.formats?.large?.url ?? media.url)
+      : (media.formats?.small?.url ?? media.formats?.thumbnail?.url ?? media.url);
+  if (!path) return undefined;
+  return /^https?:\/\//.test(path) ? path : `${CMS_IMG_BASE}${path}`;
+}
+
+interface StrapiEnvelope<T> {
   data: T;
-  error?: string;
-  message?: string;
+  meta?: unknown;
+  error?: unknown;
 }
 
 async function postCms<T>(path: string, body: unknown): Promise<T> {
@@ -32,8 +62,8 @@ async function postCms<T>(path: string, body: unknown): Promise<T> {
     const text = await res.text().catch(() => "");
     throw new Error(`CMS ${res.status}: ${text.slice(0, 140)}`);
   }
-  const json = (await res.json()) as CmsEnvelope<T>;
-  if (json.status === "failure") throw new Error(json.error || json.message || "CMS error");
+  const json = (await res.json()) as StrapiEnvelope<T>;
+  if (json.error) throw new Error("CMS error");
   return json.data;
 }
 

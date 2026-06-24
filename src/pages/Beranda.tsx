@@ -14,7 +14,7 @@ import {
 import { SkeletonCard, Skeleton } from "../components/ui";
 import { TESTIMONIALS } from "../data/catalog";
 import { fetchUnits, toCardUnit } from "../lib/mobix";
-import { fetchHotDeals, type HotDeal } from "../lib/cms";
+import { fetchHotDeals, cmsImageUrl, type HotDeal } from "../lib/cms";
 import { useAsync } from "../lib/useAsync";
 
 const STATS = [
@@ -71,15 +71,16 @@ const STEPS = [
 ];
 
 function PromoRow({ item }: { item: HotDeal }) {
+  const imgSrc = cmsImageUrl(item.thumbnail, "thumb");
   return (
     <Link
       href={`/promo/${item.slug}`}
-      className="flex items-center gap-3.5 text-inherit no-underline"
+      className="flex items-start gap-3.5 text-inherit no-underline"
     >
       <div className="relative h-20 w-[104px] flex-shrink-0 overflow-hidden rounded-[14px] bg-gradient-to-br from-teal-soft to-[#5AA8A6]">
-        {item.thumbnail && (
+        {imgSrc && (
           <img
-            src={item.thumbnail}
+            src={imgSrc}
             alt={item.judul}
             loading="lazy"
             className="absolute inset-0 h-full w-full object-cover"
@@ -89,8 +90,8 @@ function PromoRow({ item }: { item: HotDeal }) {
           />
         )}
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[14px] font-semibold leading-[1.35] text-ink line-clamp-2">
+      <div className="flex-1 min-w-0 pt-0.5">
+        <div className="text-[14px] font-semibold leading-[1.35] text-ink line-clamp-3">
           {item.judul}
         </div>
         {item.deskripsi && (

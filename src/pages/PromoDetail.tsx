@@ -2,7 +2,7 @@ import { useRoute } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
 import { Skeleton } from "../components/ui";
-import { fetchHotDealDetail } from "../lib/cms";
+import { fetchHotDealDetail, cmsImageUrl } from "../lib/cms";
 import { useAsync } from "../lib/useAsync";
 
 export function PromoDetail() {
@@ -46,10 +46,10 @@ export function PromoDetail() {
 
         {!loading && data && (
           <>
-            {data.thumbnail && (
+            {cmsImageUrl(data.thumbnail, "full") && (
               <div className="overflow-hidden bg-surface-2">
                 <img
-                  src={data.thumbnail}
+                  src={cmsImageUrl(data.thumbnail, "full")}
                   alt={data.judul}
                   loading="lazy"
                   className="w-full object-cover"
