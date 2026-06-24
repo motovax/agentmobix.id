@@ -307,6 +307,6 @@ export function toCardUnit(item: ProductListItem): CardUnit {
     km: item.odometer,
     badge: deriveBadge(item),
     thumbnail: mobixImage(item.thumbnail),
-    komisiLabel: (item.aging ?? 0) > 60 ? "+2jt" : "Mulai dari 2jt",
+    komisiLabel: (item.aging ?? 0) > 60 ? "+Rp 2 juta" : "Mulai dari 2jt",
   };
 }
