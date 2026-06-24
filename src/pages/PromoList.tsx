@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
-import { Skeleton } from "../components/ui";
+import { Skeleton, ShimmerImg } from "../components/ui";
 import { fetchHotDeals, cmsImageUrl, type HotDeal } from "../lib/cms";
 import { useAsync } from "../lib/useAsync";
 
@@ -16,17 +16,11 @@ function PromoCard({ item }: { item: HotDeal }) {
       className="flex items-start gap-3.5 rounded-[18px] border border-line bg-surface p-3 text-inherit no-underline"
     >
       <div className="relative h-20 w-[104px] flex-shrink-0 overflow-hidden rounded-[14px] bg-gradient-to-br from-teal-soft to-[#5AA8A6]">
-        {imgSrc && (
-          <img
-            src={imgSrc}
-            alt={item.judul}
-            loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
-            }}
-          />
-        )}
+        <ShimmerImg
+          src={imgSrc}
+          alt={item.judul}
+          imgClassName="absolute inset-0 h-full w-full object-cover"
+        />
       </div>
       <div className="flex-1 min-w-0 pt-0.5">
         <div className="text-[14px] font-semibold leading-[1.35] text-ink line-clamp-3">

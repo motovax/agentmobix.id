@@ -1,7 +1,7 @@
 import { useRoute } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
-import { Skeleton } from "../components/ui";
+import { Skeleton, ShimmerImg } from "../components/ui";
 import { fetchHotDealDetail, cmsImageUrl } from "../lib/cms";
 import { useAsync } from "../lib/useAsync";
 
@@ -50,16 +50,12 @@ export function PromoDetail() {
         {!loading && data && (
           <>
             {cmsImageUrl(data.thumbnail, "full") && (
-              <div className="overflow-hidden bg-surface-2">
-                <img
+              <div className="relative aspect-[1366/500] overflow-hidden bg-[#DDE2E4]">
+                <ShimmerImg
                   src={cmsImageUrl(data.thumbnail, "full")}
                   alt={data.judul}
                   loading="eager"
-                  decoding="async"
-                  className="w-full object-cover"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.display = "none";
-                  }}
+                  imgClassName="absolute inset-0 h-full w-full object-cover"
                 />
               </div>
             )}

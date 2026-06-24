@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
 import type { UnitBadge } from "../lib/mobix";
 
@@ -42,6 +43,48 @@ export function Photo({
 /** Shimmer skeleton block. */
 export function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded-xl bg-[#E6EAEC] ${className}`} />;
+}
+
+/**
+ * Image with shimmer sweep animation while loading, fades in when ready.
+ * Parent must be `relative overflow-hidden` with a fallback background color.
+ */
+export function ShimmerImg({
+  src,
+  alt,
+  imgClassName = "",
+  loading = "lazy",
+}: {
+  src?: string;
+  alt?: string;
+  imgClassName?: string;
+  loading?: "lazy" | "eager";
+}) {
+  const [loaded, setLoaded] = useState(false);
+
+  return (
+    <>
+      {!loaded && (
+        <div className="absolute inset-0 overflow-hidden bg-[#DDE2E4]">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent animate-shimmer" />
+        </div>
+      )}
+      {src && (
+        <img
+          src={src}
+          alt={alt}
+          loading={loading}
+          decoding="async"
+          className={`transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"} ${imgClassName}`}
+          onLoad={() => setLoaded(true)}
+          onError={(e) => {
+            setLoaded(true);
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+      )}
+    </>
+  );
 }
 
 /** Loading placeholder shaped like a catalog list row. */

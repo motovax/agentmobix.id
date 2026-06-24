@@ -45,6 +45,15 @@ export default {
         "hatch-lg":
           "repeating-linear-gradient(135deg,#EEF2F3 0 8px,#E0E7E9 8px 16px)",
       },
+      keyframes: {
+        shimmer: {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(100%)" },
+        },
+      },
+      animation: {
+        shimmer: "shimmer 1.6s ease-in-out infinite",
+      },
     },
   },
   plugins: [],
