@@ -54,7 +54,8 @@ export function PromoDetail() {
                 <img
                   src={cmsImageUrl(data.thumbnail, "full")}
                   alt={data.judul}
-                  loading="lazy"
+                  loading="eager"
+                  decoding="async"
                   className="w-full object-cover"
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).style.display = "none";

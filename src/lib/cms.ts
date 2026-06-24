@@ -37,7 +37,11 @@ export interface HotDeal {
   periode_by_date?: string | null;
 }
 
-/** Resolve a Strapi media object to a full URL. size "thumb" uses the small/thumbnail format. */
+/**
+ * Resolve a Strapi media object to a full URL.
+ * - "thumb": thumbnail format (245px, ~40KB) — for card-sized displays
+ * - "full":  medium format (750px, ~250KB) — sufficient for mobile hero
+ */
 export function cmsImageUrl(
   media: StrapiMedia | null | undefined,
   size: "thumb" | "full" = "thumb",
@@ -45,8 +49,8 @@ export function cmsImageUrl(
   if (!media) return undefined;
   const path =
     size === "full"
-      ? (media.formats?.large?.url ?? media.url)
-      : (media.formats?.small?.url ?? media.formats?.thumbnail?.url ?? media.url);
+      ? (media.formats?.medium?.url ?? media.formats?.large?.url ?? media.url)
+      : (media.formats?.thumbnail?.url ?? media.formats?.small?.url ?? media.url);
   if (!path) return undefined;
   return /^https?:\/\//.test(path) ? path : `${CMS_IMG_BASE}${path}`;
 }
