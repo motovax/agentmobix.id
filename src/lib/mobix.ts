@@ -186,12 +186,25 @@ async function get<T>(path: string): Promise<ApiEnvelope<T>> {
   return json;
 }
 
+export interface CabangDetail {
+  nama: string;
+  alamat: string;
+  lat: number;
+  lng: number;
+  telepon: string;
+  pic: string;
+  stok_ready: number;
+}
+
 /** Live filter values (GET endpoints, see /docs). */
 export async function fetchCategories(): Promise<string[]> {
   return (await get<string[]>("/daftar-kategori")).data ?? [];
 }
 export async function fetchBrands(): Promise<string[]> {
   return (await get<string[]>("/daftar-merek")).data ?? [];
+}
+export async function fetchCabang(): Promise<CabangDetail[]> {
+  return (await get<CabangDetail[]>("/daftar-cabang")).data ?? [];
 }
 
 const CATEGORY_ACRONYMS = new Set(["MPV", "SUV", "LCGC"]);
