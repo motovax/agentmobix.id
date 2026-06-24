@@ -4,7 +4,6 @@ import {
   NavHotDeals,
   NavHome,
   NavLokasi,
-  NavContact,
 } from "./icons";
 import type { ComponentType } from "react";
 
@@ -15,20 +14,17 @@ type NavItem = {
   key: string;
 };
 
-const WA_ADMIN = `https://wa.me/6285701959826?text=${encodeURIComponent("Halo Admin, mau tanya-tanya soal program agen Mobix dulu boleh? 🙏")}`;
-
 const ITEMS: NavItem[] = [
+  { href: "/", label: "Beranda", Icon: NavHome, key: "beranda" },
   { href: "/katalog", label: "Produk", Icon: NavProduk, key: "produk" },
   { href: "/hot-deals", label: "Hot Deals", Icon: NavHotDeals, key: "hot" },
-  { href: "/", label: "Beranda", Icon: NavHome, key: "beranda" },
   { href: "/lokasi", label: "Lokasi", Icon: NavLokasi, key: "lokasi" },
-  { href: WA_ADMIN, label: "Contact", Icon: NavContact, key: "contact" },
 ];
 
 /** Floating sticky bottom tab bar (only shown on Beranda, per the design). */
 export function BottomNav({ active }: { active: string }) {
   return (
-    <nav className="fixed bottom-9 left-1/2 z-30 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-5 gap-1 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
+    <nav className="fixed bottom-9 left-1/2 z-30 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-4 gap-1 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
       {ITEMS.map(({ href, label, Icon, key }) => {
         const isActive = key === active;
         const className = [
