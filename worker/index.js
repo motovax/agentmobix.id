@@ -14,6 +14,7 @@
 // like https://api.agentmobix.id).
 
 const API_BASE = "https://mobix.motovax.com";
+const CMS_BASE = "https://api.mobixbydss.id";
 
 const ALLOWED_ORIGINS = [
   "https://agenmobix.id",
@@ -41,6 +42,33 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
+    const url = new URL(request.url);
+    const isCms = url.pathname.startsWith("/api/cms/");
+
+    if (isCms) {
+      if (!env.STRAPI_API_KEY) {
+        return new Response(
+          JSON.stringify({ status: "failure", error: "Proxy misconfigured: STRAPI_API_KEY not set" }),
+          { status: 500, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } },
+        );
+      }
+      const cmsPath = "/api/" + url.pathname.slice("/api/cms/".length);
+      const target = CMS_BASE + cmsPath + url.search;
+      const headers = new Headers();
+      const contentType = request.headers.get("Content-Type");
+      if (contentType) headers.set("Content-Type", contentType);
+      headers.set("Authorization", `Bearer ${env.STRAPI_API_KEY}`);
+      const init = { method: request.method, headers };
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        init.body = await request.arrayBuffer();
+      }
+      const upstream = await fetch(target, init);
+      const respHeaders = new Headers(corsHeaders(origin));
+      const rct = upstream.headers.get("Content-Type");
+      if (rct) respHeaders.set("Content-Type", rct);
+      return new Response(upstream.body, { status: upstream.status, headers: respHeaders });
+    }
+
     if (!env.MOBIX_API_KEY) {
       return new Response(
         JSON.stringify({ status: "failure", error: "Proxy misconfigured: MOBIX_API_KEY not set" }),
@@ -48,7 +76,6 @@ export default {
       );
     }
 
-    const url = new URL(request.url);
     const target = API_BASE + url.pathname + url.search;
 
     const headers = new Headers();

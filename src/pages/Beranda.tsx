@@ -11,9 +11,10 @@ import {
   YouTube,
   TikTok,
 } from "../components/icons";
-import { SkeletonCard } from "../components/ui";
+import { SkeletonCard, Skeleton } from "../components/ui";
 import { TESTIMONIALS } from "../data/catalog";
 import { fetchUnits, toCardUnit } from "../lib/mobix";
+import { fetchHotDeals, type HotDeal } from "../lib/cms";
 import { useAsync } from "../lib/useAsync";
 
 const STATS = [
@@ -69,11 +70,43 @@ const STEPS = [
   },
 ];
 
+function PromoRow({ item }: { item: HotDeal }) {
+  return (
+    <Link
+      href={`/promo/${item.slug}`}
+      className="flex items-center gap-3.5 text-inherit no-underline"
+    >
+      <div className="relative h-20 w-[104px] flex-shrink-0 overflow-hidden rounded-[14px] bg-gradient-to-br from-teal-soft to-[#5AA8A6]">
+        {item.thumbnail && (
+          <img
+            src={item.thumbnail}
+            alt={item.judul}
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[14px] font-semibold leading-[1.35] text-ink line-clamp-2">
+          {item.judul}
+        </div>
+        {item.deskripsi && (
+          <div className="mt-1 text-[11px] text-muted line-clamp-2">{item.deskripsi}</div>
+        )}
+      </div>
+    </Link>
+  );
+}
+
 export function Beranda() {
   const featured = useAsync(
     () => fetchUnits({ limit: 8 }).then((r) => r.items.map(toCardUnit)),
     [],
   );
+  const promos = useAsync(() => fetchHotDeals(), []);
 
   return (
     <AppShell>
@@ -291,46 +324,40 @@ export function Beranda() {
 
         {/* PENAWARAN / PROMO */}
         <section className="rounded-[22px] border border-line bg-surface p-[18px]">
-          <h2 className="m-0 mb-3.5 -tracking-[0.01em] text-[18px] font-extrabold text-ink">
-            Penawaran atau promo lainnya
-          </h2>
+          <div className="mb-3.5 flex items-center justify-between gap-2.5">
+            <h2 className="m-0 -tracking-[0.01em] text-[18px] font-extrabold text-ink">
+              Penawaran atau promo lainnya
+            </h2>
+            {(promos.data?.length ?? 0) > 3 && (
+              <Link
+                href="/promo"
+                className="whitespace-nowrap text-[13px] font-bold text-teal-deep no-underline"
+              >
+                Lihat semua
+              </Link>
+            )}
+          </div>
           <div className="flex flex-col gap-3.5">
-            <Link href="/hot-deals" className="flex items-center gap-3.5 text-inherit no-underline">
-              <div className="relative h-20 w-[104px] flex-shrink-0 overflow-hidden rounded-[14px] bg-gradient-to-br from-teal-soft to-[#5AA8A6]">
-                <div className="absolute inset-2 flex flex-col justify-between rounded-lg bg-white/15 px-[7px] py-[5px]">
-                  <div className="text-[8px] font-extrabold tracking-[0.02em] text-surface">
-                    GARANSI
+            {promos.loading &&
+              Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3.5">
+                  <Skeleton className="h-20 w-[104px] flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3.5 w-3/4" />
+                    <Skeleton className="h-2.5 w-full" />
                   </div>
-                  <div className="text-[7px] font-semibold text-surface">3 TAHUN</div>
                 </div>
+              ))}
+            {!promos.loading && promos.error && (
+              <div className="py-4 text-center text-[12px] text-muted">
+                Gagal memuat promo.
               </div>
-              <div className="flex-1">
-                <div className="text-[14px] font-semibold leading-[1.35] text-ink">
-                  Garansi hingga 3 tahun untuk setiap unit yang kamu jual
-                </div>
-                <div className="mt-1 text-[11px] text-muted">
-                  Selling point tambahan ke calon pembeli kamu.
-                </div>
-              </div>
-            </Link>
-            <Link href="/hot-deals" className="flex items-center gap-3.5 text-inherit no-underline">
-              <div className="relative h-20 w-[104px] flex-shrink-0 overflow-hidden rounded-[14px] bg-gradient-to-br from-ink to-[#2A3F44]">
-                <div className="absolute inset-2 flex flex-col justify-between rounded-lg border border-[#FFD162]/35 bg-[#FFD162]/[0.18] px-[7px] py-[5px]">
-                  <div className="text-[8px] font-extrabold tracking-[0.02em] text-[#FFD162]">
-                    PAKET SERVIS
-                  </div>
-                  <div className="text-[14px] font-extrabold text-surface">21%</div>
-                </div>
-              </div>
-              <div className="flex-1">
-                <div className="text-[14px] font-semibold leading-[1.35] text-ink">
-                  Extended Smart Package — paket servis resmi diskon 21%
-                </div>
-                <div className="mt-1 text-[11px] text-muted">
-                  Tambahan komisi untuk agen yang bundle paket ini.
-                </div>
-              </div>
-            </Link>
+            )}
+            {!promos.loading &&
+              !promos.error &&
+              (promos.data ?? []).slice(0, 3).map((item) => (
+                <PromoRow key={item.slug} item={item} />
+              ))}
           </div>
         </section>
 

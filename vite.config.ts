@@ -9,6 +9,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiBase = env.MOBIX_API_BASE || "https://mobix.motovax.com";
   const token = env.MOBIX_API_KEY || "";
+  const cmsBase = env.CMS_API_BASE || "https://api.mobixbydss.id";
+  const strapiToken = env.STRAPI_API_KEY || "";
 
   return {
     plugins: [react()],
@@ -30,6 +32,13 @@ export default defineConfig(({ mode }) => {
         "/unit-file-serve": {
           target: apiBase,
           changeOrigin: true,
+        },
+        // Strapi CMS API — proxied to inject token server-side.
+        "/api/cms": {
+          target: cmsBase,
+          changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/api\/cms/, "/api"),
+          headers: strapiToken ? { Authorization: `Bearer ${strapiToken}` } : undefined,
         },
       },
     },

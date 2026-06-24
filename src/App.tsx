@@ -7,6 +7,8 @@ import { AiMobix } from "./pages/AiMobix";
 import { HotDeals } from "./pages/HotDeals";
 import { Lokasi } from "./pages/Lokasi";
 import { ShareSheet } from "./pages/ShareSheet";
+import { PromoList } from "./pages/PromoList";
+import { PromoDetail } from "./pages/PromoDetail";
 
 export default function App() {
   return (
@@ -17,6 +19,8 @@ export default function App() {
       <Route path="/daftar" component={DaftarAgen} />
       <Route path="/ai" component={AiMobix} />
       <Route path="/hot-deals" component={HotDeals} />
+      <Route path="/promo" component={PromoList} />
+      <Route path="/promo/:slug" component={PromoDetail} />
       <Route path="/lokasi" component={Lokasi} />
       <Route path="/share" component={ShareSheet} />
       <Route component={Beranda} />
