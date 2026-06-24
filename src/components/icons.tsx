@@ -262,6 +262,22 @@ export function TikTokSolid({ size = 26, className }: IconProps) {
   );
 }
 
+export function Telegram({ size = 22, className }: IconProps) {
+  return (
+    <svg {...base(size)} viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M21.2 4.3 2.8 11.5c-1.3.5-1.3 1.2-.2 1.6l4.6 1.4 10.7-6.7c.5-.3 1-.1.6.2L8.3 16v2.9l2.5-2.4 4.9 3.7c.9.5 1.6.2 1.8-.8L21.9 5.7c.3-1.2-.4-1.7-1-1.4z" />
+    </svg>
+  );
+}
+
+export function XTwitter({ size = 22, className }: IconProps) {
+  return (
+    <svg {...base(size)} viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
 /* ---- bottom nav icons ---- */
 
 export function NavProduk({ size = 22, className, strokeWidth = 1.5 }: IconProps) {
