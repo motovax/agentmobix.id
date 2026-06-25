@@ -248,15 +248,14 @@ export function ShareSheet() {
   }
 
   function handleShare() {
-    const pageUrl = `https://${link}`;
     if (navigator.share) {
       const canFiles =
         composedFiles.length > 0 &&
         !!navigator.canShare?.({ files: composedFiles });
       void navigator.share(
         canFiles
-          ? { files: composedFiles, text: captionText, url: pageUrl }
-          : { text: captionText, url: pageUrl },
+          ? { files: composedFiles, text: captionText }
+          : { text: captionText },
       );
       return;
     }
@@ -264,12 +263,11 @@ export function ShareSheet() {
   }
 
   function shareVia(channel: "wa" | "tg" | "x") {
+    const encoded = encodeURIComponent(captionText);
     const urls: Record<string, string> = {
-      wa: `https://wa.me/?text=${encodeURIComponent(captionText)}`,
-      tg: `https://t.me/share/url?url=${encodeURIComponent(
-        `https://${link}`,
-      )}&text=${encodeURIComponent(captionText)}`,
-      x: `https://x.com/intent/tweet?text=${encodeURIComponent(captionText)}`,
+      wa: `https://wa.me/?text=${encoded}`,
+      tg: `https://t.me/share/url?url=${encoded}`,
+      x: `https://x.com/intent/tweet?text=${encoded}`,
     };
     window.open(urls[channel], "_blank", "noopener");
     setShowChannels(false);
