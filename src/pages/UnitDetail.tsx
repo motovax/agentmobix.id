@@ -180,8 +180,8 @@ export function UnitDetail() {
               {price ? formatRupiah(price) : "Hubungi kami"}
             </div>
             <div className="text-right">
-              <div className="text-[10px] text-muted">Komisi kamu</div>
-              <div className="text-[16px] font-extrabold text-teal-deep">
+              <div className="text-[10px] text-muted">Komisi</div>
+              <div className="text-[12px] font-bold text-teal-deep">
                 {formatRpJt(komisi)}
               </div>
             </div>
@@ -310,28 +310,17 @@ export function UnitDetail() {
           </div>
         )}
 
-        {/* PIC */}
+        {/* TANYA AI MOBIX */}
         <div className="px-[18px] pb-4">
-          <div className="flex items-center gap-3 rounded-2xl bg-field p-3.5">
-            <div className="flex h-[42px] w-[42px] items-center justify-center rounded-full bg-gradient-to-br from-teal to-teal-deep text-[13px] font-extrabold text-ink">
-              {(titleCase(unit.lokasi || "MB").slice(0, 2)).toUpperCase()}
-            </div>
-            <div className="flex-1">
-              <div className="text-[13px] font-bold">
-                Tim Cabang {titleCase(unit.lokasi || "Mobix")}
-              </div>
-              <div className="text-[11px] text-muted">
-                Pegang unit ini · biasanya balas cepat
-              </div>
-            </div>
-            <Link
-              href="/ai"
-              aria-label="Chat PIC"
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-ink text-surface no-underline"
-            >
-              <Chat />
-            </Link>
-          </div>
+          <a
+            href={`https://wa.me/6285701959826?text=${encodeURIComponent(`Halo AI Mobix! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3.5 text-[14px] font-bold text-white no-underline shadow-[0_6px_24px_rgba(37,211,102,0.35)]"
+          >
+            <Chat size={18} className="text-white" />
+            Tanya ke AI Mobix
+          </a>
         </div>
 
         {/* UNIT SEJENIS */}
