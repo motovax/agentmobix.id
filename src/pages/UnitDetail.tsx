@@ -8,13 +8,12 @@ import { ChevronLeft, ShareArrow, Chat, Check, Close } from "../components/icons
 import {
   fetchUnitDetail,
   mobixImage,
-  estimateKomisi,
   titleCase,
   toCardUnit,
   deriveBadge,
 } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
-import { formatRupiah, formatRpJt, formatOdometer } from "../lib/format";
+import { formatRupiah, formatOdometer } from "../lib/format";
 import {
   TENOR_OPTIONS,
   downPayment,
@@ -86,7 +85,6 @@ export function UnitDetail() {
 
   const gallery = unit.galeri ?? [];
   const heroSrc = mobixImage(gallery[activeThumb]?.url, 800);
-  const komisi = estimateKomisi(price);
   const badge = deriveBadge({ odometer: unit.odometer, harga: price });
   const thumbCount = Math.min(4, gallery.length);
 
@@ -182,7 +180,7 @@ export function UnitDetail() {
             <div className="text-right">
               <div className="text-[10px] text-muted">Komisi</div>
               <div className="text-[12px] font-bold text-teal-deep">
-                {formatRpJt(komisi)}
+                {(unit.aging ?? 0) > 60 ? "+Rp 2 juta" : "Mulai dari 2jt"}
               </div>
             </div>
           </div>
