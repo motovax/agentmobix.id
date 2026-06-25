@@ -127,6 +127,7 @@ export function ShareSheet() {
   const { data: unit, loading } = useAsync(() => fetchUnitDetail(slug), [slug]);
 
   const [copied, setCopied] = useState<"" | "caption" | "link">("");
+  const [captionText, setCaptionText] = useState("");
   const [showChannels, setShowChannels] = useState(false);
 
   // multi-select gallery
@@ -153,6 +154,9 @@ export function ShareSheet() {
     setPriceInput(new Intl.NumberFormat("id-ID").format(unit.harga));
     setSelectedIdxes([0]);
     setPreviewIdx(0);
+    setCaptionText(
+      `${unit.nama} tangan pertama, KM ${Math.round(unit.odometer / 1000)}rb. Cukup TDP ${formatJt(unit.tdp)}, cicilan ${formatJt(unit.cicilan)}/bln. Unit ready di cabang ${titleCase(unit.lokasi || "Mobix")}, bisa cek langsung. Chat saya ya 🙌`,
+    );
   }, [unit?.id]);
 
   // fetch raw blobs (cached) + compose overlay whenever selection or price changes
@@ -223,7 +227,7 @@ export function ShareSheet() {
   }
 
   const link = unit ? `mobix.id/u/${unit.plate_no}` : "mobix.id";
-  const caption = unit
+  const autoCaption = unit
     ? `${unit.nama} tangan pertama, KM ${Math.round(
         unit.odometer / 1000,
       )}rb. Cukup TDP ${formatJt(unit.tdp)}, cicilan ${formatJt(
@@ -244,17 +248,15 @@ export function ShareSheet() {
   }
 
   function handleShare() {
-    const text = `${caption}\nhttps://${link}`;
     const pageUrl = `https://${link}`;
-
     if (navigator.share) {
       const canFiles =
         composedFiles.length > 0 &&
         !!navigator.canShare?.({ files: composedFiles });
       void navigator.share(
         canFiles
-          ? { files: composedFiles, text, url: pageUrl }
-          : { text, url: pageUrl },
+          ? { files: composedFiles, text: captionText, url: pageUrl }
+          : { text: captionText, url: pageUrl },
       );
       return;
     }
@@ -262,13 +264,12 @@ export function ShareSheet() {
   }
 
   function shareVia(channel: "wa" | "tg" | "x") {
-    const text = `${caption}\nhttps://${link}`;
     const urls: Record<string, string> = {
-      wa: `https://wa.me/?text=${encodeURIComponent(text)}`,
+      wa: `https://wa.me/?text=${encodeURIComponent(captionText)}`,
       tg: `https://t.me/share/url?url=${encodeURIComponent(
         `https://${link}`,
-      )}&text=${encodeURIComponent(caption)}`,
-      x: `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`,
+      )}&text=${encodeURIComponent(captionText)}`,
+      x: `https://x.com/intent/tweet?text=${encodeURIComponent(captionText)}`,
     };
     window.open(urls[channel], "_blank", "noopener");
     setShowChannels(false);
@@ -382,19 +383,29 @@ export function ShareSheet() {
           </div>
         )}
 
-        {/* caption preview */}
+        {/* caption – editable */}
         <div className="mb-[18px] rounded-[14px] border border-line bg-surface px-3.5 py-3">
           <div className="mb-1.5 flex items-center justify-between">
             <span className="text-[11px] font-bold text-muted">
-              Caption otomatis dari AI Mobix
+              Caption (bisa diedit)
             </span>
-            <button
-              onClick={() => copy("caption", caption)}
-              disabled={!unit}
-              className="text-[11px] font-bold text-teal-deep disabled:opacity-40"
-            >
-              {copied === "caption" ? "Tersalin ✓" : "Salin"}
-            </button>
+            <div className="flex items-center gap-2.5">
+              {unit && captionText !== autoCaption && (
+                <button
+                  onClick={() => setCaptionText(autoCaption)}
+                  className="text-[11px] font-semibold text-muted underline"
+                >
+                  Reset
+                </button>
+              )}
+              <button
+                onClick={() => copy("caption", captionText)}
+                disabled={!unit}
+                className="text-[11px] font-bold text-teal-deep disabled:opacity-40"
+              >
+                {copied === "caption" ? "Tersalin ✓" : "Salin"}
+              </button>
+            </div>
           </div>
           {loading || !unit ? (
             <div className="space-y-2">
@@ -402,7 +413,12 @@ export function ShareSheet() {
               <Skeleton className="h-3 w-2/3" />
             </div>
           ) : (
-            <p className="m-0 text-[12px] leading-[1.55] text-mid">{caption}</p>
+            <textarea
+              value={captionText}
+              onChange={(e) => setCaptionText(e.target.value)}
+              rows={4}
+              className="w-full resize-none bg-transparent text-[12px] leading-[1.55] text-mid outline-none"
+            />
           )}
         </div>
 
@@ -534,19 +550,6 @@ export function ShareSheet() {
 
         {/* secondary actions */}
         <div className="flex flex-col gap-2">
-          <button
-            onClick={() => copy("link", `https://${link}`)}
-            disabled={!unit}
-            className="flex items-center gap-3 rounded-[14px] border border-line bg-surface p-3.5 text-ink disabled:opacity-50"
-          >
-            <Copy className="text-ink" />
-            <span className="flex-1 text-left text-[14px] font-semibold">
-              Salin link unit
-            </span>
-            <span className="text-[12px] text-muted">
-              {copied === "link" ? "Tersalin ✓" : link}
-            </span>
-          </button>
           <button
             onClick={handleDownload}
             disabled={!unit || composedFiles.length === 0}
