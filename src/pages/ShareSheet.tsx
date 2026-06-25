@@ -75,14 +75,14 @@ async function composeOverlay(
 
   // price pill
   const text = `Rp ${formatJt(dealHarga)} · TDP ${formatJt(unit.tdp)}`;
-  const fs = 28;
+  const fs = 44;
   ctx.font = `bold ${fs}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
   const tw = ctx.measureText(text).width;
-  const px = 20,
-    py = 12;
-  const bx = 24,
+  const px = 28,
+    py = 16;
+  const bx = 28,
     bh = fs + py * 2,
-    by = H - 24 - bh;
+    by = H - 28 - bh;
   ctx.fillStyle = "rgba(0,0,0,0.85)";
   roundRectPath(ctx, bx, by, tw + px * 2, bh, 10);
   ctx.fill();
@@ -310,7 +310,7 @@ export function ShareSheet() {
         <div className="mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
           <Photo large className="aspect-video" src={activeUrl} alt={unit?.nama}>
             {unit && (
-              <div className="absolute bottom-3 left-3 rounded-lg bg-ink/85 px-2.5 py-[5px] text-[12px] font-bold text-surface">
+              <div className="absolute bottom-3 left-3 rounded-lg bg-ink/85 px-3 py-1.5 text-[15px] font-bold text-surface">
                 Rp {formatJt(dealHarga || unit.harga)} · TDP {formatJt(unit.tdp)}
               </div>
             )}
