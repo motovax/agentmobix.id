@@ -3,7 +3,6 @@ import type { CardUnit } from "../lib/mobix";
 import { formatJt } from "../lib/format";
 import { Photo, Badge } from "./ui";
 import { ShareArrow } from "./icons";
-import { useDsfSim } from "../lib/dsf";
 
 /**
  * Horizontal-scroller unit card (Beranda "siap kamu share"). Dual target: the
@@ -11,11 +10,6 @@ import { useDsfSim } from "../lib/dsf";
  * also triggering card navigation.
  */
 export function UnitCard({ unit }: { unit: CardUnit }) {
-  const sim = useDsfSim(unit.price, unit.title, unit.year);
-
-  const tdp = sim?.totalDownPaymentRounded ?? unit.tdp;
-  const cicilan = sim?.installmentRounded ?? unit.cicilan;
-
   return (
     <article className="relative flex-[0_0_200px] snap-start overflow-hidden rounded-2xl border border-line bg-surface-3">
       {/* full-card overlay link → detail */}
@@ -44,7 +38,7 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
           )}
         </div>
         <div className="mt-0.5 text-[11px] text-muted">
-          TDP {formatJt(tdp)} · {formatJt(cicilan)}/bln
+          TDP {formatJt(unit.tdp)} · {formatJt(unit.cicilan)}/bln
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
           {unit.posisi !== unit.branch && (
