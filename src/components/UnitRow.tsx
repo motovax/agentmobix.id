@@ -2,9 +2,15 @@ import { Link } from "wouter";
 import type { CardUnit } from "../lib/mobix";
 import { formatJt, formatKm } from "../lib/format";
 import { Photo, ThumbBadge } from "./ui";
+import { useDsfSim } from "../lib/dsf";
 
 /** Catalog list row — whole row links to the unit detail. */
 export function UnitRow({ unit }: { unit: CardUnit }) {
+  const sim = useDsfSim(unit.price, unit.title, unit.year);
+
+  const tdp = sim?.totalDownPaymentRounded ?? unit.tdp;
+  const cicilan = sim?.installmentRounded ?? unit.cicilan;
+
   return (
     <Link
       href={`/unit/${unit.slug}`}
@@ -39,7 +45,7 @@ export function UnitRow({ unit }: { unit: CardUnit }) {
           )}
         </div>
         <div className="mt-px text-[11px] text-muted">
-          TDP {formatJt(unit.tdp)} · {formatJt(unit.cicilan)}/bln · {formatKm(unit.km)}
+          TDP {formatJt(tdp)} · {formatJt(cicilan)}/bln · {formatKm(unit.km)}
         </div>
         <div className="mt-1.5">
           <div className="text-[10px] text-muted">Komisi</div>

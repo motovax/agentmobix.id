@@ -312,6 +312,7 @@ export interface CardUnit {
   cicilan: number;
   komisi: number;
   km: number;
+  year: number;
   badge: UnitBadge;
   thumbnail: string | undefined;
   komisiLabel: string;
@@ -331,6 +332,7 @@ export function toCardUnit(item: ProductListItem): CardUnit {
     cicilan: item.cicilan,
     komisi: estimateKomisi(item.harga),
     km: item.odometer,
+    year: item.year,
     badge: deriveBadge(item),
     thumbnail: mobixImage(item.thumbnail),
     komisiLabel: (item.aging ?? 0) > 60 ? "+Rp 2 juta" : "Mulai dari 2jt",

@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 const PROXY = import.meta.env.VITE_MOBIX_PROXY ?? "";
 
 export interface DsfSimResult {
@@ -76,4 +78,26 @@ export async function simulateKredit(params: DsfSimParams): Promise<DsfSimResult
   } catch {
     return null;
   }
+}
+
+/** Hook untuk list view (UnitCard, UnitRow) — fixed DP 15%, tenor 60 bln. */
+export function useDsfSim(price: number, title: string, year?: number) {
+  const [result, setResult] = useState<DsfSimResult | null>(null);
+
+  useEffect(() => {
+    if (!price) return;
+    let alive = true;
+    const parts = title.split(" ");
+    simulateKredit({
+      unitPrice: price,
+      dpPercent: 15,
+      tenor: 60,
+      brand: parts[0],
+      model: parts[1],
+      year,
+    }).then((r) => { if (alive) setResult(r); });
+    return () => { alive = false; };
+  }, [price, title, year]);
+
+  return result;
 }
