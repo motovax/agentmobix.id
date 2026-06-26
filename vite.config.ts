@@ -11,6 +11,8 @@ export default defineConfig(({ mode }) => {
   const token = env.MOBIX_API_KEY || "";
   const cmsBase = env.CMS_API_BASE || "https://api.mobixbydss.id";
   const strapiToken = env.STRAPI_API_KEY || "";
+  const dsfBase = env.DSF_BASE_URL || "https://simulation.dipostar.com";
+  const dsfToken = env.DSF_BEARER_TOKEN || "";
 
   return {
     plugins: [react()],
@@ -39,6 +41,13 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/api\/cms/, "/api"),
           headers: strapiToken ? { Authorization: `Bearer ${strapiToken}` } : undefined,
+        },
+        // DSF credit simulation — proxied to inject DSF token server-side.
+        "/api/dsf": {
+          target: dsfBase,
+          changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/api\/dsf/, ""),
+          headers: dsfToken ? { Authorization: `Bearer ${dsfToken}` } : undefined,
         },
       },
     },

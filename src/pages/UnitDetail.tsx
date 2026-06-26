@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
@@ -20,6 +20,7 @@ import {
   monthlyInstallment,
   type Tenor,
 } from "../lib/installment";
+import { simulateKredit, type DsfSimResult } from "../lib/dsf";
 
 export function UnitDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -32,13 +33,36 @@ export function UnitDetail() {
   const [tenor, setTenor] = useState<Tenor>(60);
   const [activeThumb, setActiveThumb] = useState(0);
   const [showAllThumbs, setShowAllThumbs] = useState(false);
+  const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
+  const [simLoading, setSimLoading] = useState(false);
+  const simTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const price = unit?.harga ?? 0;
   const dp = downPayment(price, dpPercent);
-  const monthly = useMemo(
-    () => monthlyInstallment(price, dpPercent, tenor),
-    [price, dpPercent, tenor],
-  );
+  const localMonthly = monthlyInstallment(price, dpPercent, tenor);
+
+  const displayMonthly = simResult?.TotalRoundedInstallment ?? localMonthly;
+  const displayTdp = simResult?.TotalRoundedDownPayment ?? null;
+
+  useEffect(() => {
+    if (!price) return;
+    clearTimeout(simTimer.current);
+    setSimLoading(true);
+    const nameParts = (unit?.nama ?? "").split(" ");
+    simTimer.current = setTimeout(async () => {
+      const result = await simulateKredit({
+        unitPrice: price,
+        dpPercent,
+        tenor,
+        brand: nameParts[0],
+        model: nameParts[1],
+        year: unit?.year,
+      });
+      setSimResult(result);
+      setSimLoading(false);
+    }, 600);
+    return () => clearTimeout(simTimer.current);
+  }, [price, dpPercent, tenor]);
 
   if (loading) {
     return (
@@ -249,14 +273,24 @@ export function UnitDetail() {
               </div>
             </div>
 
-            <div className="rounded-[14px] bg-ink p-4 text-surface">
+            <div className={`rounded-[14px] bg-ink p-4 text-surface transition-opacity ${simLoading ? "opacity-60" : ""}`}>
               <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
                 CICILAN PER BULAN
               </div>
               <div className="mt-0.5 -tracking-[0.02em] text-[26px] font-extrabold">
-                {formatRupiah(monthly)}
+                {formatRupiah(displayMonthly)}
               </div>
-              <div className="mt-0.5 text-[11px] text-[#A4D7D7]">
+              {displayTdp !== null && (
+                <div className="mt-2.5 flex items-center justify-between border-t border-white/10 pt-2.5">
+                  <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
+                    HASIL SIMULASI
+                  </div>
+                  <div className="text-[13px] font-extrabold">
+                    {formatRupiah(displayTdp)}
+                  </div>
+                </div>
+              )}
+              <div className="mt-2 text-[11px] text-[#A4D7D7]">
                 {tenor} bulan · asuransi TLO · sudah termasuk admin
               </div>
             </div>

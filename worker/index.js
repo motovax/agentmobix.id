@@ -15,6 +15,7 @@
 
 const API_BASE = "https://mobix.motovax.com";
 const CMS_BASE = "https://api.mobixbydss.id";
+const DSF_BASE = "https://simulation.dipostar.com";
 
 const ALLOWED_ORIGINS = [
   "https://agenmobix.id",
@@ -43,6 +44,31 @@ export default {
     }
 
     const url = new URL(request.url);
+
+    // DSF credit simulation proxy — injects DSF bearer token server-side.
+    if (url.pathname.startsWith("/api/dsf/")) {
+      if (!env.DSF_BEARER_TOKEN) {
+        return new Response(
+          JSON.stringify({ status: false, error: "Proxy misconfigured: DSF_BEARER_TOKEN not set" }),
+          { status: 500, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } },
+        );
+      }
+      const dsfPath = url.pathname.slice("/api/dsf".length);
+      const target = DSF_BASE + dsfPath + url.search;
+      const dsfHeaders = new Headers();
+      const dsfCt = request.headers.get("Content-Type");
+      if (dsfCt) dsfHeaders.set("Content-Type", dsfCt);
+      dsfHeaders.set("Authorization", `Bearer ${env.DSF_BEARER_TOKEN}`);
+      const dsfInit = { method: request.method, headers: dsfHeaders };
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        dsfInit.body = await request.arrayBuffer();
+      }
+      const dsfUpstream = await fetch(target, dsfInit);
+      const dsfResp = new Headers(corsHeaders(origin));
+      const dsfRct = dsfUpstream.headers.get("Content-Type");
+      if (dsfRct) dsfResp.set("Content-Type", dsfRct);
+      return new Response(dsfUpstream.body, { status: dsfUpstream.status, headers: dsfResp });
+    }
 
     // CMS image proxy — no auth, cached at CF edge for 24 h.
     if (url.pathname.startsWith("/cms-img/")) {
