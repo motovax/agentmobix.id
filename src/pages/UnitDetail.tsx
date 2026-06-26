@@ -276,7 +276,7 @@ export function UnitDetail() {
 
             <div className={`rounded-[14px] bg-ink p-4 text-surface transition-opacity ${simLoading ? "opacity-60" : ""}`}>
               <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
-                CICILAN PER BULAN
+                HASIL SIMULASI
               </div>
               <div className="mt-0.5 -tracking-[0.02em] text-[26px] font-extrabold">
                 {formatRupiah(displayMonthly)}
@@ -286,7 +286,7 @@ export function UnitDetail() {
                   {displayTdp !== null && (
                     <div className="flex items-center justify-between">
                       <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
-                        HASIL SIMULASI
+                        TOTAL BAYAR PERTAMA
                       </div>
                       <div className="text-[13px] font-extrabold">
                         {formatRupiah(displayTdp)}
