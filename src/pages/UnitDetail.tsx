@@ -35,7 +35,7 @@ export function UnitDetail() {
   const [showAllThumbs, setShowAllThumbs] = useState(false);
   const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
   const [simLoading, setSimLoading] = useState(false);
-  const simTimer = useRef<ReturnType<typeof setTimeout>>();
+  const simTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const price = unit?.harga ?? 0;
   const dp = downPayment(price, dpPercent);
