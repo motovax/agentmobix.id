@@ -3,6 +3,7 @@ const PROXY = import.meta.env.VITE_MOBIX_PROXY ?? "";
 export interface DsfSimResult {
   installmentRounded: number;
   totalDownPaymentRounded: number;
+  downPaymentRounded: number;
   downPayment: number;
   percentDownPayment: number;
   totalLoan: number;
@@ -63,6 +64,7 @@ export async function simulateKredit(params: DsfSimParams): Promise<DsfSimResult
     return {
       installmentRounded: d.installmentRounded,
       totalDownPaymentRounded: d.totalDownPaymentRounded,
+      downPaymentRounded: d.downPaymentRounded,
       downPayment: d.downPayment,
       percentDownPayment: d.percentDownPayment,
       totalLoan: d.totalLoan,

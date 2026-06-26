@@ -38,9 +38,10 @@ export function UnitDetail() {
   const simTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const price = unit?.harga ?? 0;
-  const dp = downPayment(price, dpPercent);
+  const localDp = downPayment(price, dpPercent);
   const localMonthly = monthlyInstallment(price, dpPercent, tenor);
 
+  const displayDp = simResult?.downPaymentRounded ?? localDp;
   const displayMonthly = simResult?.installmentRounded ?? localMonthly;
   const displayTdp = simResult?.totalDownPaymentRounded ?? null;
 
@@ -237,7 +238,7 @@ export function UnitDetail() {
             <div className="mb-3.5">
               <div className="mb-2 flex justify-between text-[12px] font-semibold text-mid">
                 <span>Uang muka · {dpPercent}%</span>
-                <span className="font-extrabold text-ink">{formatRupiah(dp)}</span>
+                <span className="font-extrabold text-ink">{formatRupiah(displayDp)}</span>
               </div>
               <input
                 type="range"
