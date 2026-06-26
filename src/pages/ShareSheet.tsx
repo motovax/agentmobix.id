@@ -58,6 +58,7 @@ async function composeOverlay(
   rawBlob: Blob,
   unit: ProductDetail,
   dealHarga: number,
+  includeOverlay = true,
 ): Promise<File> {
   const bitmap = await createImageBitmap(rawBlob);
   const W = 1280,
@@ -73,22 +74,24 @@ async function composeOverlay(
     sh = bitmap.height * scale;
   ctx.drawImage(bitmap, (W - sw) / 2, (H - sh) / 2, sw, sh);
 
-  // price pill
-  const text = `Rp ${formatJt(dealHarga)} · TDP ${formatJt(unit.tdp)}`;
-  const fs = 44;
-  ctx.font = `bold ${fs}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
-  const tw = ctx.measureText(text).width;
-  const px = 28,
-    py = 16;
-  const bx = 28,
-    bh = fs + py * 2,
-    by = H - 28 - bh;
-  ctx.fillStyle = "rgba(0,0,0,0.85)";
-  roundRectPath(ctx, bx, by, tw + px * 2, bh, 10);
-  ctx.fill();
-  ctx.fillStyle = "#ffffff";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, bx + px, by + bh / 2);
+  // price pill (only when includeOverlay is true)
+  if (includeOverlay) {
+    const text = `Rp ${formatJt(dealHarga)} · TDP ${formatJt(unit.tdp)}`;
+    const fs = 44;
+    ctx.font = `bold ${fs}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
+    const tw = ctx.measureText(text).width;
+    const px = 28,
+      py = 16;
+    const bx = 28,
+      bh = fs + py * 2,
+      by = H - 28 - bh;
+    ctx.fillStyle = "rgba(0,0,0,0.85)";
+    roundRectPath(ctx, bx, by, tw + px * 2, bh, 10);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, bx + px, by + bh / 2);
+  }
 
   // mobix logo – white tint (top-right)
   try {
@@ -138,9 +141,13 @@ export function ShareSheet() {
   const [dealHarga, setDealHarga] = useState(0);
   const [priceInput, setPriceInput] = useState("");
 
-  // canvas-composed share files
+  // canvas-composed files (with overlay — for preview & download)
   const [composedFiles, setComposedFiles] = useState<File[]>([]);
   const [composing, setComposing] = useState(false);
+
+  // canvas-composed files without overlay — for social media share
+  const [shareFiles, setShareFiles] = useState<File[]>([]);
+  const [shareComposing, setShareComposing] = useState(false);
 
   const blobCache = useRef<Map<string, Blob>>(new Map());
 
@@ -208,6 +215,55 @@ export function ShareSheet() {
     };
   }, [unit, selectedIdxes.join(","), dealHarga]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // compose share files WITHOUT price pill overlay — for social media
+  useEffect(() => {
+    if (!unit || !gallery.length) return;
+    const u = unit;
+    let alive = true;
+    setShareComposing(true);
+
+    const selectedGallery = selectedIdxes
+      .map((i) => gallery[i])
+      .filter(Boolean);
+
+    async function run() {
+      const blobs = await Promise.all(
+        selectedGallery.map(async (g) => {
+          if (blobCache.current.has(g.url)) return blobCache.current.get(g.url)!;
+          const src = mobixImageFetchable(g.url);
+          if (!src) return null;
+          try {
+            const r = await fetch(src);
+            const blob = r.ok ? await r.blob() : null;
+            if (blob) blobCache.current.set(g.url, blob);
+            return blob;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      const valid = blobs.filter(Boolean) as Blob[];
+      if (!valid.length || !alive) return;
+
+      const files = await Promise.all(
+        valid.map((blob) => composeOverlay(blob, u, dealHarga, false)),
+      );
+      if (alive) {
+        setShareFiles(files);
+        setShareComposing(false);
+      }
+    }
+
+    run().catch(() => {
+      if (alive) setShareComposing(false);
+    });
+
+    return () => {
+      alive = false;
+    };
+  }, [unit, selectedIdxes.join(","), dealHarga]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleGalleryTap(i: number) {
     setPreviewIdx(i);
     setSelectedIdxes((prev) => {
@@ -248,15 +304,15 @@ export function ShareSheet() {
   }
 
   function handleShare() {
-    if (navigator.share) {
-      const canFiles =
-        composedFiles.length > 0 &&
-        !!navigator.canShare?.({ files: composedFiles });
-      void navigator.share(
-        canFiles
-          ? { files: composedFiles, text: captionText }
-          : { text: captionText },
-      );
+    const filesToShare = shareFiles.length > 0 ? shareFiles : composedFiles;
+    const canShareFiles =
+      filesToShare.length > 0 && !!navigator.canShare?.({ files: filesToShare });
+
+    if (navigator.share && canShareFiles) {
+      void navigator.share({
+        files: filesToShare,
+        text: captionText,
+      });
       return;
     }
     setShowChannels((v) => !v);
@@ -377,6 +433,9 @@ export function ShareSheet() {
                   </button>
                 );
               })}
+            </div>
+            <div className="mt-1.5 text-[11px] text-muted">
+              (klik foto-foto untuk share foto lebih dari 1)
             </div>
           </div>
         )}
@@ -527,10 +586,10 @@ export function ShareSheet() {
           )}
           <button
             onClick={handleShare}
-            disabled={!unit || composing}
+            disabled={!unit || composing || shareComposing}
             className="flex w-full items-center justify-center gap-2.5 rounded-[18px] bg-teal-deep py-4 text-[15px] font-bold text-surface disabled:opacity-50"
           >
-            {composing ? (
+            {(composing || shareComposing) ? (
               <span className="text-[13px] opacity-80">Menyiapkan gambar…</span>
             ) : (
               <>
