@@ -281,14 +281,28 @@ export function UnitDetail() {
               <div className="mt-0.5 -tracking-[0.02em] text-[26px] font-extrabold">
                 {formatRupiah(displayMonthly)}
               </div>
-              {displayTdp !== null && (
-                <div className="mt-2.5 flex items-center justify-between border-t border-white/10 pt-2.5">
-                  <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
-                    HASIL SIMULASI
-                  </div>
-                  <div className="text-[13px] font-extrabold">
-                    {formatRupiah(displayTdp)}
-                  </div>
+              {(displayTdp !== null || simResult?.adminFee != null) && (
+                <div className="mt-2.5 space-y-1.5 border-t border-white/10 pt-2.5">
+                  {displayTdp !== null && (
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
+                        HASIL SIMULASI
+                      </div>
+                      <div className="text-[13px] font-extrabold">
+                        {formatRupiah(displayTdp)}
+                      </div>
+                    </div>
+                  )}
+                  {simResult?.adminFee != null && (
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
+                        BIAYA ADMIN
+                      </div>
+                      <div className="text-[13px] font-extrabold">
+                        {formatRupiah(simResult.adminFee)}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               <div className="mt-2 text-[11px] text-[#A4D7D7]">
