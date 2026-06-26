@@ -33,6 +33,7 @@ export function UnitDetail() {
   const [tenor, setTenor] = useState<Tenor>(60);
   const [activeThumb, setActiveThumb] = useState(0);
   const [showAllThumbs, setShowAllThumbs] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
   const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
   const [simLoading, setSimLoading] = useState(false);
   const simTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -131,6 +132,12 @@ export function UnitDetail() {
         {/* GALLERY */}
         <div className="relative">
           <Photo large className="aspect-[4/3]" src={heroSrc} alt={unit.nama} />
+          {/* transparent tap zone behind all overlays */}
+          <button
+            className="absolute inset-0 cursor-zoom-in"
+            aria-label="Lihat foto penuh"
+            onClick={() => setLightbox(true)}
+          />
           <Link
             href="/katalog"
             aria-label="Kembali"
@@ -154,6 +161,28 @@ export function UnitDetail() {
             </div>
           )}
         </div>
+
+        {/* LIGHTBOX */}
+        {lightbox && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/95"
+            onClick={() => setLightbox(false)}
+          >
+            <button
+              className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white"
+              aria-label="Tutup"
+              onClick={(e) => { e.stopPropagation(); setLightbox(false); }}
+            >
+              <Close size={16} />
+            </button>
+            <img
+              src={heroSrc}
+              alt={unit.nama}
+              className="max-h-screen max-w-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
 
         {/* THUMB STRIP */}
         {gallery.length > 1 && (
