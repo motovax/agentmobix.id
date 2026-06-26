@@ -28,7 +28,7 @@ export function UnitDetail() {
     [slug],
   );
 
-  const [dpPercent, setDpPercent] = useState(20);
+  const [dpPercent, setDpPercent] = useState(15);
   const [tenor, setTenor] = useState<Tenor>(60);
   const [activeThumb, setActiveThumb] = useState(0);
   const [showAllThumbs, setShowAllThumbs] = useState(false);
@@ -203,7 +203,7 @@ export function UnitDetail() {
           <div className="rounded-[18px] border border-line bg-surface p-4">
             <div className="mb-3.5 flex items-center justify-between">
               <div className="-tracking-[0.01em] text-[15px] font-extrabold">
-                Hitung paket cicilan
+                Simulasi Hitung Kredit
               </div>
               <span className="rounded-[7px] bg-teal-tint px-2 py-[3px] text-[11px] font-bold text-teal-deep">
                 Bisa di-share
@@ -217,8 +217,8 @@ export function UnitDetail() {
               </div>
               <input
                 type="range"
-                min={10}
-                max={50}
+                min={15}
+                max={60}
                 step={1}
                 value={dpPercent}
                 onChange={(e) => setDpPercent(Number(e.target.value))}
@@ -257,7 +257,7 @@ export function UnitDetail() {
                 {formatRupiah(monthly)}
               </div>
               <div className="mt-0.5 text-[11px] text-[#A4D7D7]">
-                {tenor} bulan · asuransi all-risk · sudah termasuk admin
+                {tenor} bulan · asuransi TLO · sudah termasuk admin
               </div>
             </div>
             <p className="m-0 mt-2 text-[11px] text-muted">
