@@ -59,6 +59,7 @@ async function composeOverlay(
   unit: ProductDetail,
   dealHarga: number,
   includeOverlay = true,
+  crop: "cover" | "contain" = "cover",
 ): Promise<File> {
   const bitmap = await createImageBitmap(rawBlob);
   const W = 1280,
@@ -68,11 +69,19 @@ async function composeOverlay(
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
 
-  // cover crop — fill full canvas
-  const scale = Math.max(W / bitmap.width, H / bitmap.height);
-  const sw = bitmap.width * scale,
-    sh = bitmap.height * scale;
-  ctx.drawImage(bitmap, (W - sw) / 2, (H - sh) / 2, sw, sh);
+  if (crop === "cover") {
+    // cover crop — fill full canvas
+    const scale = Math.max(W / bitmap.width, H / bitmap.height);
+    const sw = bitmap.width * scale,
+      sh = bitmap.height * scale;
+    ctx.drawImage(bitmap, (W - sw) / 2, (H - sh) / 2, sw, sh);
+  } else {
+    // contain — show full image, letterbox if needed
+    const scale = Math.min(W / bitmap.width, H / bitmap.height);
+    const sw = bitmap.width * scale,
+      sh = bitmap.height * scale;
+    ctx.drawImage(bitmap, (W - sw) / 2, (H - sh) / 2, sw, sh);
+  }
 
   // price pill (only when includeOverlay is true)
   if (includeOverlay) {
@@ -247,7 +256,7 @@ export function ShareSheet() {
       if (!valid.length || !alive) return;
 
       const files = await Promise.all(
-        valid.map((blob) => composeOverlay(blob, u, dealHarga, false)),
+        valid.map((blob) => composeOverlay(blob, u, dealHarga, false, "contain")),
       );
       if (alive) {
         setShareFiles(files);
