@@ -1,10 +1,15 @@
 const PROXY = import.meta.env.VITE_MOBIX_PROXY ?? "";
 
 export interface DsfSimResult {
-  TotalRoundedDownPayment: number;
-  TotalRoundedInstallment: number;
-  DownPaymentPercentage: number;
-  TotalLoan: number;
+  installmentRounded: number;
+  totalDownPaymentRounded: number;
+  downPayment: number;
+  percentDownPayment: number;
+  totalLoan: number;
+  rate: string;
+  rateEffectiveTwoDigitPercent: string;
+  adminFee: number;
+  disclaimer: string[];
 }
 
 export interface DsfSimParams {
@@ -46,7 +51,7 @@ export async function simulateKredit(params: DsfSimParams): Promise<DsfSimResult
   };
 
   try {
-    const res = await fetch(`${PROXY}/api/dsf/api/calculator/tenor`, {
+    const res = await fetch(`${PROXY}/api/dsf/api/calculator/tenor/allparams`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -56,10 +61,15 @@ export async function simulateKredit(params: DsfSimParams): Promise<DsfSimResult
     if (!json.status || !json.data) return null;
     const d = json.data;
     return {
-      TotalRoundedDownPayment: d.TotalRoundedDownPayment,
-      TotalRoundedInstallment: d.TotalRoundedInstallment,
-      DownPaymentPercentage: d.DownPaymentPercentage,
-      TotalLoan: d.TotalLoan,
+      installmentRounded: d.installmentRounded,
+      totalDownPaymentRounded: d.totalDownPaymentRounded,
+      downPayment: d.downPayment,
+      percentDownPayment: d.percentDownPayment,
+      totalLoan: d.totalLoan,
+      rate: d.rateTwoDigitPercent,
+      rateEffectiveTwoDigitPercent: d.rateEffectiveTwoDigitPercent,
+      adminFee: d.adminFee,
+      disclaimer: d.disclaimer ?? [],
     };
   } catch {
     return null;

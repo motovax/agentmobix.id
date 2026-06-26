@@ -41,8 +41,8 @@ export function UnitDetail() {
   const dp = downPayment(price, dpPercent);
   const localMonthly = monthlyInstallment(price, dpPercent, tenor);
 
-  const displayMonthly = simResult?.TotalRoundedInstallment ?? localMonthly;
-  const displayTdp = simResult?.TotalRoundedDownPayment ?? null;
+  const displayMonthly = simResult?.installmentRounded ?? localMonthly;
+  const displayTdp = simResult?.totalDownPaymentRounded ?? null;
 
   useEffect(() => {
     if (!price) return;
