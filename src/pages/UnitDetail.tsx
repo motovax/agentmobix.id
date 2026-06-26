@@ -129,7 +129,7 @@ export function UnitDetail() {
       <main className="min-h-screen overflow-y-auto sm:min-h-0">
         {/* GALLERY */}
         <div className="relative">
-          <Photo large className="aspect-[4/3]" src={heroSrc} alt={unit.nama} contain />
+          <Photo large className="aspect-[4/3]" src={heroSrc} alt={unit.nama} />
           <Link
             href="/katalog"
             aria-label="Kembali"
