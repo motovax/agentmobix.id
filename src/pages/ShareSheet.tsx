@@ -67,10 +67,20 @@ async function composeOverlay(
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
 
-  // cover crop
-  const scale = Math.max(W / bitmap.width, H / bitmap.height);
-  const sw = bitmap.width * scale,
-    sh = bitmap.height * scale;
+  // blurred backdrop (cover scale) so letterbox bars are never plain/empty
+  const coverScale = Math.max(W / bitmap.width, H / bitmap.height);
+  const csw = bitmap.width * coverScale,
+    csh = bitmap.height * coverScale;
+  ctx.filter = "blur(24px)";
+  ctx.drawImage(bitmap, (W - csw) / 2, (H - csh) / 2, csw, csh);
+  ctx.filter = "none";
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.fillRect(0, 0, W, H);
+
+  // contain fit — full image, no cropping
+  const containScale = Math.min(W / bitmap.width, H / bitmap.height);
+  const sw = bitmap.width * containScale,
+    sh = bitmap.height * containScale;
   ctx.drawImage(bitmap, (W - sw) / 2, (H - sh) / 2, sw, sh);
 
   // price pill
@@ -285,7 +295,7 @@ export function ShareSheet() {
   }
 
   const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
-  const activeUrl = mobixImage(activeImg?.url);
+  const activeUrl = mobixImage(activeImg?.url, 1280);
   const komisi = unit ? komisiDeal(dealHarga, unit.harga) : 0;
 
   return (
@@ -308,7 +318,7 @@ export function ShareSheet() {
 
         {/* shareable preview */}
         <div className="mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
-          <Photo large className="aspect-video" src={activeUrl} alt={unit?.nama}>
+          <Photo large className="aspect-video" src={activeUrl} alt={unit?.nama} contain>
             {unit && (
               <div className="absolute bottom-3 left-3 rounded-lg bg-ink/85 px-3 py-1.5 text-[15px] font-bold text-surface">
                 Rp {formatJt(dealHarga || unit.harga)} · TDP {formatJt(unit.tdp)}

@@ -108,7 +108,7 @@ export function UnitDetail() {
   }
 
   const gallery = unit.galeri ?? [];
-  const heroSrc = mobixImage(gallery[activeThumb]?.url, 800);
+  const heroSrc = mobixImage(gallery[activeThumb]?.url, 1600);
   const badge = deriveBadge({ odometer: unit.odometer, harga: price });
   const thumbCount = Math.min(4, gallery.length);
 
@@ -129,7 +129,7 @@ export function UnitDetail() {
       <main className="min-h-screen overflow-y-auto sm:min-h-0">
         {/* GALLERY */}
         <div className="relative">
-          <Photo large className="aspect-[4/3]" src={heroSrc} alt={unit.nama} />
+          <Photo large className="aspect-[4/3]" src={heroSrc} alt={unit.nama} contain />
           <Link
             href="/katalog"
             aria-label="Kembali"

@@ -13,12 +13,14 @@ export function Photo({
   src,
   alt,
   children,
+  contain = false,
 }: {
   className?: string;
   large?: boolean;
   src?: string;
   alt?: string;
   children?: ReactNode;
+  contain?: boolean;
 }) {
   return (
     <div
@@ -29,7 +31,7 @@ export function Photo({
           src={src}
           alt={alt}
           loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover"
+          className={`absolute inset-0 h-full w-full ${contain ? "object-contain" : "object-cover"}`}
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
