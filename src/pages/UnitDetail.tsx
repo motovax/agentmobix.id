@@ -355,7 +355,8 @@ export function UnitDetail() {
             </div>
             <div className="flex flex-col gap-2">
               {docs.map(([k, v]) => {
-                const ada = /ada/i.test(v) && !/tidak/i.test(v);
+                const isBpkb = k === "BPKB";
+                const ada = isBpkb ? true : (/\b(ada|tersedia)\b/i.test(v) && !/^(tidak|belum)\b/i.test(v));
                 return (
                   <div
                     key={k}
@@ -369,7 +370,9 @@ export function UnitDetail() {
                       {ada ? <Check size={11} /> : <Close size={10} />}
                     </span>
                     <span className="text-[13px] font-semibold uppercase text-ink">{k}</span>
-                    <span className="ml-auto text-[12px] text-muted">{v}</span>
+                    <span className="ml-auto text-[12px] text-muted">
+                      {k === "BPKB" && /^(tidak|belum)\b/i.test(v) ? "Ada" : v}
+                    </span>
                   </div>
                 );
               })}
