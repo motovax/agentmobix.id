@@ -355,7 +355,7 @@ export function UnitDetail() {
             </div>
             <div className="flex flex-col gap-2">
               {docs.map(([k, v]) => {
-                const isBpkb = k === "BPKB";
+                const isBpkb = k.toLowerCase() === "bpkb";
                 const ada = isBpkb ? true : (/\b(ada|tersedia)\b/i.test(v) && !/^(tidak|belum)\b/i.test(v));
                 return (
                   <div
@@ -371,7 +371,7 @@ export function UnitDetail() {
                     </span>
                     <span className="text-[13px] font-semibold uppercase text-ink">{k}</span>
                     <span className="ml-auto text-[12px] text-muted">
-                      {k === "BPKB" && /^(tidak|belum)\b/i.test(v) ? "Ada" : v}
+                      {isBpkb && /^(tidak|belum)\b/i.test(v) ? "Ada" : v}
                     </span>
                   </div>
                 );
