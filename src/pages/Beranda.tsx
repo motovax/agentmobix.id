@@ -388,24 +388,25 @@ export function Beranda() {
 
       </main>
 
-      <div className="fixed bottom-[120px] z-20 flex flex-col items-end gap-2 right-[max(14px,calc((100%-384px)/2))]">
+      <div className="fixed bottom-[120px] left-1/2 z-20 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[1fr_auto_1fr] items-center rounded-3xl border border-line bg-surface px-4 py-3 shadow-nav">
         <a
           href={`https://wa.me/6285701959826?text=${encodeURIComponent("Halo Admin, mau tanya-tanya soal program agen Mobix dulu boleh? 🙏")}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3 text-[13px] font-bold text-white no-underline shadow-[0_6px_24px_rgba(37,211,102,0.4)]"
+          className="inline-flex items-center justify-center gap-2 px-2 py-1.5 text-[14px] font-bold text-teal-deep no-underline"
         >
-          <Chat size={20} className="text-white" />
+          <Chat size={22} />
           Tanya Admin
         </a>
+        <div className="h-9 w-px bg-line" />
         <a
           href={`https://wa.me/6285701959826?text=${encodeURIComponent("saya mau minta hitungan leasing\n1. Dp minim\n2. Cicilan ringan\n3. Cair All in")}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3 text-[13px] font-bold text-white no-underline shadow-[0_6px_24px_rgba(37,211,102,0.4)]"
+          className="inline-flex items-center justify-center gap-2 px-2 py-1.5 text-[14px] font-bold text-teal-deep no-underline"
         >
-          <Calculator size={20} className="text-white" />
-          Hitungan Leasing
+          <Calculator size={22} />
+          Simulasi Kredit
         </a>
       </div>
 
