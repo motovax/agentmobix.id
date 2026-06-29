@@ -387,15 +387,26 @@ export function Beranda() {
 
       </main>
 
-      <a
-        href={`https://wa.me/6285701959826?text=${encodeURIComponent("Halo Admin, mau tanya-tanya soal program agen Mobix dulu boleh? 🙏")}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="fixed bottom-[120px] z-20 inline-flex items-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3 text-[13px] font-bold text-white no-underline shadow-[0_6px_24px_rgba(37,211,102,0.4)] right-[max(14px,calc((100%-384px)/2))]"
-      >
-        <Chat size={20} className="text-white" />
-        Tanya Admin
-      </a>
+      <div className="fixed bottom-[120px] z-20 flex flex-col items-end gap-2 right-[max(14px,calc((100%-384px)/2))]">
+        <a
+          href={`https://wa.me/6285701959826?text=${encodeURIComponent("Halo Admin, mau tanya-tanya soal program agen Mobix dulu boleh? 🙏")}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3 text-[13px] font-bold text-white no-underline shadow-[0_6px_24px_rgba(37,211,102,0.4)]"
+        >
+          <Chat size={20} className="text-white" />
+          Tanya Admin
+        </a>
+        <a
+          href={`https://wa.me/6285701959826?text=${encodeURIComponent("saya mau minta hitungan leasing\n1. Dp minim\n2. Cicilan ringan\n3. Cair All in")}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3 text-[13px] font-bold text-white no-underline shadow-[0_6px_24px_rgba(37,211,102,0.4)]"
+        >
+          <Chat size={20} className="text-white" />
+          Hitungan Leasing
+        </a>
+      </div>
 
       <BottomNav active="beranda" />
     </AppShell>
