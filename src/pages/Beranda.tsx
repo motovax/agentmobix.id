@@ -6,6 +6,7 @@ import {
   Search,
   Moon,
   Chat,
+  Calculator,
   Instagram,
   Facebook,
   YouTube,
@@ -403,7 +404,7 @@ export function Beranda() {
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3 text-[13px] font-bold text-white no-underline shadow-[0_6px_24px_rgba(37,211,102,0.4)]"
         >
-          <Chat size={20} className="text-white" />
+          <Calculator size={20} className="text-white" />
           Hitungan Leasing
         </a>
       </div>

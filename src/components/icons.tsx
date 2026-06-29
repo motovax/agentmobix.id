@@ -81,6 +81,16 @@ export function Chat({ size = 18, className, strokeWidth = 1.5 }: IconProps) {
   );
 }
 
+export function Calculator({ size = 18, className, strokeWidth = 1.5 }: IconProps) {
+  return (
+    <svg {...base(size)} viewBox="0 0 18 18" className={className}>
+      <rect x="3" y="2.5" width="12" height="13" rx="2" stroke="currentColor" strokeWidth={strokeWidth} />
+      <path d="M6 5.5h6" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" />
+      <path d="M6 9h.01M9 9h.01M12 9h.01M6 12h.01M9 12h.01M12 12h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function Plus({ size = 20, className, strokeWidth = 1.7 }: IconProps) {
   return (
     <svg {...base(size)} viewBox="0 0 20 20" className={className}>
