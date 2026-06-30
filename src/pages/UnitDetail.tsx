@@ -340,6 +340,9 @@ export function UnitDetail() {
             </div>
 
             <div className="mb-3.5">
+              <div className="mb-1.5 flex items-center justify-between text-[12px] font-semibold text-mid">
+                <span>DP (Down Payment)</span>
+              </div>
               <div className="mb-2 flex items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
                 <span className="pr-2 text-[13px] font-semibold text-muted">Rp</span>
                 <input
