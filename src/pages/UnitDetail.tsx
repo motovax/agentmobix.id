@@ -25,6 +25,8 @@ import {
 } from "../lib/installment";
 import { simulateKredit, type DsfSimResult } from "../lib/dsf";
 
+const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
+
 function maskPersonName(value: string) {
   const words = value.trim().split(/\s+/);
 
@@ -37,6 +39,8 @@ function maskPersonName(value: string) {
       const prefix = m[1];
       const core = m[2];
       const suffix = m[3];
+      if (UNMASKED_BPKB_WORDS.has(core.toLowerCase()))
+        return `${prefix}${core}${suffix}`;
 
       if (core.length <= 2) return `${prefix}${core}${suffix}`;
       return `${prefix}${core[0]}${"*".repeat(core.length - 2)}${core[core.length - 1]}${suffix}`;
