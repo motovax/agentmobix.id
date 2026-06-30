@@ -350,7 +350,7 @@ export function ShareSheet() {
   }
 
   const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
-  const activeUrl = mobixImage(activeImg?.url, 1280);
+  const activeUrl = mobixImage(activeImg?.url);
   const komisi = unit ? komisiDeal(dealHarga, unit.harga) : 0;
 
   return (
@@ -431,7 +431,7 @@ export function ShareSheet() {
                   >
                     <Photo
                       className="h-full w-full"
-                      src={mobixImage(g.url, 200)}
+                      src={mobixImage(g.url)}
                       alt=""
                     />
                     {isSelected && (

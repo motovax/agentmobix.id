@@ -14,6 +14,8 @@ const PROXY = import.meta.env.VITE_MOBIX_PROXY || "/api/mobix";
 // so in production point this at the API origin; in dev leave empty to use the
 // Vite "/unit-file-serve" proxy.
 const IMG_BASE = import.meta.env.VITE_MOBIX_IMAGE_BASE || "";
+// Default width used for list/detail thumbnails to keep payload lower.
+const MOBIX_THUMBNAIL_WIDTH = 420;
 
 /* ---- raw API shapes (from /openapi.json) ---- */
 
@@ -247,11 +249,15 @@ export async function fetchUnitDetail(slug: string): Promise<ProductDetail> {
 }
 
 /** Resolve an image path/url to a loadable src (absolute in prod, proxied in dev). */
-export function mobixImage(pathOrUrl: string | undefined, width?: number): string | undefined {
+export function mobixImage(
+  pathOrUrl: string | undefined,
+  width?: number,
+): string | undefined {
   if (!pathOrUrl) return undefined;
   if (/^https?:\/\//.test(pathOrUrl)) return pathOrUrl;
   const url = `${IMG_BASE}${pathOrUrl}`;
-  return width ? `${url}&w=${width}` : url;
+  const w = width ?? MOBIX_THUMBNAIL_WIDTH;
+  return `${url}&w=${w}`;
 }
 
 /**

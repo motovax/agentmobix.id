@@ -110,7 +110,7 @@ export function UnitDetail() {
   }
 
   const gallery = unit.galeri ?? [];
-  const heroSrc = mobixImage(gallery[activeThumb]?.url, 1600);
+  const heroSrc = mobixImage(gallery[activeThumb]?.url);
   const badge = deriveBadge({ odometer: unit.odometer, harga: price });
   const thumbCount = Math.min(4, gallery.length);
 
@@ -195,7 +195,7 @@ export function UnitDetail() {
                   i === activeThumb ? "ring-2 ring-ink" : ""
                 }`}
               >
-                <Photo className="h-full w-full" src={mobixImage(g.url, 800)} alt="" />
+                <Photo className="h-full w-full" src={mobixImage(g.url)} alt="" />
               </button>
             ))}
             {!showAllThumbs && gallery.length > thumbCount && (

@@ -49,10 +49,10 @@ export function PromoDetail() {
 
         {!loading && data && (
           <>
-            {cmsImageUrl(data.thumbnail, "full") && (
+            {cmsImageUrl(data.thumbnail) && (
               <div className="relative aspect-[1366/500] overflow-hidden bg-[#DDE2E4]">
                 <ShimmerImg
-                  src={cmsImageUrl(data.thumbnail, "full")}
+                  src={cmsImageUrl(data.thumbnail)}
                   alt={data.judul}
                   loading="eager"
                   imgClassName="absolute inset-0 h-full w-full object-cover"
