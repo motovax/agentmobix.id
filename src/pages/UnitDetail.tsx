@@ -44,8 +44,30 @@ function maskPersonName(value: string) {
     .join(" ");
 }
 
+function resolveBpkbOwnership(value: string) {
+  const lower = value.toLowerCase();
+  const isCompany =
+    /\b(pt|cv|coop|koperasi|persero|perseroan|limited|ltd|gmo|group|badan hukum|pt\.)\b/.test(
+      lower,
+    ) || /\bunlimited\b/.test(lower);
+
+  if (isCompany) return "BPKB Perusahaan";
+
+  const isPersonal =
+    /\b(perorangan|pribadi|peror|perorangan|individu|nama pemilik|atas nama)\b/.test(
+      lower,
+    );
+  if (isPersonal) return "BPKB Perorangan";
+
+  return null;
+}
+
 function maskBpkbValue(value: string) {
   if (!value || /^(tidak|belum)\b/i.test(value.trim())) return value;
+
+  const ownership = resolveBpkbOwnership(value);
+  if (ownership) return ownership;
+
   return maskPersonName(value);
 }
 
