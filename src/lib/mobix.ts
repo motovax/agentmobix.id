@@ -14,8 +14,8 @@ const PROXY = import.meta.env.VITE_MOBIX_PROXY || "/api/mobix";
 // so in production point this at the API origin; in dev leave empty to use the
 // Vite "/unit-file-serve" proxy.
 const IMG_BASE = import.meta.env.VITE_MOBIX_IMAGE_BASE || "";
-// Default width used for list/detail thumbnails to keep payload lower.
-const MOBIX_THUMBNAIL_WIDTH = 420;
+export const MOBIX_THUMBNAIL_WIDTH = 420;
+export const MOBIX_HERO_WIDTH = 1600;
 
 /* ---- raw API shapes (from /openapi.json) ---- */
 

@@ -8,6 +8,7 @@ import { ChevronLeft, ShareArrow, Chat, Check, Close } from "../components/icons
 import {
   fetchUnitDetail,
   mobixImage,
+  MOBIX_HERO_WIDTH,
   titleCase,
   toCardUnit,
   deriveBadge,
@@ -115,7 +116,7 @@ export function UnitDetail() {
   }
 
   const gallery = unit.galeri ?? [];
-  const heroSrc = mobixImage(gallery[activeThumb]?.url);
+  const heroSrc = mobixImage(gallery[activeThumb]?.url, MOBIX_HERO_WIDTH);
   const badge = deriveBadge({ odometer: unit.odometer, harga: price });
   const thumbCount = Math.min(4, gallery.length);
 

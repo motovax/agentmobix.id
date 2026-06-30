@@ -15,6 +15,7 @@ import {
 import {
   fetchUnitDetail,
   mobixImage,
+  MOBIX_HERO_WIDTH,
   mobixImageFetchable,
   titleCase,
   type ProductDetail,
@@ -350,7 +351,7 @@ export function ShareSheet() {
   }
 
   const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
-  const activeUrl = mobixImage(activeImg?.url);
+  const activeUrl = mobixImage(activeImg?.url, MOBIX_HERO_WIDTH);
   const komisi = unit ? komisiDeal(dealHarga, unit.harga) : 0;
 
   return (
