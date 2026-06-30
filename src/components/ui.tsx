@@ -40,7 +40,7 @@ export function Photo({
           src={placeholderSrc}
           alt={alt}
           loading="lazy"
-          className={`absolute inset-0 h-full w-full ${contain ? "object-contain" : "object-cover"} ${highResReady ? "opacity-0" : "opacity-100"} transition-opacity duration-500 blur-sm`}
+          className={`absolute inset-0 h-full w-full ${contain ? "object-contain" : "object-cover"} ${highResReady ? "opacity-0" : "opacity-100"} transition-opacity duration-500`}
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
