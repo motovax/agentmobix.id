@@ -1,4 +1,5 @@
-import { Route, Switch } from "wouter";
+import { useEffect } from "react";
+import { Route, Switch, useLocation, useSearch } from "wouter";
 import { Beranda } from "./pages/Beranda";
 import { Katalog } from "./pages/Katalog";
 import { UnitDetail } from "./pages/UnitDetail";
@@ -10,8 +11,23 @@ import { ShareSheet } from "./pages/ShareSheet";
 import { PromoList } from "./pages/PromoList";
 import { PromoDetail } from "./pages/PromoDetail";
 
+function ScrollToTopOnRouteChange() {
+  const [location] = useLocation();
+  const search = useSearch();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    const root = document.scrollingElement;
+    if (root) root.scrollTop = 0;
+  }, [location, search]);
+
+  return null;
+}
+
 export default function App() {
   return (
+    <>
+      <ScrollToTopOnRouteChange />
     <Switch>
       <Route path="/" component={Beranda} />
       <Route path="/katalog" component={Katalog} />
@@ -25,5 +41,6 @@ export default function App() {
       <Route path="/share" component={ShareSheet} />
       <Route component={Beranda} />
     </Switch>
+    </>
   );
 }

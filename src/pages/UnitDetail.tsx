@@ -37,6 +37,7 @@ export function UnitDetail() {
   const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
   const [simLoading, setSimLoading] = useState(false);
   const simTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const pageRef = useRef<HTMLElement>(null);
 
   const price = unit?.harga ?? 0;
   const localDp = downPayment(price, dpPercent);
@@ -65,6 +66,10 @@ export function UnitDetail() {
     }, 600);
     return () => clearTimeout(simTimer.current);
   }, [price, dpPercent, tenor]);
+
+  useEffect(() => {
+    pageRef.current?.scrollTo({ top: 0 });
+  }, [slug]);
 
   if (loading) {
     return (
@@ -128,7 +133,7 @@ export function UnitDetail() {
 
   return (
     <AppShell bg="bg-surface">
-      <main className="min-h-screen overflow-y-auto sm:min-h-0">
+      <main ref={pageRef} className="min-h-screen overflow-y-auto sm:min-h-0">
         {/* GALLERY */}
         <div className="relative">
           <Photo large className="aspect-[4/3]" src={heroSrc} alt={unit.nama} />
