@@ -406,7 +406,7 @@ export function Beranda() {
           className="inline-flex items-center justify-center gap-2 px-2 py-1.5 text-[14px] font-bold text-teal-deep no-underline"
         >
           <Calculator size={22} />
-          Simulasi Kredit
+          Minta Hitungan
         </a>
       </div>
 
