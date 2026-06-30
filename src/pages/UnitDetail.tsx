@@ -25,6 +25,30 @@ import {
 } from "../lib/installment";
 import { simulateKredit, type DsfSimResult } from "../lib/dsf";
 
+function maskPersonName(value: string) {
+  const words = value.trim().split(/\s+/);
+
+  return words
+    .map((word) => {
+      const m = word.match(
+        /^([^A-Za-zÀ-ÖØ-öø-ÿ']*)([A-Za-zÀ-ÖØ-öø-ÿ']+)([^A-Za-zÀ-ÖØ-öø-ÿ']*)$/u,
+      );
+      if (!m) return word;
+      const prefix = m[1];
+      const core = m[2];
+      const suffix = m[3];
+
+      if (core.length <= 2) return `${prefix}${core}${suffix}`;
+      return `${prefix}${core[0]}${"*".repeat(core.length - 2)}${core[core.length - 1]}${suffix}`;
+    })
+    .join(" ");
+}
+
+function maskBpkbValue(value: string) {
+  if (!value || /^(tidak|belum)\b/i.test(value.trim())) return value;
+  return maskPersonName(value);
+}
+
 export function UnitDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { data: unit, loading, error } = useAsync(
@@ -426,7 +450,7 @@ export function UnitDetail() {
 
         {/* KELENGKAPAN DOKUMEN */}
         {docs.length > 0 && (
-          <div className="px-[18px] pb-4">
+        <div className="px-[18px] pb-4">
             <div className="mb-2 -tracking-[0.01em] text-[15px] font-extrabold">
               Kelengkapan dokumen
             </div>
@@ -434,6 +458,7 @@ export function UnitDetail() {
               {docs.map(([k, v]) => {
                 const isBpkb = k.toLowerCase() === "bpkb";
                 const ada = isBpkb ? true : (/\b(ada|tersedia)\b/i.test(v) && !/^(tidak|belum)\b/i.test(v));
+                const displayValue = isBpkb ? maskBpkbValue(v) : v;
                 return (
                   <div
                     key={k}
@@ -448,7 +473,7 @@ export function UnitDetail() {
                     </span>
                     <span className="text-[13px] font-semibold uppercase text-ink">{k}</span>
                     <span className="ml-auto text-[12px] text-muted">
-                      {isBpkb && /^(tidak|belum)\b/i.test(v) ? "Ada" : v}
+                      {isBpkb && /^(tidak|belum)\b/i.test(v) ? "Ada" : displayValue}
                     </span>
                   </div>
                 );
