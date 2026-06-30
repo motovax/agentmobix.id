@@ -54,7 +54,7 @@ function resolveBpkbOwnership(value: string) {
   if (isCompany) return "BPKB Perusahaan";
 
   const isPersonal =
-    /\b(perorangan|pribadi|peror|perorangan|individu|nama pemilik|atas nama)\b/.test(
+    /\b(perorangan|pribadi|individu|nama pemilik|atas nama)\b/.test(
       lower,
     );
   if (isPersonal) return "BPKB Perorangan";
