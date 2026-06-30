@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import { Link, useParams } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
@@ -36,6 +37,7 @@ export function UnitDetail() {
   const [activeThumb, setActiveThumb] = useState(0);
   const [showAllThumbs, setShowAllThumbs] = useState(false);
   const [lightbox, setLightbox] = useState(false);
+  const [dpAmountInput, setDpAmountInput] = useState("");
   const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
   const [simLoading, setSimLoading] = useState(false);
   const simTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -48,6 +50,47 @@ export function UnitDetail() {
   const displayDp = simResult?.downPaymentRounded ?? localDp;
   const displayMonthly = simResult?.installmentRounded ?? localMonthly;
   const displayTdp = simResult?.totalDownPaymentRounded ?? null;
+  const currencyFormatter = new Intl.NumberFormat("id-ID");
+
+  function formatDpValue(value: number) {
+    return currencyFormatter.format(Math.max(0, Math.round(value || 0)));
+  }
+
+  function toDpPercentFromAmount(amount: number) {
+    if (!price) return 15;
+    const next = Math.round((amount / price) * 100);
+    if (Number.isNaN(next)) return 15;
+    return Math.min(60, Math.max(15, next));
+  }
+
+  useEffect(() => {
+    if (!price) return;
+    setDpAmountInput(formatDpValue(localDp));
+  }, [price, dpPercent]);
+
+  function handleDpAmountChange(e: ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value.replace(/\D/g, "");
+    if (!raw) {
+      setDpAmountInput("");
+      return;
+    }
+    const amount = Number(raw);
+    const nextPercent = toDpPercentFromAmount(amount);
+    setDpPercent(nextPercent);
+    setDpAmountInput(formatDpValue(downPayment(price, nextPercent)));
+  }
+
+  function handleDpAmountBlur() {
+    if (!price) return;
+    if (!dpAmountInput) {
+      setDpAmountInput(formatDpValue(localDp));
+      return;
+    }
+    const amount = Number(dpAmountInput.replace(/\D/g, ""));
+    const nextPercent = toDpPercentFromAmount(amount);
+    setDpPercent(nextPercent);
+    setDpAmountInput(formatDpValue(downPayment(price, nextPercent)));
+  }
 
   useEffect(() => {
     if (!price) return;
@@ -301,6 +344,22 @@ export function UnitDetail() {
             </div>
 
             <div className="mb-3.5">
+              <label className="mb-2 block text-[12px] font-semibold text-mid">
+                Total DP
+              </label>
+              <div className="mb-2 flex items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+                <span className="pr-2 text-[13px] font-semibold text-muted">Rp</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={dpAmountInput}
+                  onChange={handleDpAmountChange}
+                  onBlur={handleDpAmountBlur}
+                  className="w-full bg-transparent text-[14px] font-bold text-ink outline-none"
+                  placeholder={formatDpValue(localDp)}
+                  aria-label="Total uang muka"
+                />
+              </div>
               <div className="mb-2 flex justify-between text-[12px] font-semibold text-mid">
                 <span>Uang muka · {dpPercent}%</span>
                 <span className="font-extrabold text-ink">{formatRupiah(displayDp)}</span>
