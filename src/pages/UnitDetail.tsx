@@ -9,6 +9,7 @@ import {
   fetchUnitDetail,
   mobixImage,
   MOBIX_HERO_WIDTH,
+  MOBIX_THUMBNAIL_WIDTH,
   titleCase,
   toCardUnit,
   deriveBadge,
@@ -116,7 +117,9 @@ export function UnitDetail() {
   }
 
   const gallery = unit.galeri ?? [];
-  const heroSrc = mobixImage(gallery[activeThumb]?.url, MOBIX_HERO_WIDTH);
+  const heroUrl = gallery[activeThumb]?.url;
+  const heroSrc = mobixImage(heroUrl, MOBIX_HERO_WIDTH);
+  const heroPlaceholder = mobixImage(heroUrl, MOBIX_THUMBNAIL_WIDTH);
   const badge = deriveBadge({ odometer: unit.odometer, harga: price });
   const thumbCount = Math.min(4, gallery.length);
 
@@ -137,7 +140,13 @@ export function UnitDetail() {
       <main ref={pageRef} className="min-h-screen overflow-y-auto sm:min-h-0">
         {/* GALLERY */}
         <div className="relative">
-          <Photo large className="aspect-[4/3]" src={heroSrc} alt={unit.nama} />
+          <Photo
+            large
+            className="aspect-[4/3]"
+            src={heroSrc}
+            placeholderSrc={heroPlaceholder}
+            alt={unit.nama}
+          />
           {/* transparent tap zone behind all overlays */}
           <button
             className="absolute inset-0 cursor-zoom-in"

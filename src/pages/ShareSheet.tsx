@@ -16,6 +16,7 @@ import {
   fetchUnitDetail,
   mobixImage,
   MOBIX_HERO_WIDTH,
+  MOBIX_THUMBNAIL_WIDTH,
   mobixImageFetchable,
   titleCase,
   type ProductDetail,
@@ -352,6 +353,7 @@ export function ShareSheet() {
 
   const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
   const activeUrl = mobixImage(activeImg?.url, MOBIX_HERO_WIDTH);
+  const activePlaceholder = mobixImage(activeImg?.url, MOBIX_THUMBNAIL_WIDTH);
   const komisi = unit ? komisiDeal(dealHarga, unit.harga) : 0;
 
   return (
@@ -374,7 +376,13 @@ export function ShareSheet() {
 
         {/* shareable preview */}
         <div className="mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
-          <Photo large className="aspect-video" src={activeUrl} alt={unit?.nama}>
+          <Photo
+            large
+            className="aspect-video"
+            src={activeUrl}
+            placeholderSrc={activePlaceholder}
+            alt={unit?.nama}
+          >
             {unit && (
               <div className="absolute bottom-3 left-3 rounded-lg bg-ink/85 px-3 py-1.5 text-[15px] font-bold text-surface">
                 Rp {formatJt(dealHarga || unit.harga)} · TDP {formatJt(unit.tdp)}

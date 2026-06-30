@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { UnitBadge } from "../lib/mobix";
 
@@ -14,6 +14,7 @@ export function Photo({
   alt,
   children,
   contain = false,
+  placeholderSrc,
 }: {
   className?: string;
   large?: boolean;
@@ -21,18 +22,39 @@ export function Photo({
   alt?: string;
   children?: ReactNode;
   contain?: boolean;
+  placeholderSrc?: string;
 }) {
+  const usePlaceholder = Boolean(placeholderSrc && placeholderSrc !== src);
+  const [highResReady, setHighResReady] = useState(!usePlaceholder);
+
+  useEffect(() => {
+    setHighResReady(!usePlaceholder);
+  }, [src, placeholderSrc]);
+
   return (
     <div
       className={`relative ${large ? "bg-hatch-lg" : "bg-hatch"} ${className}`}
     >
+      {usePlaceholder && placeholderSrc && (
+        <img
+          src={placeholderSrc}
+          alt={alt}
+          loading="lazy"
+          className={`absolute inset-0 h-full w-full ${contain ? "object-contain" : "object-cover"} ${highResReady ? "opacity-0" : "opacity-100"} transition-opacity duration-500 blur-sm`}
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+      )}
       {src && (
         <img
           src={src}
           alt={alt}
           loading="lazy"
-          className={`absolute inset-0 h-full w-full ${contain ? "object-contain" : "object-cover"}`}
+          className={`absolute inset-0 h-full w-full ${contain ? "object-contain" : "object-cover"} ${usePlaceholder ? (highResReady ? "opacity-100" : "opacity-0") : "opacity-100"} transition-opacity duration-500`}
+          onLoad={() => setHighResReady(true)}
           onError={(e) => {
+            if (usePlaceholder) setHighResReady(false);
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
         />
