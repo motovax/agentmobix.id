@@ -191,27 +191,48 @@ export function UnitDetail() {
 
         {/* THUMB STRIP */}
         {gallery.length > 1 && (
-          <div className="scroll-x flex gap-2 overflow-x-auto px-4 py-3">
-            {gallery.slice(0, showAllThumbs ? gallery.length : thumbCount).map((g, i) => (
-              <button
-                key={g.id}
-                onClick={() => setActiveThumb(i)}
-                className={`h-12 flex-[0_0_64px] overflow-hidden rounded-lg ${
-                  i === activeThumb ? "ring-2 ring-ink" : ""
-                }`}
-              >
-                <Photo className="h-full w-full" src={mobixImage(g.url)} alt="" />
-              </button>
-            ))}
-            {!showAllThumbs && gallery.length > thumbCount && (
-              <button
-                onClick={() => { setShowAllThumbs(true); setActiveThumb(thumbCount); }}
-                className="flex h-12 flex-[0_0_64px] items-center justify-center rounded-lg bg-ink text-[12px] font-bold text-surface"
-              >
-                +{gallery.length - thumbCount}
-              </button>
+          <>
+            <div className="scroll-x flex gap-2 overflow-x-auto px-4 py-3">
+              {gallery.slice(0, thumbCount).map((g, i) => (
+                <button
+                  key={g.id}
+                  onClick={() => setActiveThumb(i)}
+                  className={`h-12 flex-[0_0_64px] overflow-hidden rounded-lg ${
+                    i === activeThumb ? "ring-2 ring-ink" : ""
+                  }`}
+                >
+                  <Photo className="h-full w-full" src={mobixImage(g.url)} alt="" />
+                </button>
+              ))}
+              {!showAllThumbs && gallery.length > thumbCount && (
+                <button
+                  onClick={() => setShowAllThumbs(true)}
+                  className="flex h-12 flex-[0_0_64px] items-center justify-center rounded-lg bg-ink text-[12px] font-bold text-surface"
+                >
+                  +{gallery.length - thumbCount}
+                </button>
+              )}
+            </div>
+
+            {showAllThumbs && (
+              <div className="grid grid-cols-4 gap-2 px-4 pb-3 pt-1">
+                {gallery.slice(thumbCount).map((g, index) => {
+                  const absoluteIndex = thumbCount + index;
+                  return (
+                    <button
+                      key={g.id}
+                      onClick={() => setActiveThumb(absoluteIndex)}
+                      className={`h-12 overflow-hidden rounded-lg ${
+                        absoluteIndex === activeThumb ? "ring-2 ring-ink" : ""
+                      }`}
+                    >
+                      <Photo className="h-full w-full" src={mobixImage(g.url)} alt="" />
+                    </button>
+                  );
+                })}
+              </div>
             )}
-          </div>
+          </>
         )}
 
         {/* TITLE BLOCK */}
