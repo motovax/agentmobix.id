@@ -47,7 +47,6 @@ export function UnitDetail() {
   const localDp = downPayment(price, dpPercent);
   const localMonthly = monthlyInstallment(price, dpPercent, tenor);
 
-  const displayDp = simResult?.downPaymentRounded ?? localDp;
   const displayMonthly = simResult?.installmentRounded ?? localMonthly;
   const displayTdp = simResult?.totalDownPaymentRounded ?? null;
   const currencyFormatter = new Intl.NumberFormat("id-ID");
