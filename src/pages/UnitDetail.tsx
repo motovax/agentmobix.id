@@ -73,10 +73,7 @@ export function UnitDetail() {
       setDpAmountInput("");
       return;
     }
-    const amount = Number(raw);
-    const nextPercent = toDpPercentFromAmount(amount);
-    setDpPercent(nextPercent);
-    setDpAmountInput(formatDpValue(downPayment(price, nextPercent)));
+    setDpAmountInput(formatDpValue(Number(raw)));
   }
 
   function handleDpAmountBlur() {
