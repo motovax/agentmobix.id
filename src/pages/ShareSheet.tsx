@@ -15,9 +15,9 @@ import {
 import {
   fetchUnitDetail,
   mobixImage,
-  MOBIX_HERO_WIDTH,
   MOBIX_THUMBNAIL_WIDTH,
-  mobixImageFetchable,
+  mobixImageFetchableWithWidth,
+  MOBIX_SHARE_WIDTH,
   titleCase,
   type ProductDetail,
 } from "../lib/mobix";
@@ -192,7 +192,7 @@ export function ShareSheet() {
       const blobs = await Promise.all(
         selectedGallery.map(async (g) => {
           if (blobCache.current.has(g.url)) return blobCache.current.get(g.url)!;
-          const src = mobixImageFetchable(g.url);
+          const src = mobixImageFetchableWithWidth(g.url, MOBIX_SHARE_WIDTH);
           if (!src) return null;
           try {
             const r = await fetch(src);
@@ -241,7 +241,7 @@ export function ShareSheet() {
       const blobs = await Promise.all(
         selectedGallery.map(async (g) => {
           if (blobCache.current.has(g.url)) return blobCache.current.get(g.url)!;
-          const src = mobixImageFetchable(g.url);
+          const src = mobixImageFetchableWithWidth(g.url, MOBIX_SHARE_WIDTH);
           if (!src) return null;
           try {
             const r = await fetch(src);
@@ -352,7 +352,7 @@ export function ShareSheet() {
   }
 
   const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
-  const activeUrl = mobixImage(activeImg?.url, MOBIX_HERO_WIDTH);
+  const activeUrl = mobixImage(activeImg?.url, MOBIX_SHARE_WIDTH);
   const activePlaceholder = mobixImage(activeImg?.url, MOBIX_THUMBNAIL_WIDTH);
   const komisi = unit ? komisiDeal(dealHarga, unit.harga) : 0;
 

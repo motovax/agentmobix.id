@@ -16,6 +16,7 @@ const PROXY = import.meta.env.VITE_MOBIX_PROXY || "/api/mobix";
 const IMG_BASE = import.meta.env.VITE_MOBIX_IMAGE_BASE || "";
 export const MOBIX_THUMBNAIL_WIDTH = 420;
 export const MOBIX_HERO_WIDTH = 1600;
+export const MOBIX_SHARE_WIDTH = 1920;
 
 /* ---- raw API shapes (from /openapi.json) ---- */
 
@@ -271,6 +272,20 @@ export function mobixImageFetchable(pathOrUrl: string | undefined): string | und
     ? new URL(pathOrUrl).pathname + new URL(pathOrUrl).search
     : pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
   return `${PROXY}${path}`;
+}
+
+export function mobixImageFetchableWithWidth(
+  pathOrUrl: string | undefined,
+  width: number,
+): string | undefined {
+  if (!pathOrUrl) return undefined;
+  const base = mobixImageFetchable(pathOrUrl);
+  if (!base) return undefined;
+  const [path, query = ""] = base.split("?", 2);
+  if (!query) return `${base}?w=${width}`;
+  const params = new URLSearchParams(query);
+  params.set("w", String(width));
+  return `${path}?${params.toString()}`;
 }
 
 /* ---- agent-program derivations (not present in the catalog API) ---- */
