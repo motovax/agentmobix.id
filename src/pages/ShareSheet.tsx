@@ -69,6 +69,8 @@ async function composeOverlay(
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, H);
 
   if (crop === "cover") {
     // cover crop — fill full canvas
@@ -257,7 +259,7 @@ export function ShareSheet() {
       if (!valid.length || !alive) return;
 
       const files = await Promise.all(
-        valid.map((blob) => composeOverlay(blob, u, dealHarga, false, "contain")),
+        valid.map((blob) => composeOverlay(blob, u, dealHarga, false)),
       );
       if (alive) {
         setShareFiles(files);
