@@ -109,8 +109,8 @@ async function composeOverlay(
   try {
     const logoBlob = await fetch("/mobix-logo.png").then((r) => r.blob());
     const logoBitmap = await createImageBitmap(logoBlob);
-    const lh = 44,
-      lw = Math.round((lh * logoBitmap.width) / logoBitmap.height);
+    const lw = Math.round(W * 0.07);
+    const lh = Math.round((lw * logoBitmap.height) / logoBitmap.width);
     const tmp = document.createElement("canvas");
     tmp.width = lw;
     tmp.height = lh;
