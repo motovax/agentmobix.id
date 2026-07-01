@@ -228,6 +228,7 @@ export function ShareSheet() {
   // canvas-composed files without overlay — for social media share
   const [shareFiles, setShareFiles] = useState<File[]>([]);
   const [shareComposing, setShareComposing] = useState(false);
+  const [shareFilesSignature, setShareFilesSignature] = useState("");
 
   const blobCache = useRef<Map<string, Blob>>(new Map());
 
@@ -294,53 +295,46 @@ export function ShareSheet() {
     };
   }, [unit, selectedIdxes.join(","), dealHarga]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // compose share files WITHOUT price pill overlay — for social media
-  useEffect(() => {
-    if (!unit || !gallery.length) return;
-    const u = unit;
-    let alive = true;
-    setShareComposing(true);
+  async function prepareShareFiles() {
+    if (!unit || !gallery.length) return [];
 
     const selectedGallery = selectedIdxes
       .map((i) => gallery[i])
       .filter(Boolean);
+    const signature = `${selectedIdxes.join(",")}:${dealHarga}`;
 
-    async function run() {
-      const backendFiles = await buildShareImagesViaBackend(
-        u,
-        selectedGallery,
-        dealHarga,
-        false,
-      );
-      if (!alive) return;
-
-      if (backendFiles.length > 0) {
-        setShareFiles(backendFiles);
-        setShareComposing(false);
-        return;
-      }
-
-      const files = await buildShareImagesLocally(
-        u,
-        selectedGallery,
-        dealHarga,
-        false,
-        blobCache.current,
-      );
-      if (alive) {
-        setShareFiles(files);
-        setShareComposing(false);
-      }
+    if (shareFiles.length > 0 && shareFilesSignature === signature) {
+      return shareFiles;
     }
 
-    run().catch(() => {
-      if (alive) setShareComposing(false);
-    });
+    setShareComposing(true);
 
-    return () => {
-      alive = false;
-    };
-  }, [unit, selectedIdxes.join(","), dealHarga]); // eslint-disable-line react-hooks/exhaustive-deps
+    try {
+      const backendFiles = await buildShareImagesViaBackend(
+        unit,
+        selectedGallery,
+        dealHarga,
+        false,
+      );
+
+      const files =
+        backendFiles.length > 0
+          ? backendFiles
+          : await buildShareImagesLocally(
+              unit,
+              selectedGallery,
+              dealHarga,
+              false,
+              blobCache.current,
+            );
+
+      setShareFiles(files);
+      setShareFilesSignature(signature);
+      return files;
+    } finally {
+      setShareComposing(false);
+    }
+  }
 
   function handleGalleryTap(i: number) {
     setPreviewIdx(i);
@@ -382,18 +376,25 @@ export function ShareSheet() {
   }
 
   function handleShare() {
-    const filesToShare = shareFiles.length > 0 ? shareFiles : composedFiles;
-    const canShareFiles =
-      filesToShare.length > 0 && !!navigator.canShare?.({ files: filesToShare });
+    const share = async () => {
+      const filesToShare = await prepareShareFiles();
+      const canShareFiles =
+        filesToShare.length > 0 && !!navigator.canShare?.({ files: filesToShare });
 
-    if (navigator.share && canShareFiles) {
-      void navigator.share({
-        files: filesToShare,
-        text: captionText,
-      });
-      return;
-    }
-    setShowChannels((v) => !v);
+      if (navigator.share && canShareFiles) {
+        await navigator.share({
+          files: filesToShare,
+          text: captionText,
+        });
+        return;
+      }
+
+      setShowChannels((v) => !v);
+    };
+
+    void share().catch(() => {
+      setShowChannels((v) => !v);
+    });
   }
 
   function shareVia(channel: "wa" | "tg" | "x") {
