@@ -14,9 +14,10 @@ import {
 } from "../components/icons";
 import {
   fetchUnitDetail,
+  composeShareImageViaBackend,
+  MOBIX_SHARE_WIDTH,
   mobixImage,
   mobixImageFetchableWithWidth,
-  MOBIX_SHARE_WIDTH,
   titleCase,
   type ProductDetail,
 } from "../lib/mobix";
@@ -53,6 +54,73 @@ function roundRectPath(
   ctx.lineTo(x, y + r);
   ctx.quadraticCurveTo(x, y, x + r, y);
   ctx.closePath();
+}
+
+function composeBlobToFile(
+  blob: Blob,
+  fallbackName = "unit.jpg",
+): File {
+  return new File([blob], fallbackName, { type: "image/jpeg" });
+}
+
+async function fetchRawBlob(pathOrUrl: string, cache: Map<string, Blob>) {
+  if (cache.has(pathOrUrl)) return cache.get(pathOrUrl)!;
+  const src = mobixImageFetchableWithWidth(pathOrUrl, 2560);
+  if (!src) return null;
+  try {
+    const r = await fetch(src);
+    if (!r.ok) return null;
+    const blob = await r.blob();
+    if (blob) cache.set(pathOrUrl, blob);
+    return blob;
+  } catch {
+    return null;
+  }
+}
+
+async function buildShareImagesViaBackend(
+  unit: ProductDetail,
+  selectedGallery: ProductDetail["galeri"],
+  dealHarga: number,
+  includeOverlay: boolean,
+): Promise<File[]> {
+  const sources = selectedGallery
+    .map((g) => g?.url)
+    .filter((value): value is string => Boolean(value));
+  const entries = await Promise.all(
+    sources.map(async (source) => {
+      const blob = await composeShareImageViaBackend({
+        source,
+        price: dealHarga,
+        tdp: unit.tdp,
+        includeOverlay,
+        width: 1280,
+        height: 720,
+        crop: "cover",
+      });
+      if (!blob) return null;
+      return composeBlobToFile(blob, `unit.jpg`);
+    }),
+  );
+
+  return entries.filter(Boolean) as File[];
+}
+
+async function buildShareImagesLocally(
+  unit: ProductDetail,
+  selectedGallery: ProductDetail["galeri"],
+  dealHarga: number,
+  includeOverlay: boolean,
+  cache: Map<string, Blob>,
+): Promise<File[]> {
+  const sources = selectedGallery
+    .map((g) => g?.url)
+    .filter((value): value is string => Boolean(value));
+  const blobs = await Promise.all(
+    sources.map((url) => fetchRawBlob(url, cache)),
+  );
+  const valid = blobs.filter(Boolean) as Blob[];
+  return Promise.all(valid.map((blob) => composeOverlay(blob, unit, dealHarga, includeOverlay)));
 }
 
 async function composeOverlay(
@@ -190,27 +258,26 @@ export function ShareSheet() {
       .filter(Boolean);
 
     async function run() {
-      const blobs = await Promise.all(
-        selectedGallery.map(async (g) => {
-          if (blobCache.current.has(g.url)) return blobCache.current.get(g.url)!;
-          const src = mobixImageFetchableWithWidth(g.url, MOBIX_SHARE_WIDTH);
-          if (!src) return null;
-          try {
-            const r = await fetch(src);
-            const blob = r.ok ? await r.blob() : null;
-            if (blob) blobCache.current.set(g.url, blob);
-            return blob;
-          } catch {
-            return null;
-          }
-        }),
+      const backendFiles = await buildShareImagesViaBackend(
+        u,
+        selectedGallery,
+        dealHarga,
+        true,
       );
+      if (!alive) return;
 
-      const valid = blobs.filter(Boolean) as Blob[];
-      if (!valid.length || !alive) return;
+      if (backendFiles.length > 0) {
+        setComposedFiles(backendFiles);
+        setComposing(false);
+        return;
+      }
 
-      const files = await Promise.all(
-        valid.map((blob) => composeOverlay(blob, u, dealHarga)),
+      const files = await buildShareImagesLocally(
+        u,
+        selectedGallery,
+        dealHarga,
+        true,
+        blobCache.current,
       );
       if (alive) {
         setComposedFiles(files);
@@ -239,27 +306,26 @@ export function ShareSheet() {
       .filter(Boolean);
 
     async function run() {
-      const blobs = await Promise.all(
-        selectedGallery.map(async (g) => {
-          if (blobCache.current.has(g.url)) return blobCache.current.get(g.url)!;
-          const src = mobixImageFetchableWithWidth(g.url, MOBIX_SHARE_WIDTH);
-          if (!src) return null;
-          try {
-            const r = await fetch(src);
-            const blob = r.ok ? await r.blob() : null;
-            if (blob) blobCache.current.set(g.url, blob);
-            return blob;
-          } catch {
-            return null;
-          }
-        }),
+      const backendFiles = await buildShareImagesViaBackend(
+        u,
+        selectedGallery,
+        dealHarga,
+        false,
       );
+      if (!alive) return;
 
-      const valid = blobs.filter(Boolean) as Blob[];
-      if (!valid.length || !alive) return;
+      if (backendFiles.length > 0) {
+        setShareFiles(backendFiles);
+        setShareComposing(false);
+        return;
+      }
 
-      const files = await Promise.all(
-        valid.map((blob) => composeOverlay(blob, u, dealHarga, false)),
+      const files = await buildShareImagesLocally(
+        u,
+        selectedGallery,
+        dealHarga,
+        false,
+        blobCache.current,
       );
       if (alive) {
         setShareFiles(files);

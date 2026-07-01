@@ -98,6 +98,18 @@ export interface ApiEnvelope<T> {
   };
 }
 
+export type ShareImageCrop = "cover" | "contain";
+
+export interface ShareImageRequest {
+  source: string;
+  price: number;
+  tdp: number;
+  includeOverlay?: boolean;
+  width?: number;
+  height?: number;
+  crop?: ShareImageCrop;
+}
+
 export interface ListRequest {
   merek?: string[];
   judul?: string[];
@@ -289,6 +301,36 @@ export function mobixImageFetchableWithWidth(
   const base = mobixImageFetchable(pathOrUrl);
   if (!base) return undefined;
   return withWidth(base, width);
+}
+
+/**
+ * Build a composed share image on the backend (Mobix API) and return the JPEG blob.
+ * Returns `null` instead of throwing so the caller can fallback to browser-side compose.
+ */
+export async function composeShareImageViaBackend(
+  request: ShareImageRequest,
+): Promise<Blob | null> {
+  const url = new URL(`${PROXY}/share-image`, window.location.origin);
+  url.searchParams.set("source", request.source);
+  url.searchParams.set("price", String(request.price ?? 0));
+  url.searchParams.set("tdp", String(request.tdp ?? 0));
+  url.searchParams.set("overlay", request.includeOverlay ? "1" : "0");
+  url.searchParams.set("crop", request.crop || "cover");
+
+  if (request.width) {
+    url.searchParams.set("w", String(request.width));
+  }
+  if (request.height) {
+    url.searchParams.set("h", String(request.height));
+  }
+
+  try {
+    const res = await fetch(url.toString());
+    if (!res.ok) return null;
+    return await res.blob();
+  } catch {
+    return null;
+  }
 }
 
 /* ---- agent-program derivations (not present in the catalog API) ---- */
