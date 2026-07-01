@@ -16,7 +16,14 @@ const PROXY = import.meta.env.VITE_MOBIX_PROXY || "/api/mobix";
 const IMG_BASE = import.meta.env.VITE_MOBIX_IMAGE_BASE || "";
 export const MOBIX_THUMBNAIL_WIDTH = 420;
 export const MOBIX_HERO_WIDTH = 1600;
-export const MOBIX_SHARE_WIDTH = 1920;
+export const MOBIX_SHARE_WIDTH = 2560;
+
+function withWidth(url: string, width: number) {
+  const [path, search = ""] = url.split("?", 2);
+  const params = new URLSearchParams(search);
+  params.set("w", String(width));
+  return `${path}?${params.toString()}`;
+}
 
 /* ---- raw API shapes (from /openapi.json) ---- */
 
@@ -255,10 +262,10 @@ export function mobixImage(
   width?: number,
 ): string | undefined {
   if (!pathOrUrl) return undefined;
-  if (/^https?:\/\//.test(pathOrUrl)) return pathOrUrl;
+  if (/^https?:\/\//.test(pathOrUrl)) return withWidth(pathOrUrl, width ?? MOBIX_THUMBNAIL_WIDTH);
   const url = `${IMG_BASE}${pathOrUrl}`;
   const w = width ?? MOBIX_THUMBNAIL_WIDTH;
-  return `${url}&w=${w}`;
+  return withWidth(url, w);
 }
 
 /**
@@ -281,11 +288,7 @@ export function mobixImageFetchableWithWidth(
   if (!pathOrUrl) return undefined;
   const base = mobixImageFetchable(pathOrUrl);
   if (!base) return undefined;
-  const [path, query = ""] = base.split("?", 2);
-  if (!query) return `${base}?w=${width}`;
-  const params = new URLSearchParams(query);
-  params.set("w", String(width));
-  return `${path}?${params.toString()}`;
+  return withWidth(base, width);
 }
 
 /* ---- agent-program derivations (not present in the catalog API) ---- */
