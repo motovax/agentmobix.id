@@ -221,7 +221,7 @@ export function ShareSheet() {
   const [dealHarga, setDealHarga] = useState(0);
   const [priceInput, setPriceInput] = useState("");
 
-  // canvas-composed files (with overlay — for preview & download)
+  // canvas-composed files without price/TDP overlay — for download
   const [composedFiles, setComposedFiles] = useState<File[]>([]);
   const [composing, setComposing] = useState(false);
 
@@ -247,7 +247,7 @@ export function ShareSheet() {
     );
   }, [unit?.id]);
 
-  // fetch raw blobs (cached) + compose overlay whenever selection or price changes
+  // fetch raw blobs (cached) + compose download files whenever selection changes
   useEffect(() => {
     if (!unit || !gallery.length) return;
     const u = unit; // capture non-null for closure
@@ -263,7 +263,7 @@ export function ShareSheet() {
         u,
         selectedGallery,
         dealHarga,
-        true,
+        false,
       );
       if (!alive) return;
 
@@ -277,7 +277,7 @@ export function ShareSheet() {
         u,
         selectedGallery,
         dealHarga,
-        true,
+        false,
         blobCache.current,
       );
       if (alive) {
@@ -293,7 +293,7 @@ export function ShareSheet() {
     return () => {
       alive = false;
     };
-  }, [unit, selectedIdxes.join(","), dealHarga]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [unit, selectedIdxes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function prepareShareFiles() {
     if (!unit || !gallery.length) return [];
