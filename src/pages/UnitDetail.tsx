@@ -23,7 +23,12 @@ import {
   monthlyInstallment,
   type Tenor,
 } from "../lib/installment";
-import { simulateKredit, type DsfSimResult } from "../lib/dsf";
+import {
+  findLowestCreditPrice,
+  simulateKredit,
+  type DsfCreditPriceResult,
+  type DsfSimResult,
+} from "../lib/dsf";
 
 const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
 
@@ -90,6 +95,8 @@ export function UnitDetail() {
   const [dpAmountInput, setDpAmountInput] = useState("");
   const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
   const [simLoading, setSimLoading] = useState(false);
+  const [creditPrice, setCreditPrice] = useState<DsfCreditPriceResult | null>(null);
+  const [creditPriceLoading, setCreditPriceLoading] = useState(false);
   const simTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const pageRef = useRef<HTMLElement>(null);
 
@@ -142,21 +149,56 @@ export function UnitDetail() {
     if (!price) return;
     clearTimeout(simTimer.current);
     setSimLoading(true);
-    const nameParts = (unit?.nama ?? "").split(" ");
     simTimer.current = setTimeout(async () => {
       const result = await simulateKredit({
         unitPrice: price,
         dpPercent,
         tenor,
-        brand: nameParts[0],
-        model: nameParts[1],
+        brand: unit?.brand,
+        model: unit?.type,
         year: unit?.year,
       });
       setSimResult(result);
       setSimLoading(false);
     }, 600);
     return () => clearTimeout(simTimer.current);
-  }, [price, dpPercent, tenor]);
+  }, [price, dpPercent, tenor, unit?.brand, unit?.type, unit?.year]);
+
+  useEffect(() => {
+    if (!price || !unit) {
+      setCreditPrice(null);
+      setCreditPriceLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setCreditPrice(null);
+    setCreditPriceLoading(true);
+
+    findLowestCreditPrice(
+      {
+        unitPrice: price,
+        dpPercent: 15,
+        tenor: 60,
+        brand: unit.brand,
+        model: unit.type,
+        year: unit.year,
+      },
+      price,
+      controller.signal,
+    )
+      .then((result) => {
+        if (!controller.signal.aborted) setCreditPrice(result);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setCreditPrice(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCreditPriceLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [price, unit?.id, unit?.brand, unit?.type, unit?.year]);
 
   useEffect(() => {
     pageRef.current?.scrollTo({ top: 0 });
@@ -353,8 +395,20 @@ export function UnitDetail() {
             {unit.nama}
           </h1>
           <div className="mt-2.5 flex items-center justify-between">
-            <div className="-tracking-[0.02em] text-[24px] font-extrabold">
-              {price ? formatRupiah(price) : "Hubungi kami"}
+            <div>
+              <div className="-tracking-[0.02em] text-[24px] font-extrabold">
+                {price ? formatRupiah(price) : "Hubungi kami"}
+              </div>
+              {creditPrice && (
+                <div className="mt-1 text-[12px] font-semibold text-teal-deep">
+                  Harga Kredit : {formatRupiah(creditPrice.unitPrice)}
+                </div>
+              )}
+              {!creditPrice && creditPriceLoading && (
+                <div className="mt-1 text-[12px] font-semibold text-muted">
+                  Menghitung batas harga kredit...
+                </div>
+              )}
             </div>
             <div className="text-right">
               <div className="text-[10px] text-muted">Komisi</div>

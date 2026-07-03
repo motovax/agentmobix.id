@@ -15,6 +15,22 @@ export interface DsfSimResult {
   disclaimer: string[];
 }
 
+interface DsfAllParamsData {
+  installmentRounded: number;
+  totalDownPaymentRounded: number;
+  downPaymentRounded: number;
+  downPayment: number;
+  percentDownPayment: number;
+  totalLoan: number;
+  rateTwoDigitPercent: string;
+  rateEffectiveTwoDigitPercent: string;
+  adminFee: number;
+  disclaimer?: string[];
+  refund?: {
+    allInToSupplier?: number;
+  };
+}
+
 export interface DsfSimParams {
   unitPrice: number;
   dpPercent: number;
@@ -24,14 +40,14 @@ export interface DsfSimParams {
   year?: number;
 }
 
-export async function simulateKredit(params: DsfSimParams): Promise<DsfSimResult | null> {
+function buildDsfSimulationPayload(params: DsfSimParams) {
   const { unitPrice, dpPercent, tenor, brand = "Unknown", model = "Unknown", year = 2020 } = params;
 
-  const payload = {
+  return {
     UnitPrice: unitPrice,
     City: "JAKARTA SELATAN",
-    Brand: (brand ?? "").toUpperCase(),
-    Model: (model ?? "").toUpperCase(),
+    Brand: brand,
+    Model: model,
     ManufacturedYear: String(year),
     LoanPackageName: "MOCIL SPC - PC",
     PaymentType: "ADDB",
@@ -43,27 +59,44 @@ export async function simulateKredit(params: DsfSimParams): Promise<DsfSimResult
     Insurances: {
       InsuranceType: "TLO",
       PutAsOnLoan: "yes",
+      AdditionalInsurances: [],
       TanggungJawabPihakKetiga: {
         IsApplied: "YES",
         UangPertanggungan: 10000000,
       },
     },
-    Fee: { BeaPolis: 50000, AdminFee: 5500000 },
+    Fee: {
+      BeaPolis: 50000,
+      AdminFee: 5500000,
+    },
     SimulationType: "DP",
     SimulationValue: dpPercent,
     TenorInMonths: tenor,
   };
+}
 
+async function fetchDsfAllParams(
+  params: DsfSimParams,
+  signal?: AbortSignal,
+): Promise<DsfAllParamsData | null> {
+  const payload = buildDsfSimulationPayload(params);
+
+  const res = await fetch(`${PROXY}/api/dsf/api/calculator/tenor/allparams`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  if (!json.status || !json.data) return null;
+  return json.data;
+}
+
+export async function simulateKredit(params: DsfSimParams): Promise<DsfSimResult | null> {
   try {
-    const res = await fetch(`${PROXY}/api/dsf/api/calculator/tenor/allparams`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    if (!json.status || !json.data) return null;
-    const d = json.data;
+    const d = await fetchDsfAllParams(params);
+    if (!d) return null;
     return {
       installmentRounded: d.installmentRounded,
       totalDownPaymentRounded: d.totalDownPaymentRounded,
@@ -79,6 +112,56 @@ export async function simulateKredit(params: DsfSimParams): Promise<DsfSimResult
   } catch {
     return null;
   }
+}
+
+export interface DsfCreditPriceResult {
+  unitPrice: number;
+  allInToSupplier: number;
+}
+
+export async function findLowestCreditPrice(
+  params: DsfSimParams,
+  cashTarget: number,
+  signal?: AbortSignal,
+): Promise<DsfCreditPriceResult | null> {
+  if (!params.unitPrice || !cashTarget) return null;
+
+  async function evalPrice(unitPrice: number): Promise<DsfCreditPriceResult | null> {
+    const data = await fetchDsfAllParams({ ...params, unitPrice }, signal);
+    const allInToSupplier = data?.refund?.allInToSupplier ?? 0;
+    if (allInToSupplier <= 0) return null;
+    return { unitPrice, allInToSupplier };
+  }
+
+  let best = await evalPrice(params.unitPrice);
+  if (!best || best.allInToSupplier < cashTarget) return null;
+
+  let low = 0;
+  let high = params.unitPrice;
+  for (let i = 0; i < 14 && high - low > 1000; i += 1) {
+    const mid = (low + high) / 2;
+    const result = await evalPrice(mid);
+    if (!result) {
+      low = mid;
+      continue;
+    }
+    if (result.allInToSupplier >= cashTarget) {
+      best = result;
+      high = mid;
+    } else {
+      low = mid;
+    }
+  }
+
+  const rounded = Math.ceil(best.unitPrice / 1000) * 1000;
+  if (rounded > 0 && rounded <= params.unitPrice && Math.abs(rounded - best.unitPrice) > 0.01) {
+    const roundedResult = await evalPrice(rounded);
+    if (roundedResult && roundedResult.allInToSupplier >= cashTarget) {
+      best = roundedResult;
+    }
+  }
+
+  return best;
 }
 
 /** Hook untuk list view (UnitCard, UnitRow) — fixed DP 15%, tenor 60 bln. */
