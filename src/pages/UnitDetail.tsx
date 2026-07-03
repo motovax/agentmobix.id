@@ -102,7 +102,8 @@ export function UnitDetail() {
 
   const price = unit?.harga ?? 0;
   const detailCreditPrice = unit?.harga_kredit ?? 0;
-  const displayCreditPrice = detailCreditPrice || creditPrice?.unitPrice || 0;
+  const rawCreditPrice = detailCreditPrice || creditPrice?.unitPrice || 0;
+  const displayCreditPrice = rawCreditPrice > 0 ? Math.max(price, rawCreditPrice) : 0;
   const localDp = downPayment(price, dpPercent);
   const localMonthly = monthlyInstallment(price, dpPercent, tenor);
 
