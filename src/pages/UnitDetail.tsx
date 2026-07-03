@@ -101,9 +101,7 @@ export function UnitDetail() {
   const pageRef = useRef<HTMLElement>(null);
 
   const price = unit?.harga ?? 0;
-  const detailCreditPrice = unit?.harga_kredit ?? 0;
-  const rawCreditPrice = detailCreditPrice || creditPrice?.unitPrice || 0;
-  const displayCreditPrice = rawCreditPrice > 0 ? Math.max(price, rawCreditPrice) : 0;
+  const displayCreditPrice = creditPrice?.unitPrice ?? 0;
   const localDp = downPayment(price, dpPercent);
   const localMonthly = monthlyInstallment(price, dpPercent, tenor);
 
@@ -168,7 +166,7 @@ export function UnitDetail() {
   }, [price, dpPercent, tenor, unit?.brand, unit?.type, unit?.year]);
 
   useEffect(() => {
-    if (!price || !unit || detailCreditPrice > 0) {
+    if (!price || !unit) {
       setCreditPrice(null);
       setCreditPriceLoading(false);
       return;
@@ -201,7 +199,7 @@ export function UnitDetail() {
       });
 
     return () => controller.abort();
-  }, [price, detailCreditPrice, unit?.id, unit?.brand, unit?.type, unit?.year]);
+  }, [price, unit?.id, unit?.brand, unit?.type, unit?.year]);
 
   useEffect(() => {
     pageRef.current?.scrollTo({ top: 0 });
