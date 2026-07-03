@@ -64,6 +64,7 @@ export interface ProductDetail {
   slug: string;
   brand: string;
   harga: number;
+  harga_kredit?: number;
   tdp: number;
   cicilan: number;
   lokasi: string;

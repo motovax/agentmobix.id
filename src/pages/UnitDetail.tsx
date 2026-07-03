@@ -101,6 +101,8 @@ export function UnitDetail() {
   const pageRef = useRef<HTMLElement>(null);
 
   const price = unit?.harga ?? 0;
+  const detailCreditPrice = unit?.harga_kredit ?? 0;
+  const displayCreditPrice = detailCreditPrice || creditPrice?.unitPrice || 0;
   const localDp = downPayment(price, dpPercent);
   const localMonthly = monthlyInstallment(price, dpPercent, tenor);
 
@@ -165,7 +167,7 @@ export function UnitDetail() {
   }, [price, dpPercent, tenor, unit?.brand, unit?.type, unit?.year]);
 
   useEffect(() => {
-    if (!price || !unit) {
+    if (!price || !unit || detailCreditPrice > 0) {
       setCreditPrice(null);
       setCreditPriceLoading(false);
       return;
@@ -198,7 +200,7 @@ export function UnitDetail() {
       });
 
     return () => controller.abort();
-  }, [price, unit?.id, unit?.brand, unit?.type, unit?.year]);
+  }, [price, detailCreditPrice, unit?.id, unit?.brand, unit?.type, unit?.year]);
 
   useEffect(() => {
     pageRef.current?.scrollTo({ top: 0 });
@@ -399,12 +401,12 @@ export function UnitDetail() {
               <div className="-tracking-[0.02em] text-[24px] font-extrabold">
                 {price ? formatRupiah(price) : "Hubungi kami"}
               </div>
-              {creditPrice && (
+              {displayCreditPrice > 0 && (
                 <div className="mt-1 text-[12px] font-semibold text-teal-deep">
-                  Harga Kredit : {formatRupiah(creditPrice.unitPrice)}
+                  Harga Kredit : {formatRupiah(displayCreditPrice)}
                 </div>
               )}
-              {!creditPrice && creditPriceLoading && (
+              {!displayCreditPrice && creditPriceLoading && (
                 <div className="mt-1 text-[12px] font-semibold text-muted">
                   Menghitung batas harga kredit...
                 </div>
