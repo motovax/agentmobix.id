@@ -24,9 +24,7 @@ import {
   type Tenor,
 } from "../lib/installment";
 import {
-  findLowestCreditPrice,
   simulateKredit,
-  type DsfCreditPriceResult,
   type DsfSimResult,
 } from "../lib/dsf";
 
@@ -95,13 +93,11 @@ export function UnitDetail() {
   const [dpAmountInput, setDpAmountInput] = useState("");
   const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
   const [simLoading, setSimLoading] = useState(false);
-  const [creditPrice, setCreditPrice] = useState<DsfCreditPriceResult | null>(null);
-  const [creditPriceLoading, setCreditPriceLoading] = useState(false);
   const simTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const pageRef = useRef<HTMLElement>(null);
 
   const price = unit?.harga ?? 0;
-  const displayCreditPrice = creditPrice?.unitPrice ?? 0;
+  const displayCreditPrice = unit?.harga_kredit ?? 0;
   const localDp = downPayment(price, dpPercent);
   const localMonthly = monthlyInstallment(price, dpPercent, tenor);
 
@@ -164,42 +160,6 @@ export function UnitDetail() {
     }, 600);
     return () => clearTimeout(simTimer.current);
   }, [price, dpPercent, tenor, unit?.brand, unit?.type, unit?.year]);
-
-  useEffect(() => {
-    if (!price || !unit) {
-      setCreditPrice(null);
-      setCreditPriceLoading(false);
-      return;
-    }
-
-    const controller = new AbortController();
-    setCreditPrice(null);
-    setCreditPriceLoading(true);
-
-    findLowestCreditPrice(
-      {
-        unitPrice: price,
-        dpPercent: 15,
-        tenor: 60,
-        brand: unit.brand,
-        model: unit.type,
-        year: unit.year,
-      },
-      price,
-      controller.signal,
-    )
-      .then((result) => {
-        if (!controller.signal.aborted) setCreditPrice(result);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setCreditPrice(null);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setCreditPriceLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [price, unit?.id, unit?.brand, unit?.type, unit?.year]);
 
   useEffect(() => {
     pageRef.current?.scrollTo({ top: 0 });
@@ -403,11 +363,6 @@ export function UnitDetail() {
               {displayCreditPrice > 0 && (
                 <div className="mt-1 text-[12px] font-semibold text-teal-deep">
                   Harga Kredit : {formatRupiah(displayCreditPrice)}
-                </div>
-              )}
-              {!displayCreditPrice && creditPriceLoading && (
-                <div className="mt-1 text-[12px] font-semibold text-muted">
-                  Menghitung batas harga kredit...
                 </div>
               )}
             </div>
