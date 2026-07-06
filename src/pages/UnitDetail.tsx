@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChangeEvent, PointerEvent as ReactPointerEvent } from "react";
+import type { ChangeEvent } from "react";
+import { Splide, SplideSlide } from "@splidejs/react-splide";
+import "@splidejs/react-splide/css/core";
 import { Link, useParams } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
@@ -29,18 +31,6 @@ import {
 } from "../lib/dsf";
 
 const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
-const GALLERY_SWIPE_THRESHOLD = 44;
-const GALLERY_TAP_TOLERANCE = 8;
-
-type GalleryDragState = {
-  pointerId: number | null;
-  startX: number;
-  startY: number;
-  deltaX: number;
-  deltaY: number;
-  hasMoved: boolean;
-  suppressClick: boolean;
-};
 
 function maskPersonName(value: string) {
   const words = value.trim().split(/\s+/);
@@ -102,22 +92,12 @@ export function UnitDetail() {
   const [activeThumb, setActiveThumb] = useState(0);
   const [showAllThumbs, setShowAllThumbs] = useState(false);
   const [lightbox, setLightbox] = useState(false);
-  const [galleryDragOffset, setGalleryDragOffset] = useState(0);
-  const [galleryIsDragging, setGalleryIsDragging] = useState(false);
   const [dpAmountInput, setDpAmountInput] = useState("");
   const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
   const [simLoading, setSimLoading] = useState(false);
   const simTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const pageRef = useRef<HTMLElement>(null);
-  const galleryDrag = useRef<GalleryDragState>({
-    pointerId: null,
-    startX: 0,
-    startY: 0,
-    deltaX: 0,
-    deltaY: 0,
-    hasMoved: false,
-    suppressClick: false,
-  });
+  const galleryRef = useRef<Splide>(null);
 
   const price = unit?.harga ?? 0;
   const baseCreditPrice = unit?.harga_kredit || price;
@@ -235,6 +215,9 @@ export function UnitDetail() {
   }, [price, baseCreditPrice, dpPercent, tenor, unit?.brand, unit?.type, unit?.year]);
 
   useEffect(() => {
+    setActiveThumb(0);
+    setShowAllThumbs(false);
+    setLightbox(false);
     pageRef.current?.scrollTo({ top: 0 });
   }, [slug]);
 
@@ -294,109 +277,10 @@ export function UnitDetail() {
   const heroSrc = mobixImage(heroUrl, MOBIX_HERO_WIDTH);
   const badge = deriveBadge({ odometer: unit.odometer, harga: price });
   const thumbCount = Math.min(4, gallery.length);
-  const heroSlideIndexes =
-    gallery.length > 1
-      ? [
-          (activeThumb - 1 + gallery.length) % gallery.length,
-          activeThumb,
-          (activeThumb + 1) % gallery.length,
-        ]
-      : [activeThumb];
 
-  function showRelativePhoto(direction: -1 | 1) {
-    if (gallery.length < 2) return;
-    setActiveThumb((current) => {
-      const next = current + direction;
-      if (next < 0) return gallery.length - 1;
-      if (next >= gallery.length) return 0;
-      return next;
-    });
-  }
-
-  function handleGalleryPointerDown(e: ReactPointerEvent<HTMLButtonElement>) {
-    galleryDrag.current = {
-      pointerId: e.pointerId,
-      startX: e.clientX,
-      startY: e.clientY,
-      deltaX: 0,
-      deltaY: 0,
-      hasMoved: false,
-      suppressClick: false,
-    };
-
-    if (gallery.length > 1) {
-      setGalleryIsDragging(true);
-      setGalleryDragOffset(0);
-      e.currentTarget.setPointerCapture(e.pointerId);
-    }
-  }
-
-  function handleGalleryPointerMove(e: ReactPointerEvent<HTMLButtonElement>) {
-    const drag = galleryDrag.current;
-    if (drag.pointerId !== e.pointerId) return;
-
-    drag.deltaX = e.clientX - drag.startX;
-    drag.deltaY = e.clientY - drag.startY;
-    const absX = Math.abs(drag.deltaX);
-    const absY = Math.abs(drag.deltaY);
-    drag.hasMoved = absX > GALLERY_TAP_TOLERANCE || absY > GALLERY_TAP_TOLERANCE;
-
-    if (gallery.length > 1 && absX > absY) {
-      e.preventDefault();
-      const maxOffset = e.currentTarget.clientWidth * 0.55;
-      setGalleryDragOffset(
-        Math.max(-maxOffset, Math.min(maxOffset, drag.deltaX)),
-      );
-    }
-  }
-
-  function handleGalleryPointerUp(e: ReactPointerEvent<HTMLButtonElement>) {
-    const drag = galleryDrag.current;
-    if (drag.pointerId !== e.pointerId) return;
-
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-
-    const absX = Math.abs(drag.deltaX);
-    const absY = Math.abs(drag.deltaY);
-    const shouldSwipe =
-      gallery.length > 1 &&
-      absX >= GALLERY_SWIPE_THRESHOLD &&
-      absX > absY * 1.15;
-
-    if (shouldSwipe) {
-      showRelativePhoto(drag.deltaX < 0 ? 1 : -1);
-      drag.suppressClick = true;
-    } else {
-      drag.suppressClick = drag.hasMoved;
-    }
-
-    drag.pointerId = null;
-    setGalleryIsDragging(false);
-    setGalleryDragOffset(0);
-  }
-
-  function handleGalleryPointerCancel(e: ReactPointerEvent<HTMLButtonElement>) {
-    const drag = galleryDrag.current;
-    if (drag.pointerId !== e.pointerId) return;
-
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-
-    drag.suppressClick = drag.hasMoved;
-    drag.pointerId = null;
-    setGalleryIsDragging(false);
-    setGalleryDragOffset(0);
-  }
-
-  function handleGalleryClick() {
-    if (galleryDrag.current.suppressClick) {
-      galleryDrag.current.suppressClick = false;
-      return;
-    }
-    setLightbox(true);
+  function selectPhoto(index: number) {
+    setActiveThumb(index);
+    galleryRef.current?.go(index);
   }
 
   const topSpecs = [
@@ -416,41 +300,45 @@ export function UnitDetail() {
       <main ref={pageRef} className="min-h-screen overflow-y-auto sm:min-h-0">
         {/* GALLERY */}
         <div className="relative overflow-hidden">
-          <div
-            className={`flex ${galleryIsDragging ? "" : "transition-transform duration-200 ease-out"}`}
-            style={{
-              transform:
-                gallery.length > 1
-                  ? `translateX(calc(-100% + ${galleryDragOffset}px))`
-                  : "translateX(0)",
-            }}
-          >
-            {heroSlideIndexes.map((slideIndex, slotIndex) => {
-              const slide = gallery[slideIndex];
-              const slideUrl = slide?.url;
-              return (
-                <Photo
-                  key={`${slotIndex}-${slide?.id ?? "empty"}-${slideIndex}`}
-                  large
-                  className="aspect-[4/3] flex-[0_0_100%]"
-                  src={mobixImage(slideUrl, MOBIX_HERO_WIDTH)}
-                  placeholderSrc={mobixImage(slideUrl, MOBIX_THUMBNAIL_WIDTH)}
-                  alt={slideIndex === activeThumb ? unit.nama : ""}
-                />
-              );
-            })}
-          </div>
-          {/* transparent tap zone behind all overlays */}
-          <button
-            type="button"
-            className="absolute inset-0 cursor-zoom-in touch-pan-y select-none"
-            aria-label="Lihat foto penuh atau geser foto"
-            onClick={handleGalleryClick}
-            onPointerDown={handleGalleryPointerDown}
-            onPointerMove={handleGalleryPointerMove}
-            onPointerUp={handleGalleryPointerUp}
-            onPointerCancel={handleGalleryPointerCancel}
-          />
+          {gallery.length > 0 ? (
+            <Splide
+              key={unit.slug}
+              ref={galleryRef}
+              className="unit-gallery-splide aspect-[4/3] cursor-zoom-in bg-hatch-lg"
+              options={{
+                arrows: false,
+                drag: gallery.length > 1,
+                gap: 0,
+                pagination: false,
+                perMove: 1,
+                perPage: 1,
+                rewind: gallery.length > 1,
+                slideFocus: false,
+                speed: 260,
+                waitForTransition: false,
+              }}
+              onMoved={(_splide, index) => setActiveThumb(index)}
+              onClick={(_splide, _slide, event) => {
+                event.preventDefault();
+                setLightbox(true);
+              }}
+              aria-label={`Galeri foto ${unit.nama}`}
+            >
+              {gallery.map((g, index) => (
+                <SplideSlide key={g.id}>
+                  <Photo
+                    large
+                    className="h-full w-full"
+                    src={mobixImage(g.url, MOBIX_HERO_WIDTH)}
+                    placeholderSrc={mobixImage(g.url, MOBIX_THUMBNAIL_WIDTH)}
+                    alt={index === activeThumb ? unit.nama : ""}
+                  />
+                </SplideSlide>
+              ))}
+            </Splide>
+          ) : (
+            <Photo large className="aspect-[4/3]" alt={unit.nama} />
+          )}
           <Link
             href="/katalog"
             aria-label="Kembali"
@@ -504,7 +392,7 @@ export function UnitDetail() {
               {gallery.slice(0, thumbCount).map((g, i) => (
                 <button
                   key={g.id}
-                  onClick={() => setActiveThumb(i)}
+                  onClick={() => selectPhoto(i)}
                   className={`h-12 flex-[0_0_64px] overflow-hidden rounded-lg ${
                     i === activeThumb ? "ring-2 ring-ink" : ""
                   }`}
@@ -529,7 +417,7 @@ export function UnitDetail() {
                   return (
                     <button
                       key={g.id}
-                      onClick={() => setActiveThumb(absoluteIndex)}
+                      onClick={() => selectPhoto(absoluteIndex)}
                       className={`h-12 overflow-hidden rounded-lg ${
                         absoluteIndex === activeThumb ? "ring-2 ring-ink" : ""
                       }`}

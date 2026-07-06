@@ -25,6 +25,12 @@
   .scroll-x::-webkit-scrollbar {
     display: none;
   }
+
+  .unit-gallery-splide .splide__track,
+  .unit-gallery-splide .splide__list,
+  .unit-gallery-splide .splide__slide {
+    height: 100%;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
