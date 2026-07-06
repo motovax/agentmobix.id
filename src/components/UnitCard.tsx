@@ -10,6 +10,13 @@ import { Calculator, ShareArrow } from "./icons";
  * also triggering card navigation.
  */
 export function UnitCard({ unit }: { unit: CardUnit }) {
+  const shareParams = new URLSearchParams({
+    u: unit.slug,
+    tenor: "60",
+    tdp: String(Math.round(unit.tdp)),
+    cicilan: String(Math.round(unit.cicilan)),
+  });
+
   return (
     <article className="relative flex-[0_0_200px] snap-start overflow-hidden rounded-2xl border border-line bg-surface-3">
       {/* full-card overlay link → detail */}
@@ -66,7 +73,7 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
             </div>
           </div>
           <Link
-            href={`/share?u=${unit.slug}`}
+            href={`/share?${shareParams.toString()}`}
             aria-label={`Share ${unit.title}`}
             className="relative z-[2] inline-flex items-center gap-1 rounded-[10px] bg-ink px-2.5 py-2 text-[11px] font-bold text-surface no-underline"
           >

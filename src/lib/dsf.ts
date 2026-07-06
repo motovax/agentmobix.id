@@ -4,6 +4,7 @@ const DSF_BASE = import.meta.env.VITE_DSF_BASE_URL || "https://simulation.dipost
 const DSF_TOKEN = import.meta.env.VITE_DSF_BEARER_TOKEN || "";
 
 export interface DsfSimResult {
+  hargaKredit: number;
   installmentRounded: number;
   totalDownPaymentRounded: number;
   downPaymentRounded: number;
@@ -17,6 +18,7 @@ export interface DsfSimResult {
 }
 
 interface DsfAllParamsData {
+  harga_kredit?: number;
   installmentRounded: number;
   totalDownPaymentRounded: number;
   downPaymentRounded: number;
@@ -97,10 +99,18 @@ async function fetchDsfAllParams(
 }
 
 export async function simulateKredit(params: DsfSimParams): Promise<DsfSimResult | null> {
+  return simulateKreditWithSignal(params);
+}
+
+export async function simulateKreditWithSignal(
+  params: DsfSimParams,
+  signal?: AbortSignal,
+): Promise<DsfSimResult | null> {
   try {
-    const d = await fetchDsfAllParams(params);
+    const d = await fetchDsfAllParams(params, signal);
     if (!d) return null;
     return {
+      hargaKredit: d.harga_kredit || params.unitPrice,
       installmentRounded: d.installmentRounded,
       totalDownPaymentRounded: d.totalDownPaymentRounded,
       downPaymentRounded: d.downPaymentRounded,
@@ -120,6 +130,27 @@ export async function simulateKredit(params: DsfSimParams): Promise<DsfSimResult
 export interface DsfCreditPriceResult {
   unitPrice: number;
   allInToSupplier: number;
+}
+
+export async function resolveMobixCreditSimulation(
+  params: DsfSimParams,
+  cashTarget: number,
+  maxCreditPrice: number,
+  signal?: AbortSignal,
+): Promise<DsfSimResult | null> {
+  const seedPrice = maxCreditPrice > 0 ? maxCreditPrice : params.unitPrice;
+  let search: DsfCreditPriceResult | null = null;
+  try {
+    search = await findLowestCreditPrice(
+      { ...params, unitPrice: seedPrice },
+      cashTarget,
+      signal,
+    );
+  } catch {
+    search = null;
+  }
+  const unitPrice = search?.unitPrice || seedPrice || params.unitPrice;
+  return simulateKreditWithSignal({ ...params, unitPrice }, signal);
 }
 
 export async function findLowestCreditPrice(

@@ -24,7 +24,7 @@ import {
   type Tenor,
 } from "../lib/installment";
 import {
-  simulateKredit,
+  resolveMobixCreditSimulation,
   type DsfSimResult,
 } from "../lib/dsf";
 
@@ -97,12 +97,27 @@ export function UnitDetail() {
   const pageRef = useRef<HTMLElement>(null);
 
   const price = unit?.harga ?? 0;
-  const displayCreditPrice = unit?.harga_kredit ?? 0;
+  const baseCreditPrice = unit?.harga_kredit || price;
   const localDp = downPayment(price, dpPercent);
   const localMonthly = monthlyInstallment(price, dpPercent, tenor);
 
+  const dsfCreditPrice = simResult?.hargaKredit;
+  const dsfDp = simResult?.downPaymentRounded;
+  const dsfDpPercent = simResult?.percentDownPayment;
   const dsfMonthly = simResult?.installmentRounded;
   const dsfTdp = simResult?.totalDownPaymentRounded;
+  const displayCreditPrice =
+    typeof dsfCreditPrice === "number" && Number.isFinite(dsfCreditPrice) && dsfCreditPrice > 0
+      ? dsfCreditPrice
+      : baseCreditPrice;
+  const displayDp =
+    typeof dsfDp === "number" && Number.isFinite(dsfDp) && dsfDp > 0
+      ? dsfDp
+      : localDp;
+  const displayDpPercent =
+    typeof dsfDpPercent === "number" && Number.isFinite(dsfDpPercent) && dsfDpPercent > 0
+      ? dsfDpPercent
+      : dpPercent;
   const displayMonthly =
     typeof dsfMonthly === "number" && Number.isFinite(dsfMonthly) && dsfMonthly > 0
       ? dsfMonthly
@@ -112,6 +127,16 @@ export function UnitDetail() {
       ? dsfTdp
       : localDp;
   const currencyFormatter = new Intl.NumberFormat("id-ID");
+  const shareParams = new URLSearchParams({
+    u: unit?.slug ?? slug ?? "",
+    tenor: String(tenor),
+    dp_pct: String(Math.round(displayDpPercent * 10) / 10),
+    dp: String(Math.round(displayDp)),
+    harga_kredit: String(Math.round(displayCreditPrice)),
+    cicilan: String(Math.round(displayMonthly)),
+    tdp: String(Math.round(displayTdp)),
+  });
+  const shareHref = `/share?${shareParams.toString()}`;
 
   function formatDpValue(value: number) {
     return currencyFormatter.format(Math.max(0, Math.round(value || 0)));
@@ -157,27 +182,34 @@ export function UnitDetail() {
       return;
     }
     let alive = true;
+    const controller = new AbortController();
     clearTimeout(simTimer.current);
     setSimResult(null);
     setSimLoading(true);
     simTimer.current = setTimeout(async () => {
-      const result = await simulateKredit({
-        unitPrice: price,
-        dpPercent,
-        tenor,
-        brand: unit?.brand,
-        model: unit?.type,
-        year: unit?.year,
-      });
+      const result = await resolveMobixCreditSimulation(
+        {
+          unitPrice: baseCreditPrice,
+          dpPercent,
+          tenor,
+          brand: unit?.brand,
+          model: unit?.type,
+          year: unit?.year,
+        },
+        price,
+        baseCreditPrice,
+        controller.signal,
+      );
       if (!alive) return;
       setSimResult(result);
       setSimLoading(false);
     }, 600);
     return () => {
       alive = false;
+      controller.abort();
       clearTimeout(simTimer.current);
     };
-  }, [price, dpPercent, tenor, unit?.brand, unit?.type, unit?.year]);
+  }, [price, baseCreditPrice, dpPercent, tenor, unit?.brand, unit?.type, unit?.year]);
 
   useEffect(() => {
     pageRef.current?.scrollTo({ top: 0 });
@@ -279,7 +311,7 @@ export function UnitDetail() {
             <ChevronLeft />
           </Link>
           <Link
-            href={`/share?u=${unit.slug}`}
+            href={shareHref}
             aria-label="Share"
             className="absolute right-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
           >
@@ -428,6 +460,9 @@ export function UnitDetail() {
             <div className="mb-3.5">
               <div className="mb-1.5 flex items-center justify-between text-[12px] font-semibold text-mid">
                 <span>DP (Down Payment)</span>
+                <span className="text-teal-deep">
+                  {Math.round(displayDpPercent * 10) / 10}% · {formatRupiah(displayDp)}
+                </span>
               </div>
               <div className="mb-2 flex items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
                 <span className="pr-2 text-[13px] font-semibold text-muted">Rp</span>
@@ -452,6 +487,10 @@ export function UnitDetail() {
                 aria-label="Persentase uang muka"
                 className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#E0E7E9] accent-ink"
               />
+              <div className="mt-1.5 flex items-center justify-between text-[10px] font-semibold text-muted">
+                <span>15%</span>
+                <span>60%</span>
+              </div>
             </div>
 
             <div className="mb-3.5">
@@ -481,6 +520,22 @@ export function UnitDetail() {
                 HASIL SIMULASI
               </div>
               <div className="mt-2.5 space-y-1.5 border-t border-white/10 pt-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
+                    HARGA KREDIT
+                  </div>
+                  <div className="text-[13px] font-extrabold">
+                    {formatRupiah(displayCreditPrice)}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
+                    DP
+                  </div>
+                  <div className="text-[13px] font-extrabold">
+                    {formatRupiah(displayDp)}
+                  </div>
+                </div>
                 <div className="flex items-center justify-between">
                   <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
                     CICILAN PER BULAN
@@ -587,7 +642,7 @@ export function UnitDetail() {
       {/* STICKY ACTIONS */}
       <div className="fixed bottom-9 left-1/2 z-30 flex w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
         <Link
-          href={`/share?u=${unit.slug}`}
+          href={shareHref}
           className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-ink px-3.5 py-3 text-[13px] font-bold text-surface no-underline"
         >
           Share ke klien

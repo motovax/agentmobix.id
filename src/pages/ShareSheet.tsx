@@ -63,6 +63,11 @@ function composeBlobToFile(
   return new File([blob], fallbackName, { type: "image/jpeg" });
 }
 
+function positiveParamNumber(params: URLSearchParams, key: string): number | null {
+  const value = Number(params.get(key));
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 async function fetchRawBlob(pathOrUrl: string, cache: Map<string, Blob>) {
   if (cache.has(pathOrUrl)) return cache.get(pathOrUrl)!;
   const src = mobixImageFetchableWithWidth(pathOrUrl, 2560);
@@ -79,9 +84,9 @@ async function fetchRawBlob(pathOrUrl: string, cache: Map<string, Blob>) {
 }
 
 async function buildShareImagesViaBackend(
-  unit: ProductDetail,
   selectedGallery: ProductDetail["galeri"],
   dealHarga: number,
+  tdp: number,
   includeOverlay: boolean,
 ): Promise<File[]> {
   const sources = selectedGallery
@@ -92,7 +97,7 @@ async function buildShareImagesViaBackend(
       const blob = await composeShareImageViaBackend({
         source,
         price: dealHarga,
-        tdp: unit.tdp,
+        tdp,
         includeOverlay,
         width: 1280,
         height: 720,
@@ -107,9 +112,9 @@ async function buildShareImagesViaBackend(
 }
 
 async function buildShareImagesLocally(
-  unit: ProductDetail,
   selectedGallery: ProductDetail["galeri"],
   dealHarga: number,
+  tdp: number,
   includeOverlay: boolean,
   cache: Map<string, Blob>,
 ): Promise<File[]> {
@@ -120,13 +125,13 @@ async function buildShareImagesLocally(
     sources.map((url) => fetchRawBlob(url, cache)),
   );
   const valid = blobs.filter(Boolean) as Blob[];
-  return Promise.all(valid.map((blob) => composeOverlay(blob, unit, dealHarga, includeOverlay)));
+  return Promise.all(valid.map((blob) => composeOverlay(blob, dealHarga, tdp, includeOverlay)));
 }
 
 async function composeOverlay(
   rawBlob: Blob,
-  unit: ProductDetail,
   dealHarga: number,
+  tdp: number,
   includeOverlay = true,
   crop: "cover" | "contain" = "cover",
 ): Promise<File> {
@@ -156,7 +161,7 @@ async function composeOverlay(
 
   // price pill (only when includeOverlay is true)
   if (includeOverlay) {
-    const text = `Rp ${formatJt(dealHarga)} · TDP ${formatJt(unit.tdp)}`;
+    const text = `Rp ${formatJt(dealHarga)} · TDP ${formatJt(tdp)}`;
     const fs = 44;
     ctx.font = `bold ${fs}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
     const tw = ctx.measureText(text).width;
@@ -206,7 +211,8 @@ async function composeOverlay(
 
 export function ShareSheet() {
   const search = useSearch();
-  const slug = new URLSearchParams(search).get("u") ?? "";
+  const searchParams = new URLSearchParams(search);
+  const slug = searchParams.get("u") ?? "";
   const { data: unit, loading } = useAsync(() => fetchUnitDetail(slug), [slug]);
 
   const [copied, setCopied] = useState<"" | "caption" | "link">("");
@@ -234,6 +240,12 @@ export function ShareSheet() {
 
   const gallery = unit?.galeri ?? [];
   const activeImg = gallery[previewIdx] ?? gallery[0];
+  const shareTenor = positiveParamNumber(searchParams, "tenor") ?? 60;
+  const shareTdp = positiveParamNumber(searchParams, "tdp") ?? unit?.tdp ?? 0;
+  const shareCicilan = positiveParamNumber(searchParams, "cicilan") ?? unit?.cicilan ?? 0;
+  const shareDp = positiveParamNumber(searchParams, "dp") ?? null;
+  const shareDpPercent = positiveParamNumber(searchParams, "dp_pct") ?? null;
+  const shareCreditPrice = positiveParamNumber(searchParams, "harga_kredit") ?? unit?.harga_kredit ?? null;
 
   // init when unit loads
   useEffect(() => {
@@ -243,14 +255,13 @@ export function ShareSheet() {
     setSelectedIdxes([0]);
     setPreviewIdx(0);
     setCaptionText(
-      `${unit.nama} tangan pertama, KM ${Math.round(unit.odometer / 1000)}rb. Cukup TDP ${formatJt(unit.tdp)}, cicilan ${formatJt(unit.cicilan)}/bln. Unit ready di cabang ${titleCase(unit.lokasi || "Mobix")}, bisa cek langsung. Chat saya ya 🙌`,
+      `${unit.nama} tangan pertama, KM ${Math.round(unit.odometer / 1000)}rb. Cukup TDP ${formatJt(shareTdp)}, cicilan ${formatJt(shareCicilan)}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${titleCase(unit.lokasi || "Mobix")}, bisa cek langsung. Chat saya ya 🙌`,
     );
-  }, [unit?.id]);
+  }, [unit?.id, shareTdp, shareCicilan, shareTenor]);
 
   // fetch raw blobs (cached) + compose download files whenever selection changes
   useEffect(() => {
     if (!unit || !gallery.length) return;
-    const u = unit; // capture non-null for closure
     let alive = true;
     setComposing(true);
 
@@ -260,9 +271,9 @@ export function ShareSheet() {
 
     async function run() {
       const backendFiles = await buildShareImagesViaBackend(
-        u,
         selectedGallery,
         dealHarga,
+        shareTdp,
         false,
       );
       if (!alive) return;
@@ -274,9 +285,9 @@ export function ShareSheet() {
       }
 
       const files = await buildShareImagesLocally(
-        u,
         selectedGallery,
         dealHarga,
+        shareTdp,
         false,
         blobCache.current,
       );
@@ -301,7 +312,7 @@ export function ShareSheet() {
     const selectedGallery = selectedIdxes
       .map((i) => gallery[i])
       .filter(Boolean);
-    const signature = `${selectedIdxes.join(",")}:${dealHarga}`;
+    const signature = `${selectedIdxes.join(",")}:${dealHarga}:${shareTdp}`;
 
     if (shareFiles.length > 0 && shareFilesSignature === signature) {
       return shareFiles;
@@ -311,9 +322,9 @@ export function ShareSheet() {
 
     try {
       const backendFiles = await buildShareImagesViaBackend(
-        unit,
         selectedGallery,
         dealHarga,
+        shareTdp,
         false,
       );
 
@@ -321,9 +332,9 @@ export function ShareSheet() {
         backendFiles.length > 0
           ? backendFiles
           : await buildShareImagesLocally(
-              unit,
               selectedGallery,
               dealHarga,
+              shareTdp,
               false,
               blobCache.current,
             );
@@ -358,9 +369,9 @@ export function ShareSheet() {
   const autoCaption = unit
     ? `${unit.nama} tangan pertama, KM ${Math.round(
         unit.odometer / 1000,
-      )}rb. Cukup TDP ${formatJt(unit.tdp)}, cicilan ${formatJt(
-        unit.cicilan,
-      )}/bln. Unit ready di cabang ${titleCase(
+      )}rb. Cukup TDP ${formatJt(shareTdp)}, cicilan ${formatJt(
+        shareCicilan,
+      )}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${titleCase(
         unit.lokasi || "Mobix",
       )}, bisa cek langsung. Chat saya ya 🙌`
     : "";
@@ -453,7 +464,7 @@ export function ShareSheet() {
           >
             {unit && (
               <div className="absolute bottom-3 left-3 rounded-lg bg-ink/85 px-3 py-1.5 text-[15px] font-bold text-surface">
-                Rp {formatJt(dealHarga || unit.harga)} · TDP {formatJt(unit.tdp)}
+                Rp {formatJt(dealHarga || unit.harga)} · TDP {formatJt(shareTdp)}
               </div>
             )}
             <img
@@ -472,9 +483,21 @@ export function ShareSheet() {
               <>
                 <div className="text-[14px] font-bold">{unit.nama}</div>
                 <div className="mt-0.5 text-[12px] text-muted">
-                  Cicilan dari {formatRupiah(unit.cicilan)}/bln · 60 bln ·{" "}
+                  Cicilan dari {formatRupiah(shareCicilan)}/bln · {shareTenor} bln ·{" "}
                   {titleCase(unit.lokasi || "Mobix")}
                 </div>
+                {(shareCreditPrice || shareDp) && (
+                  <div className="mt-1 text-[11px] text-muted">
+                    {shareCreditPrice && <>Harga kredit {formatRupiah(shareCreditPrice)}</>}
+                    {shareCreditPrice && shareDp && " · "}
+                    {shareDp && (
+                      <>
+                        DP {formatRupiah(shareDp)}
+                        {shareDpPercent && ` (${Math.round(shareDpPercent * 10) / 10}%)`}
+                      </>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
