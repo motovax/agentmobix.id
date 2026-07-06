@@ -522,22 +522,6 @@ export function UnitDetail() {
               <div className="mt-2.5 space-y-1.5 border-t border-white/10 pt-2.5">
                 <div className="flex items-center justify-between">
                   <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
-                    HARGA KREDIT
-                  </div>
-                  <div className="text-[13px] font-extrabold">
-                    {formatRupiah(displayCreditPrice)}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
-                    DP
-                  </div>
-                  <div className="text-[13px] font-extrabold">
-                    {formatRupiah(displayDp)}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
                     CICILAN PER BULAN
                   </div>
                   <div className="text-[13px] font-extrabold">
