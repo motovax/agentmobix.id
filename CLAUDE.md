@@ -14,6 +14,11 @@ Auto-trigger setiap push ke `main`. Untuk trigger manual:
 gh workflow run deploy.yml
 ```
 
+Jika agen melakukan `push` ke `main`, jangan berhenti di `git push` saja. Selalu lanjutkan dengan:
+- cek status workflow deploy GitHub Pages,
+- jika deploy gagal atau tidak jalan, trigger ulang `deploy.yml`,
+- verifikasi hasil deploy sebelum handoff ke user.
+
 ### Cloudflare Worker (`worker/`)
 Auto-trigger setiap push ke `main` yang mengubah file di `worker/`. Untuk trigger manual:
 ```
