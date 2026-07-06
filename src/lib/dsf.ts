@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-const DSF_BASE = import.meta.env.VITE_DSF_BASE_URL || "https://simulation.dipostar.com";
-const DSF_TOKEN = import.meta.env.VITE_DSF_BEARER_TOKEN || "";
+const API_BASE = import.meta.env.VITE_MOBIX_API_BASE || "https://mobix.motovax.com";
+const API_KEY = import.meta.env.VITE_MOBIX_API_KEY || "";
 
 export interface DsfSimResult {
   hargaKredit: number;
@@ -85,8 +85,8 @@ async function fetchDsfAllParams(
   const payload = buildDsfSimulationPayload(params);
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (DSF_TOKEN) headers.Authorization = `Bearer ${DSF_TOKEN}`;
-  const res = await fetch(`${DSF_BASE}/api/calculator/tenor/allparams`, {
+  if (API_KEY) headers.Authorization = `Bearer ${API_KEY}`;
+  const res = await fetch(`${API_BASE}/kalkulator/allparams`, {
     method: "POST",
     headers,
     body: JSON.stringify(payload),

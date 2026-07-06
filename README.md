@@ -27,7 +27,7 @@ The app calls each API origin directly from browser JavaScript:
 
 - Mobix inventory: `https://mobix.motovax.com`
 - Strapi CMS: `https://api.mobixbydss.id/api`
-- DSF simulation: `https://simulation.dipostar.com`
+- Credit simulation: `https://mobix.motovax.com/kalkulator/allparams`
 
 The Mobix API key is a public Developer API key generated in Motovax. Its access
 is controlled by scopes, product fields, and CORS origins in the Developer API
@@ -42,8 +42,6 @@ VITE_MOBIX_IMAGE_BASE=https://mobix.motovax.com
 VITE_STRAPI_API_KEY=
 VITE_CMS_API_BASE=https://api.mobixbydss.id/api
 VITE_CMS_IMAGE_BASE=https://api.mobixbydss.id
-VITE_DSF_BEARER_TOKEN=
-VITE_DSF_BASE_URL=https://simulation.dipostar.com
 ```
 
 ## Deployment
