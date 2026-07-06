@@ -98,8 +98,6 @@ export function UnitDetail() {
 
   const price = unit?.harga ?? 0;
   const baseCreditPrice = unit?.harga_kredit || price;
-  const localDp = downPayment(price, dpPercent);
-  const localMonthly = monthlyInstallment(price, dpPercent, tenor);
 
   const dsfCreditPrice = simResult?.hargaKredit;
   const dsfDp = simResult?.downPaymentRounded;
@@ -110,6 +108,8 @@ export function UnitDetail() {
     typeof dsfCreditPrice === "number" && Number.isFinite(dsfCreditPrice) && dsfCreditPrice > 0
       ? dsfCreditPrice
       : baseCreditPrice;
+  const localDp = downPayment(displayCreditPrice, dpPercent);
+  const localMonthly = monthlyInstallment(displayCreditPrice, dpPercent, tenor);
   const displayDp =
     typeof dsfDp === "number" && Number.isFinite(dsfDp) && dsfDp > 0
       ? dsfDp
@@ -143,16 +143,16 @@ export function UnitDetail() {
   }
 
   function toDpPercentFromAmount(amount: number) {
-    if (!price) return 15;
-    const next = Math.round((amount / price) * 100);
+    if (!displayCreditPrice) return 15;
+    const next = Math.round((amount / displayCreditPrice) * 100);
     if (Number.isNaN(next)) return 15;
     return Math.min(60, Math.max(15, next));
   }
 
   useEffect(() => {
-    if (!price) return;
-    setDpAmountInput(formatDpValue(localDp));
-  }, [price, dpPercent]);
+    if (!displayCreditPrice) return;
+    setDpAmountInput(formatDpValue(displayDp));
+  }, [displayCreditPrice, displayDp]);
 
   function handleDpAmountChange(e: ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value.replace(/\D/g, "");
@@ -172,7 +172,7 @@ export function UnitDetail() {
     const amount = Number(dpAmountInput.replace(/\D/g, ""));
     const nextPercent = toDpPercentFromAmount(amount);
     setDpPercent(nextPercent);
-    setDpAmountInput(formatDpValue(downPayment(price, nextPercent)));
+    setDpAmountInput(formatDpValue(downPayment(displayCreditPrice, nextPercent)));
   }
 
   useEffect(() => {
