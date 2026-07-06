@@ -141,14 +141,14 @@ export function Katalog() {
                 }`}
               >
                 {c.label}
-                {isActive && total ? ` · ${total}` : ""}
+                {isActive && !loading && total > 0 ? ` · ${total}` : ""}
               </button>
             );
           })}
         </div>
         <div className="mt-2 flex items-center justify-between px-0.5">
           <span className="text-[12px] text-muted">
-            {total ? `${total} unit ready` : "Memuat stok…"} · langsung dari cabang
+            {loading ? "Memuat stok…" : `${total} unit ready · langsung dari cabang`}
           </span>
           <span className="text-[12px] font-semibold text-teal-deep">Stok live</span>
         </div>
