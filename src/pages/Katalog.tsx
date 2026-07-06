@@ -141,7 +141,7 @@ export function Katalog() {
                 }`}
               >
                 {c.label}
-                {c.value === "" && total ? ` · ${total}` : ""}
+                {isActive && total ? ` · ${total}` : ""}
               </button>
             );
           })}
