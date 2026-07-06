@@ -1,19 +1,16 @@
 // Mobix API client.
 //
-// The authed POST endpoints (/daftar-produk, /detail-produk) are reached through
-// a same-origin proxy (`/api/mobix/...`) that injects the bearer token
-// server-side — see vite.config.ts. The browser never sees the token. Images go
-// through `/unit-file-serve` (public), also proxied to keep a single origin.
+// Browser calls the Mobix API origin directly with a Developer API key.
+// In dev and production, calls use the same direct API configuration.
+// In production, set VITE_MOBIX_API_KEY to the Motovax Developer API key.
+// CORS and readable fields are configured in Motovax Developer API.
+const API_BASE = import.meta.env.VITE_MOBIX_API_BASE || "https://mobix.motovax.com";
+const API_KEY = import.meta.env.VITE_MOBIX_API_KEY || "";
 
-// In dev, calls go to the Vite proxy ("/api/mobix") which injects the token.
-// In production (static GitHub Pages), set VITE_MOBIX_PROXY to the Cloudflare
-// Worker URL that holds the token + adds CORS. See worker/ and README.
-const PROXY = import.meta.env.VITE_MOBIX_PROXY || "/api/mobix";
-
-// Image base. Photos are public and load cross-origin via <img> without CORS,
-// so in production point this at the API origin; in dev leave empty to use the
-// Vite "/unit-file-serve" proxy.
-const IMG_BASE = import.meta.env.VITE_MOBIX_IMAGE_BASE || "";
+// Photos are public and served by the Mobix API origin.
+//
+// CORS is configured in Motovax Developer API.
+const IMG_BASE = import.meta.env.VITE_MOBIX_IMAGE_BASE || API_BASE;
 export const MOBIX_THUMBNAIL_WIDTH = 420;
 export const MOBIX_HERO_WIDTH = 1600;
 export const MOBIX_SHARE_WIDTH = 2560;
@@ -183,9 +180,11 @@ export function classifyQuery(q: string): QueryClassification {
 }
 
 async function post<T>(path: string, body: unknown): Promise<ApiEnvelope<T>> {
-  const res = await fetch(`${PROXY}${path}`, {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (API_KEY) headers.Authorization = `Bearer ${API_KEY}`;
+  const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -200,7 +199,9 @@ async function post<T>(path: string, body: unknown): Promise<ApiEnvelope<T>> {
 }
 
 async function get<T>(path: string): Promise<ApiEnvelope<T>> {
-  const res = await fetch(`${PROXY}${path}`);
+  const headers: Record<string, string> = {};
+  if (API_KEY) headers.Authorization = `Bearer ${API_KEY}`;
+  const res = await fetch(`${API_BASE}${path}`, { headers });
   if (!res.ok) throw new Error(`Mobix API ${res.status}`);
   const json = (await res.json()) as ApiEnvelope<T>;
   if (json.status === "failure") {
@@ -282,16 +283,15 @@ export function mobixImage(
 }
 
 /**
- * Image URL routed through the API proxy (CF Worker in prod, Vite proxy in dev).
- * The proxy adds CORS headers, so fetch() can read the blob for navigator.share({ files }).
- * mobixImage() goes to the CDN origin directly which works for <img> but blocks fetch().
+ * Image URL on the Mobix API origin. CORS is configured in Developer API so
+ * fetch() can read the blob for navigator.share({ files }).
  */
 export function mobixImageFetchable(pathOrUrl: string | undefined): string | undefined {
   if (!pathOrUrl) return undefined;
   const path = /^https?:\/\//.test(pathOrUrl)
     ? new URL(pathOrUrl).pathname + new URL(pathOrUrl).search
     : pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
-  return `${PROXY}${path}`;
+  return `${API_BASE}${path}`;
 }
 
 export function mobixImageFetchableWithWidth(
@@ -311,7 +311,7 @@ export function mobixImageFetchableWithWidth(
 export async function composeShareImageViaBackend(
   request: ShareImageRequest,
 ): Promise<Blob | null> {
-  const url = new URL(`${PROXY}/share-image`, window.location.origin);
+  const url = new URL(`${API_BASE}/share-image`);
   url.searchParams.set("source", request.source);
   url.searchParams.set("price", String(request.price ?? 0));
   url.searchParams.set("tdp", String(request.tdp ?? 0));
@@ -326,7 +326,9 @@ export async function composeShareImageViaBackend(
   }
 
   try {
-    const res = await fetch(url.toString());
+    const headers: Record<string, string> = {};
+    if (API_KEY) headers.Authorization = `Bearer ${API_KEY}`;
+    const res = await fetch(url.toString(), { headers });
     if (!res.ok) return null;
     return await res.blob();
   } catch {

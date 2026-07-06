@@ -1,10 +1,14 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** Production API proxy base (Cloudflare Worker URL). Empty in dev. */
-  readonly VITE_MOBIX_PROXY?: string;
-  /** Production image origin for /unit-file-serve. Empty in dev. */
+  readonly VITE_MOBIX_API_KEY?: string;
+  readonly VITE_MOBIX_API_BASE?: string;
   readonly VITE_MOBIX_IMAGE_BASE?: string;
+  readonly VITE_STRAPI_API_KEY?: string;
+  readonly VITE_CMS_API_BASE?: string;
+  readonly VITE_CMS_IMAGE_BASE?: string;
+  readonly VITE_DSF_BEARER_TOKEN?: string;
+  readonly VITE_DSF_BASE_URL?: string;
 }
 
 interface ImportMeta {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-const PROXY = import.meta.env.VITE_MOBIX_PROXY ?? "";
+const DSF_BASE = import.meta.env.VITE_DSF_BASE_URL || "https://simulation.dipostar.com";
+const DSF_TOKEN = import.meta.env.VITE_DSF_BEARER_TOKEN || "";
 
 export interface DsfSimResult {
   installmentRounded: number;
@@ -81,9 +82,11 @@ async function fetchDsfAllParams(
 ): Promise<DsfAllParamsData | null> {
   const payload = buildDsfSimulationPayload(params);
 
-  const res = await fetch(`${PROXY}/api/dsf/api/calculator/tenor/allparams`, {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (DSF_TOKEN) headers.Authorization = `Bearer ${DSF_TOKEN}`;
+  const res = await fetch(`${DSF_BASE}/api/calculator/tenor/allparams`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(payload),
     signal,
   });

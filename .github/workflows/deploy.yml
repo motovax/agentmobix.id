@@ -29,10 +29,14 @@ jobs:
       - name: Build
         run: bun run build
         env:
-          # Set repo variable VITE_MOBIX_PROXY to the Cloudflare Worker URL.
-          VITE_MOBIX_PROXY: ${{ vars.VITE_MOBIX_PROXY }}
-          # Public image origin (no auth needed for <img>).
+          VITE_MOBIX_API_KEY: ${{ vars.VITE_MOBIX_API_KEY }}
+          VITE_MOBIX_API_BASE: ${{ vars.VITE_MOBIX_API_BASE || 'https://mobix.motovax.com' }}
           VITE_MOBIX_IMAGE_BASE: ${{ vars.VITE_MOBIX_IMAGE_BASE || 'https://mobix.motovax.com' }}
+          VITE_STRAPI_API_KEY: ${{ vars.VITE_STRAPI_API_KEY }}
+          VITE_CMS_API_BASE: ${{ vars.VITE_CMS_API_BASE || 'https://api.mobixbydss.id/api' }}
+          VITE_CMS_IMAGE_BASE: ${{ vars.VITE_CMS_IMAGE_BASE || 'https://api.mobixbydss.id' }}
+          VITE_DSF_BEARER_TOKEN: ${{ vars.VITE_DSF_BEARER_TOKEN }}
+          VITE_DSF_BASE_URL: ${{ vars.VITE_DSF_BASE_URL || 'https://simulation.dipostar.com' }}
 
       - name: SPA fallback (client-side routing on Pages)
         run: cp dist/index.html dist/404.html

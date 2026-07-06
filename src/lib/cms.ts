@@ -1,13 +1,7 @@
 // CMS API client (Strapi at api.mobixbydss.id).
-//
-// In dev, calls go through the Vite proxy "/api/cms" → api.mobixbydss.id/api.
-// In prod, calls go through the same Cloudflare Worker with the /api/cms prefix.
-
-const PROXY_BASE = import.meta.env.VITE_MOBIX_PROXY ?? "";
-const CMS = PROXY_BASE ? `${PROXY_BASE}/api/cms` : "/api/cms";
-// In prod, images are routed through CF Worker (/cms-img) for edge caching.
-// In dev, fetched directly from the CMS origin (img tags have no CORS restriction).
-const CMS_IMG_BASE = PROXY_BASE ? `${PROXY_BASE}/cms-img` : "https://api.mobixbydss.id";
+const CMS = import.meta.env.VITE_CMS_API_BASE || "https://api.mobixbydss.id/api";
+const CMS_TOKEN = import.meta.env.VITE_STRAPI_API_KEY || "";
+const CMS_IMG_BASE = import.meta.env.VITE_CMS_IMAGE_BASE || "https://api.mobixbydss.id";
 
 interface StrapiMediaFormat {
   url: string;
@@ -62,9 +56,11 @@ interface StrapiEnvelope<T> {
 }
 
 async function postCms<T>(path: string, body: unknown): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (CMS_TOKEN) headers.Authorization = `Bearer ${CMS_TOKEN}`;
   const res = await fetch(`${CMS}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) {
