@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import type { CardUnit } from "../lib/mobix";
 import { formatJt } from "../lib/format";
 import { Photo, Badge } from "./ui";
-import { ShareArrow } from "./icons";
+import { Calculator, ShareArrow } from "./icons";
 
 /**
  * Horizontal-scroller unit card (Beranda "siap kamu share"). Dual target: the
@@ -50,6 +50,14 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
             🏢 Cabang: {unit.branch}
           </span>
         </div>
+        <Link
+          href={`/unit/${unit.slug}#simulasi-kredit`}
+          aria-label={`Simulasi kredit ${unit.title}`}
+          className="relative z-[2] mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-teal-tint-border bg-teal-tint px-2.5 py-2 text-[11px] font-bold text-teal-deep no-underline"
+        >
+          <Calculator size={13} />
+          Simulasi kredit
+        </Link>
         <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-[#EEF2F3] pt-2.5">
           <div>
             <div className="text-[10px] text-muted">Komisi</div>

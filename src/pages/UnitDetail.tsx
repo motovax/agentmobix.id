@@ -101,8 +101,16 @@ export function UnitDetail() {
   const localDp = downPayment(price, dpPercent);
   const localMonthly = monthlyInstallment(price, dpPercent, tenor);
 
-  const displayMonthly = simResult?.installmentRounded ?? localMonthly;
-  const displayTdp = simResult?.totalDownPaymentRounded ?? null;
+  const dsfMonthly = simResult?.installmentRounded;
+  const dsfTdp = simResult?.totalDownPaymentRounded;
+  const displayMonthly =
+    typeof dsfMonthly === "number" && Number.isFinite(dsfMonthly) && dsfMonthly > 0
+      ? dsfMonthly
+      : localMonthly;
+  const displayTdp =
+    typeof dsfTdp === "number" && Number.isFinite(dsfTdp) && dsfTdp > 0
+      ? dsfTdp
+      : localDp;
   const currencyFormatter = new Intl.NumberFormat("id-ID");
 
   function formatDpValue(value: number) {
@@ -143,8 +151,14 @@ export function UnitDetail() {
   }
 
   useEffect(() => {
-    if (!price) return;
+    if (!price) {
+      setSimResult(null);
+      setSimLoading(false);
+      return;
+    }
+    let alive = true;
     clearTimeout(simTimer.current);
+    setSimResult(null);
     setSimLoading(true);
     simTimer.current = setTimeout(async () => {
       const result = await simulateKredit({
@@ -155,15 +169,27 @@ export function UnitDetail() {
         model: unit?.type,
         year: unit?.year,
       });
+      if (!alive) return;
       setSimResult(result);
       setSimLoading(false);
     }, 600);
-    return () => clearTimeout(simTimer.current);
+    return () => {
+      alive = false;
+      clearTimeout(simTimer.current);
+    };
   }, [price, dpPercent, tenor, unit?.brand, unit?.type, unit?.year]);
 
   useEffect(() => {
     pageRef.current?.scrollTo({ top: 0 });
   }, [slug]);
+
+  useEffect(() => {
+    if (loading || !unit || window.location.hash !== "#simulasi-kredit") return;
+    const timer = window.setTimeout(() => {
+      document.getElementById("simulasi-kredit")?.scrollIntoView({ block: "start" });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loading, unit?.slug]);
 
   if (loading) {
     return (
@@ -388,7 +414,7 @@ export function UnitDetail() {
         </div>
 
         {/* CALCULATOR */}
-        <div className="px-[18px] pb-4">
+        <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4">
           <div className="rounded-[18px] border border-line bg-surface p-4">
             <div className="mb-3.5 flex items-center justify-between">
               <div className="-tracking-[0.01em] text-[15px] font-extrabold">
@@ -463,16 +489,14 @@ export function UnitDetail() {
                     {formatRupiah(displayMonthly)}
                   </div>
                 </div>
-                {displayTdp !== null && (
-                  <div className="flex items-center justify-between">
-                    <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
-                      TOTAL BAYAR PERTAMA
-                    </div>
-                    <div className="text-[13px] font-extrabold">
-                      {formatRupiah(displayTdp)}
-                    </div>
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
+                    TOTAL BAYAR PERTAMA
                   </div>
-                )}
+                  <div className="text-[13px] font-extrabold">
+                    {formatRupiah(displayTdp)}
+                  </div>
+                </div>
               </div>
               <div className="mt-2.5 border-t border-white/10 pt-2 text-[11px] text-[#A4D7D7]">
                 {tenor} bulan · asuransi TLO · sudah termasuk admin
