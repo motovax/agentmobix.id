@@ -25,8 +25,6 @@ import {
   type Tenor,
 } from "../lib/installment";
 import {
-  normalizeDsfDpPercent,
-  resolveDsfPolicy,
   resolveMobixCreditSimulation,
   type DsfSimResult,
 } from "../lib/dsf";
@@ -104,23 +102,6 @@ export function UnitDetail() {
 
   const price = unit?.harga ?? 0;
   const baseCreditPrice = unit?.harga_kredit || price;
-  const dsfPolicy = resolveDsfPolicy({
-    category: unit?.category,
-    tenor,
-    year: unit?.year,
-  });
-  const requestDpPercent = unit
-    ? normalizeDsfDpPercent({
-        unitPrice: baseCreditPrice,
-        dpPercent,
-        tenor,
-        category: unit.category,
-        year: unit.year,
-      })
-    : dpPercent;
-  const dpSliderMin = dsfPolicy.fixedDpPercent ?? dsfPolicy.minDpPercent;
-  const dpSliderMax = dsfPolicy.fixedDpPercent ?? 60;
-  const isFixedDp = dsfPolicy.fixedDpPercent != null;
 
   const dsfCreditPrice = simResult?.hargaKredit;
   const dsfDp = simResult?.downPaymentRounded;
@@ -138,7 +119,7 @@ export function UnitDetail() {
   const displayDpPercent =
     typeof dsfDpPercent === "number" && Number.isFinite(dsfDpPercent) && dsfDpPercent > 0
       ? dsfDpPercent
-      : requestDpPercent;
+      : dpPercent;
   const displayMonthly =
     typeof dsfMonthly === "number" && Number.isFinite(dsfMonthly) && dsfMonthly > 0
       ? dsfMonthly
@@ -171,11 +152,10 @@ export function UnitDetail() {
   }
 
   function toDpPercentFromAmount(amount: number) {
-    if (!displayCreditPrice) return dpSliderMin;
+    if (!displayCreditPrice) return 15;
     const next = Math.round((amount / displayCreditPrice) * 100);
-    if (Number.isNaN(next)) return dpSliderMin;
-    if (isFixedDp) return dpSliderMin;
-    return Math.min(dpSliderMax, Math.max(dpSliderMin, next));
+    if (Number.isNaN(next)) return 15;
+    return Math.min(60, Math.max(15, next));
   }
 
   useEffect(() => {
@@ -185,18 +165,6 @@ export function UnitDetail() {
     }
     setDpAmountInput(formatDpValue(displayDp));
   }, [displayCreditPrice, displayDp]);
-
-  useEffect(() => {
-    if (!unit) return;
-    const next = normalizeDsfDpPercent({
-      unitPrice: baseCreditPrice,
-      dpPercent,
-      tenor,
-      category: unit.category,
-      year: unit.year,
-    });
-    if (next !== dpPercent) setDpPercent(next);
-  }, [baseCreditPrice, dpPercent, tenor, unit?.category, unit?.year]);
 
   function handleDpAmountChange(e: ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value.replace(/\D/g, "");
@@ -240,9 +208,8 @@ export function UnitDetail() {
       const result = await resolveMobixCreditSimulation(
         {
           unitPrice: baseCreditPrice,
-          dpPercent: requestDpPercent,
+          dpPercent,
           tenor,
-          category: unit?.category,
           brand: unit?.brand,
           model: unit?.type,
           year: unit?.year,
@@ -264,9 +231,8 @@ export function UnitDetail() {
   }, [
     price,
     baseCreditPrice,
-    requestDpPercent,
+    dpPercent,
     tenor,
-    unit?.category,
     unit?.brand,
     unit?.type,
     unit?.year,
@@ -598,29 +564,17 @@ export function UnitDetail() {
               </div>
               <input
                 type="range"
-                min={dpSliderMin}
-                max={dpSliderMax}
+                min={15}
+                max={60}
                 step={1}
-                value={requestDpPercent}
-                disabled={isFixedDp}
-                onChange={(e) => {
-                  const next = Number(e.target.value);
-                  setDpPercent(
-                    normalizeDsfDpPercent({
-                      unitPrice: baseCreditPrice,
-                      dpPercent: next,
-                      tenor,
-                      category: unit.category,
-                      year: unit.year,
-                    }),
-                  );
-                }}
+                value={dpPercent}
+                onChange={(e) => setDpPercent(Number(e.target.value))}
                 aria-label="Persentase uang muka"
-                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#E0E7E9] accent-ink disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#E0E7E9] accent-ink"
               />
               <div className="mt-1.5 flex items-center justify-between text-[10px] font-semibold text-muted">
-                <span>{dpSliderMin}%</span>
-                <span>{dpSliderMax}%</span>
+                <span>15%</span>
+                <span>60%</span>
               </div>
             </div>
 
