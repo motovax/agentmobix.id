@@ -38,13 +38,79 @@ export interface DsfSimParams {
   unitPrice: number;
   dpPercent: number;
   tenor: number;
+  category?: string;
   brand?: string;
   model?: string;
   year?: number;
 }
 
+type DsfVehicleClass = "PC" | "CV";
+
+interface DsfPolicy {
+  vehicleClass: DsfVehicleClass;
+  loanPackageName: string;
+  paymentType: "ADDB" | "ADDM";
+  minDpPercent: number;
+  fixedDpPercent?: number;
+}
+
+const CV_CATEGORIES = new Set(["truck", "pickup", "van"]);
+
+function normalizeCategory(category?: string) {
+  return (category || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+export function isDsfCommercialVehicle(category?: string): boolean {
+  return CV_CATEGORIES.has(normalizeCategory(category));
+}
+
+function resolvePcLoanPackageName(year: number) {
+  if (year === 2012 || year === 2013) return "PAKET C";
+
+  const age = new Date().getFullYear() - year;
+  if (age < 10) return "PAKET C11";
+
+  return "MOCIL SPC - PC";
+}
+
+export function resolveDsfPolicy(params: Pick<DsfSimParams, "category" | "tenor" | "year">): DsfPolicy {
+  const year = params.year ?? 2020;
+  if (isDsfCommercialVehicle(params.category)) {
+    return {
+      vehicleClass: "CV",
+      loanPackageName: "MOCIL PLUS",
+      paymentType: "ADDB",
+      minDpPercent: 25,
+      fixedDpPercent: 25,
+    };
+  }
+
+  if (params.tenor === 12) {
+    return {
+      vehicleClass: "PC",
+      loanPackageName: "MOCIL 1 YR",
+      paymentType: "ADDM",
+      minDpPercent: 30,
+    };
+  }
+
+  return {
+    vehicleClass: "PC",
+    loanPackageName: resolvePcLoanPackageName(year),
+    paymentType: "ADDB",
+    minDpPercent: 15,
+  };
+}
+
+export function normalizeDsfDpPercent(params: DsfSimParams): number {
+  const policy = resolveDsfPolicy(params);
+  if (policy.fixedDpPercent != null) return policy.fixedDpPercent;
+  return Math.max(policy.minDpPercent, params.dpPercent);
+}
+
 function buildDsfSimulationPayload(params: DsfSimParams) {
-  const { unitPrice, dpPercent, tenor, brand = "Unknown", model = "Unknown", year = 2020 } = params;
+  const { unitPrice, tenor, brand = "Unknown", model = "Unknown", year = 2020 } = params;
+  const policy = resolveDsfPolicy({ category: params.category, tenor, year });
 
   return {
     UnitPrice: unitPrice,
@@ -52,8 +118,8 @@ function buildDsfSimulationPayload(params: DsfSimParams) {
     Brand: brand,
     Model: model,
     ManufacturedYear: String(year),
-    LoanPackageName: "MOCIL SPC - PC",
-    PaymentType: "ADDB",
+    LoanPackageName: policy.loanPackageName,
+    PaymentType: policy.paymentType,
     Refund: {
       IsApplied: "YES",
       Showroom: "PT DIGITAL SUMBER SEJAHTERA MOTOR",
@@ -73,7 +139,7 @@ function buildDsfSimulationPayload(params: DsfSimParams) {
       AdminFee: 5500000,
     },
     SimulationType: "DP",
-    SimulationValue: dpPercent,
+    SimulationValue: normalizeDsfDpPercent(params),
     TenorInMonths: tenor,
   };
 }
@@ -139,18 +205,17 @@ export async function resolveMobixCreditSimulation(
   signal?: AbortSignal,
 ): Promise<DsfSimResult | null> {
   const seedPrice = maxCreditPrice > 0 ? maxCreditPrice : params.unitPrice;
-  let search: DsfCreditPriceResult | null = null;
   try {
-    search = await findLowestCreditPrice(
+    const search = await findLowestCreditPrice(
       { ...params, unitPrice: seedPrice },
       cashTarget,
       signal,
     );
+    if (!search) return null;
+    return simulateKreditWithSignal({ ...params, unitPrice: search.unitPrice }, signal);
   } catch {
-    search = null;
+    return null;
   }
-  const unitPrice = search?.unitPrice || seedPrice || params.unitPrice;
-  return simulateKreditWithSignal({ ...params, unitPrice }, signal);
 }
 
 export async function findLowestCreditPrice(
@@ -198,8 +263,8 @@ export async function findLowestCreditPrice(
   return best;
 }
 
-/** Hook untuk list view (UnitCard, UnitRow) — fixed DP 15%, tenor 60 bln. */
-export function useDsfSim(price: number, title: string, year?: number) {
+/** Hook untuk list view (UnitCard, UnitRow) dengan aturan DP DSF default tenor 60 bln. */
+export function useDsfSim(price: number, title: string, year?: number, category?: string) {
   const [result, setResult] = useState<DsfSimResult | null>(null);
 
   useEffect(() => {
@@ -210,12 +275,13 @@ export function useDsfSim(price: number, title: string, year?: number) {
       unitPrice: price,
       dpPercent: 15,
       tenor: 60,
+      category,
       brand: parts[0],
       model: parts[1],
       year,
     }).then((r) => { if (alive) setResult(r); });
     return () => { alive = false; };
-  }, [price, title, year]);
+  }, [price, title, year, category]);
 
   return result;
 }

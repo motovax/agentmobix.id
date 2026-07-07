@@ -22,10 +22,11 @@ import { formatRupiah, formatOdometer } from "../lib/format";
 import {
   TENOR_OPTIONS,
   downPayment,
-  monthlyInstallment,
   type Tenor,
 } from "../lib/installment";
 import {
+  normalizeDsfDpPercent,
+  resolveDsfPolicy,
   resolveMobixCreditSimulation,
   type DsfSimResult,
 } from "../lib/dsf";
@@ -95,12 +96,31 @@ export function UnitDetail() {
   const [dpAmountInput, setDpAmountInput] = useState("");
   const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
   const [simLoading, setSimLoading] = useState(false);
+  const [simError, setSimError] = useState(false);
+  const [simRefreshKey, setSimRefreshKey] = useState(0);
   const simTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const pageRef = useRef<HTMLElement>(null);
   const galleryRef = useRef<Splide>(null);
 
   const price = unit?.harga ?? 0;
   const baseCreditPrice = unit?.harga_kredit || price;
+  const dsfPolicy = resolveDsfPolicy({
+    category: unit?.category,
+    tenor,
+    year: unit?.year,
+  });
+  const requestDpPercent = unit
+    ? normalizeDsfDpPercent({
+        unitPrice: baseCreditPrice,
+        dpPercent,
+        tenor,
+        category: unit.category,
+        year: unit.year,
+      })
+    : dpPercent;
+  const dpSliderMin = dsfPolicy.fixedDpPercent ?? dsfPolicy.minDpPercent;
+  const dpSliderMax = dsfPolicy.fixedDpPercent ?? 60;
+  const isFixedDp = dsfPolicy.fixedDpPercent != null;
 
   const dsfCreditPrice = simResult?.hargaKredit;
   const dsfDp = simResult?.downPaymentRounded;
@@ -110,52 +130,73 @@ export function UnitDetail() {
   const displayCreditPrice =
     typeof dsfCreditPrice === "number" && Number.isFinite(dsfCreditPrice) && dsfCreditPrice > 0
       ? dsfCreditPrice
-      : baseCreditPrice;
-  const localDp = downPayment(displayCreditPrice, dpPercent);
-  const localMonthly = monthlyInstallment(displayCreditPrice, dpPercent, tenor);
+      : null;
   const displayDp =
     typeof dsfDp === "number" && Number.isFinite(dsfDp) && dsfDp > 0
       ? dsfDp
-      : localDp;
+      : null;
   const displayDpPercent =
     typeof dsfDpPercent === "number" && Number.isFinite(dsfDpPercent) && dsfDpPercent > 0
       ? dsfDpPercent
-      : dpPercent;
+      : requestDpPercent;
   const displayMonthly =
     typeof dsfMonthly === "number" && Number.isFinite(dsfMonthly) && dsfMonthly > 0
       ? dsfMonthly
-      : localMonthly;
+      : null;
   const displayTdp =
     typeof dsfTdp === "number" && Number.isFinite(dsfTdp) && dsfTdp > 0
       ? dsfTdp
-      : localDp;
+      : null;
+  const simPending = price > 0 && simResult === null && !simError;
+  const canShareSimulation =
+    displayCreditPrice !== null &&
+    displayDp !== null &&
+    displayMonthly !== null &&
+    displayTdp !== null;
   const currencyFormatter = new Intl.NumberFormat("id-ID");
-  const shareParams = new URLSearchParams({
-    u: unit?.slug ?? slug ?? "",
-    tenor: String(tenor),
-    dp_pct: String(Math.round(displayDpPercent * 10) / 10),
-    dp: String(Math.round(displayDp)),
-    harga_kredit: String(Math.round(displayCreditPrice)),
-    cicilan: String(Math.round(displayMonthly)),
-    tdp: String(Math.round(displayTdp)),
-  });
-  const shareHref = `/share?${shareParams.toString()}`;
+  const shareHref = canShareSimulation
+    ? `/share?${new URLSearchParams({
+        u: unit?.slug ?? slug ?? "",
+        tenor: String(tenor),
+        dp_pct: String(Math.round(displayDpPercent * 10) / 10),
+        dp: String(Math.round(displayDp)),
+        harga_kredit: String(Math.round(displayCreditPrice)),
+        cicilan: String(Math.round(displayMonthly)),
+        tdp: String(Math.round(displayTdp)),
+      }).toString()}`
+    : null;
 
   function formatDpValue(value: number) {
     return currencyFormatter.format(Math.max(0, Math.round(value || 0)));
   }
 
   function toDpPercentFromAmount(amount: number) {
-    if (!displayCreditPrice) return 15;
+    if (!displayCreditPrice) return dpSliderMin;
     const next = Math.round((amount / displayCreditPrice) * 100);
-    if (Number.isNaN(next)) return 15;
-    return Math.min(60, Math.max(15, next));
+    if (Number.isNaN(next)) return dpSliderMin;
+    if (isFixedDp) return dpSliderMin;
+    return Math.min(dpSliderMax, Math.max(dpSliderMin, next));
   }
 
   useEffect(() => {
-    if (!displayCreditPrice) return;
+    if (!displayCreditPrice || !displayDp) {
+      setDpAmountInput("");
+      return;
+    }
     setDpAmountInput(formatDpValue(displayDp));
   }, [displayCreditPrice, displayDp]);
+
+  useEffect(() => {
+    if (!unit) return;
+    const next = normalizeDsfDpPercent({
+      unitPrice: baseCreditPrice,
+      dpPercent,
+      tenor,
+      category: unit.category,
+      year: unit.year,
+    });
+    if (next !== dpPercent) setDpPercent(next);
+  }, [baseCreditPrice, dpPercent, tenor, unit?.category, unit?.year]);
 
   function handleDpAmountChange(e: ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value.replace(/\D/g, "");
@@ -167,9 +208,9 @@ export function UnitDetail() {
   }
 
   function handleDpAmountBlur() {
-    if (!price) return;
+    if (!price || !displayCreditPrice) return;
     if (!dpAmountInput) {
-      setDpAmountInput(formatDpValue(localDp));
+      setDpAmountInput(displayDp ? formatDpValue(displayDp) : "");
       return;
     }
     const amount = Number(dpAmountInput.replace(/\D/g, ""));
@@ -178,23 +219,30 @@ export function UnitDetail() {
     setDpAmountInput(formatDpValue(downPayment(displayCreditPrice, nextPercent)));
   }
 
+  function refreshDsfSimulation() {
+    setSimRefreshKey((value) => value + 1);
+  }
+
   useEffect(() => {
     if (!price) {
       setSimResult(null);
       setSimLoading(false);
+      setSimError(false);
       return;
     }
     let alive = true;
     const controller = new AbortController();
     clearTimeout(simTimer.current);
     setSimResult(null);
+    setSimError(false);
     setSimLoading(true);
     simTimer.current = setTimeout(async () => {
       const result = await resolveMobixCreditSimulation(
         {
           unitPrice: baseCreditPrice,
-          dpPercent,
+          dpPercent: requestDpPercent,
           tenor,
+          category: unit?.category,
           brand: unit?.brand,
           model: unit?.type,
           year: unit?.year,
@@ -205,6 +253,7 @@ export function UnitDetail() {
       );
       if (!alive) return;
       setSimResult(result);
+      setSimError(result === null);
       setSimLoading(false);
     }, 600);
     return () => {
@@ -212,7 +261,17 @@ export function UnitDetail() {
       controller.abort();
       clearTimeout(simTimer.current);
     };
-  }, [price, baseCreditPrice, dpPercent, tenor, unit?.brand, unit?.type, unit?.year]);
+  }, [
+    price,
+    baseCreditPrice,
+    requestDpPercent,
+    tenor,
+    unit?.category,
+    unit?.brand,
+    unit?.type,
+    unit?.year,
+    simRefreshKey,
+  ]);
 
   useEffect(() => {
     setActiveThumb(0);
@@ -346,13 +405,24 @@ export function UnitDetail() {
           >
             <ChevronLeft />
           </Link>
-          <Link
-            href={shareHref}
-            aria-label="Share"
-            className="absolute right-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
-          >
-            <ShareArrow size={17} />
-          </Link>
+          {shareHref ? (
+            <Link
+              href={shareHref}
+              aria-label="Share"
+              className="absolute right-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
+            >
+              <ShareArrow size={17} />
+            </Link>
+          ) : (
+            <button
+              type="button"
+              aria-label="Share belum tersedia"
+              disabled
+              className="absolute right-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/70 text-ink/40 backdrop-blur"
+            >
+              <ShareArrow size={17} />
+            </button>
+          )}
           <span className="absolute bottom-3.5 left-3.5 rounded-lg bg-teal px-2.5 py-1 text-[16px] font-bold text-ink">
             {badge ?? "Tersedia"} · {unit.plate_no}
           </span>
@@ -454,11 +524,19 @@ export function UnitDetail() {
               <div className="-tracking-[0.02em] text-[24px] font-extrabold">
                 {price ? formatRupiah(price) : "Hubungi kami"}
               </div>
-              {displayCreditPrice > 0 && (
+              {simPending ? (
+                <div className="mt-1 text-[12px] font-semibold text-muted">
+                  Harga Kredit : Menghitung...
+                </div>
+              ) : simError ? (
+                <div className="mt-1 text-[12px] font-semibold text-danger">
+                  Harga Kredit : Maaf, ada kendala sistem
+                </div>
+              ) : displayCreditPrice ? (
                 <div className="mt-1 text-[12px] font-semibold text-teal-deep">
                   Harga Kredit : {formatRupiah(displayCreditPrice)}
                 </div>
-              )}
+              ) : null}
             </div>
             <div className="text-right">
               <div className="text-[10px] text-muted">Komisi</div>
@@ -489,7 +567,7 @@ export function UnitDetail() {
                 Simulasi Hitung Kredit
               </div>
               <span className="rounded-[7px] bg-teal-tint px-2 py-[3px] text-[11px] font-bold text-teal-deep">
-                Bisa di-share
+                {canShareSimulation ? "Bisa di-share" : "Menunggu DSF"}
               </span>
             </div>
 
@@ -497,7 +575,11 @@ export function UnitDetail() {
               <div className="mb-1.5 flex items-center justify-between text-[12px] font-semibold text-mid">
                 <span>DP (Down Payment)</span>
                 <span className="text-teal-deep">
-                  {Math.round(displayDpPercent * 10) / 10}% · {formatRupiah(displayDp)}
+                  {displayDp
+                    ? `${Math.round(displayDpPercent * 10) / 10}% · ${formatRupiah(displayDp)}`
+                    : simPending
+                      ? "Menghitung..."
+                      : "Maaf, ada kendala sistem"}
                 </span>
               </div>
               <div className="mb-2 flex items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
@@ -508,24 +590,37 @@ export function UnitDetail() {
                   value={dpAmountInput}
                   onChange={handleDpAmountChange}
                   onBlur={handleDpAmountBlur}
-                  className="w-full bg-transparent text-[14px] font-bold text-ink outline-none"
-                  placeholder={formatDpValue(localDp)}
+                  disabled={!displayCreditPrice}
+                  className="w-full bg-transparent text-[14px] font-bold text-ink outline-none disabled:opacity-60"
+                  placeholder={simPending ? "Menghitung..." : ""}
                   aria-label="Total uang muka"
                 />
               </div>
               <input
                 type="range"
-                min={15}
-                max={60}
+                min={dpSliderMin}
+                max={dpSliderMax}
                 step={1}
-                value={dpPercent}
-                onChange={(e) => setDpPercent(Number(e.target.value))}
+                value={requestDpPercent}
+                disabled={isFixedDp}
+                onChange={(e) => {
+                  const next = Number(e.target.value);
+                  setDpPercent(
+                    normalizeDsfDpPercent({
+                      unitPrice: baseCreditPrice,
+                      dpPercent: next,
+                      tenor,
+                      category: unit.category,
+                      year: unit.year,
+                    }),
+                  );
+                }}
                 aria-label="Persentase uang muka"
-                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#E0E7E9] accent-ink"
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#E0E7E9] accent-ink disabled:cursor-not-allowed disabled:opacity-60"
               />
               <div className="mt-1.5 flex items-center justify-between text-[10px] font-semibold text-muted">
-                <span>15%</span>
-                <span>60%</span>
+                <span>{dpSliderMin}%</span>
+                <span>{dpSliderMax}%</span>
               </div>
             </div>
 
@@ -555,27 +650,51 @@ export function UnitDetail() {
               <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
                 HASIL SIMULASI
               </div>
-              <div className="mt-2.5 space-y-1.5 border-t border-white/10 pt-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
-                    CICILAN PER BULAN
-                  </div>
-                  <div className="text-[13px] font-extrabold">
-                    {formatRupiah(displayMonthly)}
-                  </div>
+              {simPending ? (
+                <div className="mt-2.5 border-t border-white/10 pt-2.5 text-[13px] font-semibold text-surface">
+                  Menghitung harga kredit...
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
-                    TOTAL BAYAR PERTAMA
+              ) : simError ? (
+                <div className="mt-2.5 border-t border-white/10 pt-2.5">
+                  <div className="text-[13px] font-extrabold text-surface">
+                    Maaf, ada kendala sistem
                   </div>
-                  <div className="text-[13px] font-extrabold">
-                    {formatRupiah(displayTdp)}
+                  <div className="mt-1 text-[11px] leading-[1.5] text-[#A4D7D7]">
+                    Harga kredit belum tersedia dari DSF. Coba refresh untuk mengambil ulang simulasi.
                   </div>
+                  <button
+                    type="button"
+                    onClick={refreshDsfSimulation}
+                    className="mt-3 rounded-[10px] bg-teal px-3.5 py-2 text-[12px] font-bold text-ink"
+                  >
+                    Refresh harga kredit
+                  </button>
                 </div>
-              </div>
-              <div className="mt-2.5 border-t border-white/10 pt-2 text-[11px] text-[#A4D7D7]">
-                {tenor} bulan · asuransi TLO · sudah termasuk admin
-              </div>
+              ) : (
+                <>
+                  <div className="mt-2.5 space-y-1.5 border-t border-white/10 pt-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
+                        CICILAN PER BULAN
+                      </div>
+                      <div className="text-[13px] font-extrabold">
+                        {displayMonthly ? formatRupiah(displayMonthly) : "-"}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
+                        TOTAL BAYAR PERTAMA
+                      </div>
+                      <div className="text-[13px] font-extrabold">
+                        {displayTdp ? formatRupiah(displayTdp) : "-"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-2.5 border-t border-white/10 pt-2 text-[11px] text-[#A4D7D7]">
+                    {tenor} bulan · asuransi TLO · sudah termasuk admin
+                  </div>
+                </>
+              )}
             </div>
             <p className="m-0 mt-2 text-[11px] text-muted">
               Simulasi, syarat &amp; ketentuan berlaku. Komisi bersifat estimasi.
@@ -661,13 +780,24 @@ export function UnitDetail() {
 
       {/* STICKY ACTIONS */}
       <div className="fixed bottom-9 left-1/2 z-30 flex w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
-        <Link
-          href={shareHref}
-          className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-ink px-3.5 py-3 text-[13px] font-bold text-surface no-underline"
-        >
-          Share ke klien
-          <ShareArrow size={14} />
-        </Link>
+        {shareHref ? (
+          <Link
+            href={shareHref}
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-ink px-3.5 py-3 text-[13px] font-bold text-surface no-underline"
+          >
+            Share ke klien
+            <ShareArrow size={14} />
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-ink/35 px-3.5 py-3 text-[13px] font-bold text-surface"
+          >
+            Share menunggu DSF
+            <ShareArrow size={14} />
+          </button>
+        )}
       </div>
     </AppShell>
   );
