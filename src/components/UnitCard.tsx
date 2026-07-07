@@ -59,11 +59,11 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
         </div>
         <Link
           href={`/unit/${unit.slug}#simulasi-kredit`}
-          aria-label={`Simulasi kredit ${unit.title}`}
+          aria-label={`Tanya hitungan ${unit.title}`}
           className="relative z-[2] mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-teal-tint-border bg-teal-tint px-2.5 py-2 text-[11px] font-bold text-teal-deep no-underline"
         >
           <Calculator size={13} />
-          Simulasi kredit
+          Tanya Hitungan
         </Link>
         <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-[#EEF2F3] pt-2.5">
           <div>
