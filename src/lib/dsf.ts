@@ -42,6 +42,7 @@ export interface DsfSimParams {
   tenor: number;
   simulationType?: DsfSimMethod;
   simulationValue?: number;
+  cashPriceTarget?: number;
   brand?: string;
   model?: string;
   year?: number;
@@ -54,6 +55,7 @@ function buildDsfSimulationPayload(params: DsfSimParams) {
     tenor,
     simulationType = "DP",
     simulationValue = dpPercent,
+    cashPriceTarget,
     brand = "Unknown",
     model = "Unknown",
     year = 2020,
@@ -61,6 +63,7 @@ function buildDsfSimulationPayload(params: DsfSimParams) {
 
   return {
     UnitPrice: unitPrice,
+    ...(cashPriceTarget && cashPriceTarget > 0 ? { CashPriceTarget: cashPriceTarget } : {}),
     City: "JAKARTA SELATAN",
     Brand: brand,
     Model: model,
@@ -143,6 +146,29 @@ export async function simulateKreditWithSignal(
 export interface DsfCreditPriceResult {
   unitPrice: number;
   allInToSupplier: number;
+}
+
+export async function resolveSmartCreditPrice(
+  params: DsfSimParams,
+  cashTarget: number,
+  signal?: AbortSignal,
+): Promise<DsfCreditPriceResult | null> {
+  if (!params.unitPrice || !cashTarget) return null;
+
+  try {
+    const data = await fetchDsfAllParams(
+      { ...params, cashPriceTarget: cashTarget },
+      signal,
+    );
+    const unitPrice = data?.harga_kredit ?? 0;
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) return null;
+    return {
+      unitPrice,
+      allInToSupplier: data?.refund?.allInToSupplier ?? 0,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function resolveMobixCreditSimulation(

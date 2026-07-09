@@ -25,6 +25,7 @@ import {
   type Tenor,
 } from "../lib/installment";
 import {
+  resolveSmartCreditPrice,
   simulateKreditWithSignal,
   type DsfSimMethod,
   type DsfSimResult,
@@ -107,6 +108,9 @@ export function UnitDetail() {
   const [simLoading, setSimLoading] = useState(false);
   const [simError, setSimError] = useState(false);
   const [simRunKey, setSimRunKey] = useState(0);
+  const [smartCreditPrice, setSmartCreditPrice] = useState<number | null>(null);
+  const [smartCreditPriceLoading, setSmartCreditPriceLoading] = useState(false);
+  const [smartCreditPriceError, setSmartCreditPriceError] = useState(false);
   const pageRef = useRef<HTMLElement>(null);
   const galleryRef = useRef<Splide>(null);
 
@@ -126,14 +130,9 @@ export function UnitDetail() {
     Math.round(creditPriceForBounds * MAX_INSTALLMENT_RATE),
   );
 
-  const dsfCreditPrice = simResult?.hargaKredit;
   const dsfDpPercent = simResult?.percentDownPayment;
   const dsfMonthly = simResult?.installmentRounded;
   const dsfTdp = simResult?.totalDownPaymentRounded;
-  const displayCreditPrice =
-    typeof dsfCreditPrice === "number" && Number.isFinite(dsfCreditPrice) && dsfCreditPrice > 0
-      ? dsfCreditPrice
-      : null;
   const displayDpPercent =
     simulationMethod === "DP" ||
     typeof dsfDpPercent !== "number" ||
@@ -161,19 +160,15 @@ export function UnitDetail() {
   const monthlySimulationAmount =
     monthlyAmount > 0 ? monthlyAmount : defaultMonthlyAmount;
   const simPending = price > 0 && simResult === null && !simError;
-  const unitCreditPrice =
-    typeof unit?.harga_kredit === "number" &&
-    Number.isFinite(unit.harga_kredit) &&
-    unit.harga_kredit > 0 &&
-    unit.harga_kredit !== price
-      ? unit.harga_kredit
-      : null;
   const creditPriceForDisplay =
-    displayCreditPrice && displayCreditPrice !== price
-      ? displayCreditPrice
-      : unitCreditPrice;
+    typeof smartCreditPrice === "number" &&
+    Number.isFinite(smartCreditPrice) &&
+    smartCreditPrice > 0 &&
+    smartCreditPrice !== price
+      ? smartCreditPrice
+      : null;
   const hasCreditPriceIssue =
-    !simPending && !simError && simResult !== null && creditPriceForDisplay === null;
+    price > 0 && !smartCreditPriceLoading && creditPriceForDisplay === null;
   const displayAdminFee =
     typeof simResult?.adminFee === "number" &&
     Number.isFinite(simResult.adminFee) &&
@@ -358,6 +353,49 @@ export function UnitDetail() {
 
   useEffect(() => {
     if (!price) {
+      setSmartCreditPrice(null);
+      setSmartCreditPriceLoading(false);
+      setSmartCreditPriceError(false);
+      return;
+    }
+
+    let alive = true;
+    const controller = new AbortController();
+    setSmartCreditPrice(null);
+    setSmartCreditPriceError(false);
+    setSmartCreditPriceLoading(true);
+
+    (async () => {
+      const result = await resolveSmartCreditPrice(
+        {
+          unitPrice: price,
+          dpPercent: MIN_DP_PERCENT,
+          simulationType: "DP",
+          simulationValue: MIN_DP_PERCENT,
+          tenor: 60,
+          brand: unit?.brand,
+          model: unit?.type,
+          year: unit?.year,
+        },
+        price,
+        controller.signal,
+      );
+      if (!alive) return;
+      const nextPrice =
+        result?.unitPrice && result.unitPrice !== price ? result.unitPrice : null;
+      setSmartCreditPrice(nextPrice);
+      setSmartCreditPriceError(nextPrice === null);
+      setSmartCreditPriceLoading(false);
+    })();
+
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [price, unit?.brand, unit?.type, unit?.year]);
+
+  useEffect(() => {
+    if (!price) {
       setSimResult(null);
       setSimLoading(false);
       setSimError(false);
@@ -416,6 +454,8 @@ export function UnitDetail() {
     setMonthlyAmountInput("");
     setSimResult(null);
     setSimError(false);
+    setSmartCreditPrice(null);
+    setSmartCreditPriceError(false);
     setSimRunKey((value) => value + 1);
     pageRef.current?.scrollTo({ top: 0 });
   }, [slug]);
@@ -664,11 +704,11 @@ export function UnitDetail() {
               <div className="-tracking-[0.02em] text-[24px] font-extrabold">
                 {price ? formatRupiah(price) : "Hubungi kami"}
               </div>
-              {simPending ? (
+              {smartCreditPriceLoading ? (
                 <div className="mt-1 text-[12px] font-semibold text-muted">
                   Harga Kredit : Menghitung...
                 </div>
-              ) : simError || hasCreditPriceIssue ? (
+              ) : smartCreditPriceError || hasCreditPriceIssue ? (
                 <div className="mt-1 text-[12px] font-semibold text-danger">
                   Harga Kredit : Maaf, ada kendala sistem
                 </div>
@@ -899,7 +939,7 @@ export function UnitDetail() {
               </div>
               {simPending ? (
                 <div className="mt-2.5 border-t border-line pt-2.5 text-[13px] font-semibold text-mid">
-                  Menghitung harga kredit...
+                  Menghitung simulasi...
                 </div>
               ) : simError ? (
                 <div className="mt-2.5 border-t border-line pt-2.5">
