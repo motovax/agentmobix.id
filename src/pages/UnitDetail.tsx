@@ -165,6 +165,12 @@ export function UnitDetail() {
     typeof dsfTdp === "number" && Number.isFinite(dsfTdp) && dsfTdp > 0
       ? dsfTdp
       : null;
+  const displayAdminFee =
+    typeof simResult?.adminFee === "number" &&
+    Number.isFinite(simResult.adminFee) &&
+    simResult.adminFee > 0
+      ? simResult.adminFee
+      : 5500000;
   const simPending = price > 0 && simResult === null && !simError;
   const canShareSimulation =
     displayCreditPrice !== null &&
@@ -850,54 +856,77 @@ export function UnitDetail() {
               </div>
             </div>
 
-            <div className={`rounded-[14px] bg-ink p-4 text-surface transition-opacity ${simLoading ? "opacity-60" : ""}`}>
-              <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
-                HASIL SIMULASI
+            <div
+              className={`rounded-[14px] border border-line bg-surface-2 p-4 text-ink transition-opacity ${
+                simLoading ? "opacity-60" : ""
+              }`}
+            >
+              <div className="text-[14px] font-extrabold text-ink">
+                Hasil Simulasi
               </div>
               {simPending ? (
-                <div className="mt-2.5 border-t border-white/10 pt-2.5 text-[13px] font-semibold text-surface">
+                <div className="mt-2.5 border-t border-line pt-2.5 text-[13px] font-semibold text-mid">
                   Menghitung harga kredit...
                 </div>
               ) : simError ? (
-                <div className="mt-2.5 border-t border-white/10 pt-2.5">
-                  <div className="text-[13px] font-extrabold text-surface">
+                <div className="mt-2.5 border-t border-line pt-2.5">
+                  <div className="text-[13px] font-extrabold text-ink">
                     Maaf, ada kendala sistem
                   </div>
-                  <div className="mt-1 text-[11px] leading-[1.5] text-[#A4D7D7]">
+                  <div className="mt-1 text-[11px] leading-[1.5] text-muted">
                     Harga kredit belum tersedia dari DSF. Coba refresh untuk mengambil ulang simulasi.
                   </div>
                   <button
                     type="button"
                     onClick={refreshDsfSimulation}
-                    className="mt-3 rounded-[10px] bg-teal px-3.5 py-2 text-[12px] font-bold text-ink"
+                    className="mt-3 rounded-[10px] bg-ink px-3.5 py-2 text-[12px] font-bold text-surface"
                   >
                     Refresh harga kredit
                   </button>
                 </div>
               ) : (
-                <>
-                  <div className="mt-2.5 space-y-1.5 border-t border-white/10 pt-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
-                        CICILAN PER BULAN
-                      </div>
-                      <div className="text-[13px] font-extrabold">
-                        {displayMonthly ? formatRupiah(displayMonthly) : "-"}
-                      </div>
+                <div className="mt-2.5 space-y-2.5 border-t border-line pt-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[12px] font-semibold text-mid">
+                      Biaya Admin
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-bold tracking-[0.04em] text-[#A4D7D7]">
-                        TOTAL BAYAR PERTAMA
-                      </div>
-                      <div className="text-[13px] font-extrabold">
-                        {displayTdp ? formatRupiah(displayTdp) : "-"}
-                      </div>
+                    <div className="text-right text-[13px] font-extrabold text-ink">
+                      {formatRupiah(displayAdminFee)}
                     </div>
                   </div>
-                  <div className="mt-2.5 border-t border-white/10 pt-2 text-[11px] text-[#A4D7D7]">
-                    {tenor} bulan · asuransi TLO · sudah termasuk admin
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[12px] font-semibold text-mid">
+                      Biaya Provisi
+                    </div>
+                    <div className="text-right text-[13px] font-extrabold text-ink">
+                      Tanpa provisi
+                    </div>
                   </div>
-                </>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[12px] font-semibold text-mid">
+                      Total Bayar Pertama
+                    </div>
+                    <div className="text-right text-[13px] font-extrabold text-ink">
+                      {displayTdp ? formatRupiah(displayTdp) : "-"}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[12px] font-semibold text-mid">
+                      Cicilan/Bulan
+                    </div>
+                    <div className="text-right text-[13px] font-extrabold text-ink">
+                      {displayMonthly ? formatRupiah(displayMonthly) : "-"}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[12px] font-semibold text-mid">
+                      Tenor
+                    </div>
+                    <div className="text-right text-[13px] font-extrabold text-ink">
+                      {tenor} Bulan
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
             <p className="m-0 mt-2 text-[11px] text-muted">
