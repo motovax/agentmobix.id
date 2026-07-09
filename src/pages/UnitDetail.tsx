@@ -160,15 +160,27 @@ export function UnitDetail() {
   const tdpSimulationAmount = tdpAmount > 0 ? tdpAmount : defaultTdpAmount;
   const monthlySimulationAmount =
     monthlyAmount > 0 ? monthlyAmount : defaultMonthlyAmount;
+  const simPending = price > 0 && simResult === null && !simError;
+  const unitCreditPrice =
+    typeof unit?.harga_kredit === "number" &&
+    Number.isFinite(unit.harga_kredit) &&
+    unit.harga_kredit > 0 &&
+    unit.harga_kredit !== price
+      ? unit.harga_kredit
+      : null;
+  const creditPriceForDisplay =
+    displayCreditPrice && displayCreditPrice !== price
+      ? displayCreditPrice
+      : unitCreditPrice;
+  const hasCreditPriceIssue =
+    !simPending && !simError && simResult !== null && creditPriceForDisplay === null;
   const displayAdminFee =
     typeof simResult?.adminFee === "number" &&
     Number.isFinite(simResult.adminFee) &&
     simResult.adminFee > 0
       ? simResult.adminFee
       : 5500000;
-  const simPending = price > 0 && simResult === null && !simError;
   const canShareSimulation =
-    displayCreditPrice !== null &&
     displayDp !== null &&
     displayMonthly !== null &&
     displayTdp !== null;
@@ -179,7 +191,9 @@ export function UnitDetail() {
         tenor: String(tenor),
         dp_pct: String(Math.round(displayDpPercent * 10) / 10),
         dp: String(Math.round(displayDp)),
-        harga_kredit: String(Math.round(displayCreditPrice)),
+        ...(creditPriceForDisplay
+          ? { harga_kredit: String(Math.round(creditPriceForDisplay)) }
+          : {}),
         cicilan: String(Math.round(displayMonthly)),
         tdp: String(Math.round(displayTdp)),
       }).toString()}`
@@ -654,13 +668,13 @@ export function UnitDetail() {
                 <div className="mt-1 text-[12px] font-semibold text-muted">
                   Harga Kredit : Menghitung...
                 </div>
-              ) : simError ? (
+              ) : simError || hasCreditPriceIssue ? (
                 <div className="mt-1 text-[12px] font-semibold text-danger">
                   Harga Kredit : Maaf, ada kendala sistem
                 </div>
-              ) : displayCreditPrice ? (
+              ) : creditPriceForDisplay ? (
                 <div className="mt-1 text-[12px] font-semibold text-teal-deep">
-                  Harga Kredit : {formatRupiah(displayCreditPrice)}
+                  Harga Kredit : {formatRupiah(creditPriceForDisplay)}
                 </div>
               ) : null}
             </div>

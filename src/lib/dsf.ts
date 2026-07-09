@@ -4,7 +4,7 @@ const API_BASE = import.meta.env.VITE_MOBIX_API_BASE || "https://mobix.motovax.c
 const API_KEY = import.meta.env.VITE_MOBIX_API_KEY || "";
 
 export interface DsfSimResult {
-  hargaKredit: number;
+  hargaKredit: number | null;
   installmentRounded: number;
   totalDownPaymentRounded: number;
   downPaymentRounded: number;
@@ -123,7 +123,7 @@ export async function simulateKreditWithSignal(
     const d = await fetchDsfAllParams(params, signal);
     if (!d) return null;
     return {
-      hargaKredit: d.harga_kredit || params.unitPrice,
+      hargaKredit: d.harga_kredit || null,
       installmentRounded: d.installmentRounded,
       totalDownPaymentRounded: d.totalDownPaymentRounded,
       downPaymentRounded: d.downPaymentRounded,
@@ -159,7 +159,11 @@ export async function resolveMobixCreditSimulation(
       signal,
     );
     if (!search) return null;
-    return simulateKreditWithSignal({ ...params, unitPrice: search.unitPrice }, signal);
+    const result = await simulateKreditWithSignal(
+      { ...params, unitPrice: search.unitPrice },
+      signal,
+    );
+    return result ? { ...result, hargaKredit: search.unitPrice } : null;
   } catch {
     return null;
   }
