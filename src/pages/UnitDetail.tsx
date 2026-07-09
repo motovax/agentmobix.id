@@ -163,8 +163,7 @@ export function UnitDetail() {
   const creditPriceForDisplay =
     typeof smartCreditPrice === "number" &&
     Number.isFinite(smartCreditPrice) &&
-    smartCreditPrice > 0 &&
-    smartCreditPrice !== price
+    smartCreditPrice > 0
       ? smartCreditPrice
       : null;
   const hasCreditPriceIssue =
@@ -381,8 +380,7 @@ export function UnitDetail() {
         controller.signal,
       );
       if (!alive) return;
-      const nextPrice =
-        result?.unitPrice && result.unitPrice !== price ? result.unitPrice : null;
+      const nextPrice = result?.unitPrice && result.unitPrice > 0 ? result.unitPrice : null;
       setSmartCreditPrice(nextPrice);
       setSmartCreditPriceError(nextPrice === null);
       setSmartCreditPriceLoading(false);
