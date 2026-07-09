@@ -25,7 +25,7 @@ import {
   type Tenor,
 } from "../lib/installment";
 import {
-  resolveMobixCreditSimulation,
+  simulateKreditWithSignal,
   type DsfSimMethod,
   type DsfSimResult,
 } from "../lib/dsf";
@@ -106,14 +106,12 @@ export function UnitDetail() {
   const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
   const [simLoading, setSimLoading] = useState(false);
   const [simError, setSimError] = useState(false);
-  const [simRefreshKey, setSimRefreshKey] = useState(0);
-  const simTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [simRunKey, setSimRunKey] = useState(0);
   const pageRef = useRef<HTMLElement>(null);
   const galleryRef = useRef<Splide>(null);
 
   const price = unit?.harga ?? 0;
-  const baseCreditPrice = unit?.harga_kredit || price;
-  const creditPriceForBounds = baseCreditPrice || price;
+  const creditPriceForBounds = price;
   const minTdpAmount = Math.max(
     0,
     Math.round(unit?.tdp && unit.tdp > 0 ? unit.tdp : creditPriceForBounds * (MIN_DP_PERCENT / 100)),
@@ -127,21 +125,8 @@ export function UnitDetail() {
     minMonthlyAmount,
     Math.round(creditPriceForBounds * MAX_INSTALLMENT_RATE),
   );
-  const tdpSimulationAmount =
-    tdpAmount > 0
-      ? tdpAmount
-      : unit?.tdp && unit.tdp > 0
-        ? unit.tdp
-        : minTdpAmount;
-  const monthlySimulationAmount =
-    monthlyAmount > 0
-      ? monthlyAmount
-      : unit?.cicilan && unit.cicilan > 0
-        ? Math.round(unit.cicilan)
-        : minMonthlyAmount;
 
   const dsfCreditPrice = simResult?.hargaKredit;
-  const dsfDp = simResult?.downPaymentRounded;
   const dsfDpPercent = simResult?.percentDownPayment;
   const dsfMonthly = simResult?.installmentRounded;
   const dsfTdp = simResult?.totalDownPaymentRounded;
@@ -149,14 +134,14 @@ export function UnitDetail() {
     typeof dsfCreditPrice === "number" && Number.isFinite(dsfCreditPrice) && dsfCreditPrice > 0
       ? dsfCreditPrice
       : null;
-  const displayDp =
-    typeof dsfDp === "number" && Number.isFinite(dsfDp) && dsfDp > 0
-      ? dsfDp
-      : null;
   const displayDpPercent =
-    typeof dsfDpPercent === "number" && Number.isFinite(dsfDpPercent) && dsfDpPercent > 0
-      ? dsfDpPercent
-      : dpPercent;
+    simulationMethod === "DP" ||
+    typeof dsfDpPercent !== "number" ||
+    !Number.isFinite(dsfDpPercent) ||
+    dsfDpPercent <= 0
+      ? dpPercent
+      : dsfDpPercent;
+  const displayDp = price > 0 ? downPayment(price, displayDpPercent) : null;
   const displayMonthly =
     typeof dsfMonthly === "number" && Number.isFinite(dsfMonthly) && dsfMonthly > 0
       ? dsfMonthly
@@ -165,6 +150,16 @@ export function UnitDetail() {
     typeof dsfTdp === "number" && Number.isFinite(dsfTdp) && dsfTdp > 0
       ? dsfTdp
       : null;
+  const defaultTdpAmount =
+    displayTdp ?? (unit?.tdp && unit.tdp > 0 ? unit.tdp : minTdpAmount);
+  const defaultMonthlyAmount =
+    displayMonthly ??
+    (unit?.cicilan && unit.cicilan > 0
+      ? Math.round(unit.cicilan)
+      : minMonthlyAmount);
+  const tdpSimulationAmount = tdpAmount > 0 ? tdpAmount : defaultTdpAmount;
+  const monthlySimulationAmount =
+    monthlyAmount > 0 ? monthlyAmount : defaultMonthlyAmount;
   const displayAdminFee =
     typeof simResult?.adminFee === "number" &&
     Number.isFinite(simResult.adminFee) &&
@@ -203,19 +198,19 @@ export function UnitDetail() {
   }
 
   function toDpPercentFromAmount(amount: number) {
-    if (!displayCreditPrice) return MIN_DP_PERCENT;
-    const next = Math.round((amount / displayCreditPrice) * 100);
+    if (!price) return MIN_DP_PERCENT;
+    const next = Math.round((amount / price) * 100);
     if (Number.isNaN(next)) return MIN_DP_PERCENT;
     return clampValue(next, MIN_DP_PERCENT, MAX_DP_PERCENT);
   }
 
   useEffect(() => {
-    if (!displayCreditPrice || !displayDp) {
+    if (!price || !displayDp) {
       setDpAmountInput("");
       return;
     }
     setDpAmountInput(formatDpValue(displayDp));
-  }, [displayCreditPrice, displayDp]);
+  }, [price, displayDp]);
 
   useEffect(() => {
     if (!tdpAmount) {
@@ -233,6 +228,28 @@ export function UnitDetail() {
     setMonthlyAmountInput(formatDpValue(monthlyAmount));
   }, [monthlyAmount]);
 
+  useEffect(() => {
+    if (simulationMethod === "TDP" && !tdpAmount && displayTdp) {
+      setTdpAmount(clampValue(displayTdp, minTdpAmount, maxTdpAmount));
+    }
+
+    if (simulationMethod === "Installment" && !monthlyAmount && displayMonthly) {
+      setMonthlyAmount(
+        clampValue(displayMonthly, minMonthlyAmount, maxMonthlyAmount),
+      );
+    }
+  }, [
+    simulationMethod,
+    tdpAmount,
+    monthlyAmount,
+    displayTdp,
+    displayMonthly,
+    minTdpAmount,
+    maxTdpAmount,
+    minMonthlyAmount,
+    maxMonthlyAmount,
+  ]);
+
   function handleDpAmountChange(e: ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value.replace(/\D/g, "");
     if (!raw) {
@@ -243,7 +260,7 @@ export function UnitDetail() {
   }
 
   function handleDpAmountBlur() {
-    if (!price || !displayCreditPrice) return;
+    if (!price) return;
     if (!dpAmountInput) {
       setDpAmountInput(displayDp ? formatDpValue(displayDp) : "");
       return;
@@ -251,7 +268,7 @@ export function UnitDetail() {
     const amount = Number(dpAmountInput.replace(/\D/g, ""));
     const nextPercent = toDpPercentFromAmount(amount);
     setDpPercent(nextPercent);
-    setDpAmountInput(formatDpValue(downPayment(displayCreditPrice, nextPercent)));
+    setDpAmountInput(formatDpValue(downPayment(price, nextPercent)));
   }
 
   function handleSimulationMethodChange(e: ChangeEvent<HTMLSelectElement>) {
@@ -321,8 +338,8 @@ export function UnitDetail() {
     setMonthlyAmountInput(formatDpValue(nextAmount));
   }
 
-  function refreshDsfSimulation() {
-    setSimRefreshKey((value) => value + 1);
+  function runDsfSimulation() {
+    setSimRunKey((value) => value + 1);
   }
 
   useEffect(() => {
@@ -334,14 +351,13 @@ export function UnitDetail() {
     }
     let alive = true;
     const controller = new AbortController();
-    clearTimeout(simTimer.current);
     setSimResult(null);
     setSimError(false);
     setSimLoading(true);
-    simTimer.current = setTimeout(async () => {
-      const result = await resolveMobixCreditSimulation(
+    (async () => {
+      const result = await simulateKreditWithSignal(
         {
-          unitPrice: baseCreditPrice,
+          unitPrice: price,
           dpPercent,
           simulationType: simulationMethod,
           simulationValue:
@@ -355,32 +371,23 @@ export function UnitDetail() {
           model: unit?.type,
           year: unit?.year,
         },
-        price,
-        baseCreditPrice,
         controller.signal,
       );
       if (!alive) return;
       setSimResult(result);
       setSimError(result === null);
       setSimLoading(false);
-    }, 600);
+    })();
     return () => {
       alive = false;
       controller.abort();
-      clearTimeout(simTimer.current);
     };
   }, [
     price,
-    baseCreditPrice,
-    dpPercent,
-    simulationMethod,
-    tdpSimulationAmount,
-    monthlySimulationAmount,
-    tenor,
     unit?.brand,
     unit?.type,
     unit?.year,
-    simRefreshKey,
+    simRunKey,
   ]);
 
   useEffect(() => {
@@ -393,6 +400,9 @@ export function UnitDetail() {
     setTdpAmountInput("");
     setMonthlyAmount(0);
     setMonthlyAmountInput("");
+    setSimResult(null);
+    setSimError(false);
+    setSimRunKey((value) => value + 1);
     pageRef.current?.scrollTo({ top: 0 });
   }, [slug]);
 
@@ -723,7 +733,7 @@ export function UnitDetail() {
                     value={dpAmountInput}
                     onChange={handleDpAmountChange}
                     onBlur={handleDpAmountBlur}
-                    disabled={!displayCreditPrice}
+                    disabled={!price}
                     className="w-full bg-transparent text-[14px] font-bold text-ink outline-none disabled:opacity-60"
                     placeholder={simPending ? "Menghitung..." : ""}
                     aria-label="Total uang muka"
@@ -856,6 +866,15 @@ export function UnitDetail() {
               </div>
             </div>
 
+            <button
+              type="button"
+              onClick={runDsfSimulation}
+              disabled={!price || simLoading}
+              className="mb-3 w-full rounded-[12px] bg-ink px-4 py-3 text-[13px] font-extrabold text-surface disabled:bg-ink/35"
+            >
+              {simLoading ? "Menghitung..." : "Hitung"}
+            </button>
+
             <div
               className={`rounded-[14px] border border-line bg-surface-2 p-4 text-ink transition-opacity ${
                 simLoading ? "opacity-60" : ""
@@ -878,10 +897,10 @@ export function UnitDetail() {
                   </div>
                   <button
                     type="button"
-                    onClick={refreshDsfSimulation}
+                    onClick={runDsfSimulation}
                     className="mt-3 rounded-[10px] bg-ink px-3.5 py-2 text-[12px] font-bold text-surface"
                   >
-                    Refresh harga kredit
+                    Hitung ulang
                   </button>
                 </div>
               ) : (
