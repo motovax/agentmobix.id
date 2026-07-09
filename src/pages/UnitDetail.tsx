@@ -835,15 +835,8 @@ export function UnitDetail() {
 
             {simulationMethod === "TDP" && (
               <div className="mb-3.5">
-                <div className="mb-1.5 flex items-center justify-between gap-3 text-[12px] font-semibold text-mid">
-                  <span>Total Bayar Pertama</span>
-                  <span className="text-right text-teal-deep">
-                    {displayTdp
-                      ? formatRupiah(displayTdp)
-                      : simPending
-                        ? "Menghitung..."
-                        : "Maaf, ada kendala sistem"}
-                  </span>
+                <div className="mb-1.5 text-[12px] font-semibold text-mid">
+                  Total Bayar Pertama
                 </div>
                 <div className="mb-2 flex items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
                   <span className="pr-2 text-[13px] font-semibold text-muted">Rp</span>
@@ -879,15 +872,8 @@ export function UnitDetail() {
 
             {simulationMethod === "Installment" && (
               <div className="mb-3.5">
-                <div className="mb-1.5 flex items-center justify-between gap-3 text-[12px] font-semibold text-mid">
-                  <span>Cicilan per bulan</span>
-                  <span className="text-right text-teal-deep">
-                    {displayMonthly
-                      ? formatRupiah(displayMonthly)
-                      : simPending
-                        ? "Menghitung..."
-                        : "Maaf, ada kendala sistem"}
-                  </span>
+                <div className="mb-1.5 text-[12px] font-semibold text-mid">
+                  Cicilan per bulan
                 </div>
                 <div className="mb-2 flex items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
                   <span className="pr-2 text-[13px] font-semibold text-muted">Rp</span>
