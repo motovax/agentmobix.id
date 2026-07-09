@@ -99,6 +99,7 @@ export function UnitDetail() {
   const [activeThumb, setActiveThumb] = useState(0);
   const [showAllThumbs, setShowAllThumbs] = useState(false);
   const [lightbox, setLightbox] = useState(false);
+  const [dpPercentInput, setDpPercentInput] = useState(String(MIN_DP_PERCENT));
   const [dpAmountInput, setDpAmountInput] = useState("");
   const [tdpAmount, setTdpAmount] = useState(0);
   const [tdpAmountInput, setTdpAmountInput] = useState("");
@@ -213,6 +214,10 @@ export function UnitDetail() {
   }
 
   useEffect(() => {
+    setDpPercentInput(String(Math.round(displayDpPercent * 10) / 10));
+  }, [displayDpPercent]);
+
+  useEffect(() => {
     if (!price || !displayDp) {
       setDpAmountInput("");
       return;
@@ -257,6 +262,19 @@ export function UnitDetail() {
     minMonthlyAmount,
     maxMonthlyAmount,
   ]);
+
+  function handleDpPercentChange(e: ChangeEvent<HTMLInputElement>) {
+    setDpPercentInput(e.target.value.replace(/[^\d.]/g, ""));
+  }
+
+  function handleDpPercentBlur() {
+    const parsed = Number(dpPercentInput);
+    const nextPercent = Number.isFinite(parsed)
+      ? clampValue(parsed, MIN_DP_PERCENT, MAX_DP_PERCENT)
+      : MIN_DP_PERCENT;
+    setDpPercent(nextPercent);
+    setDpPercentInput(String(Math.round(nextPercent * 10) / 10));
+  }
 
   function handleDpAmountChange(e: ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value.replace(/\D/g, "");
@@ -446,6 +464,7 @@ export function UnitDetail() {
     setLightbox(false);
     setSimulationMethod("DP");
     setDpPercent(MIN_DP_PERCENT);
+    setDpPercentInput(String(MIN_DP_PERCENT));
     setTdpAmount(0);
     setTdpAmountInput("");
     setMonthlyAmount(0);
@@ -767,29 +786,35 @@ export function UnitDetail() {
 
             {simulationMethod === "DP" && (
               <div className="mb-3.5">
-                <div className="mb-1.5 flex items-center justify-between text-[12px] font-semibold text-mid">
-                  <span>DP (Down Payment)</span>
-                  <span className="text-teal-deep">
-                    {displayDp
-                      ? `${Math.round(displayDpPercent * 10) / 10}% · ${formatRupiah(displayDp)}`
-                      : simPending
-                        ? "Menghitung..."
-                        : "Maaf, ada kendala sistem"}
-                  </span>
+                <div className="mb-1.5 text-[12px] font-semibold text-mid">
+                  DP (Down Payment)
                 </div>
-                <div className="mb-2 flex items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
-                  <span className="pr-2 text-[13px] font-semibold text-muted">Rp</span>
+                <div className="mb-2 grid grid-cols-[112px_26px_minmax(0,1fr)] items-center gap-2">
                   <input
                     type="text"
-                    inputMode="numeric"
-                    value={dpAmountInput}
-                    onChange={handleDpAmountChange}
-                    onBlur={handleDpAmountBlur}
+                    inputMode="decimal"
+                    value={dpPercentInput}
+                    onChange={handleDpPercentChange}
+                    onBlur={handleDpPercentBlur}
                     disabled={!price}
-                    className="w-full bg-transparent text-[14px] font-bold text-ink outline-none disabled:opacity-60"
-                    placeholder={simPending ? "Menghitung..." : ""}
-                    aria-label="Total uang muka"
+                    className="h-[62px] w-full rounded-xl border border-line bg-surface-2 px-3 text-center text-[16px] font-bold text-ink outline-none disabled:opacity-60"
+                    aria-label="Persentase uang muka"
                   />
+                  <span className="text-center text-[22px] font-bold text-ink">%</span>
+                  <div className="flex h-[62px] min-w-0 items-center rounded-xl border border-line bg-surface-2 px-3">
+                    <span className="pr-2 text-[15px] font-semibold text-muted">Rp</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={dpAmountInput}
+                      onChange={handleDpAmountChange}
+                      onBlur={handleDpAmountBlur}
+                      disabled={!price}
+                      className="min-w-0 flex-1 bg-transparent text-[16px] font-bold text-ink outline-none disabled:opacity-60"
+                      placeholder={simPending ? "Menghitung..." : ""}
+                      aria-label="Total uang muka"
+                    />
+                  </div>
                 </div>
                 <input
                   type="range"
