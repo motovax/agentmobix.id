@@ -17,6 +17,8 @@ export interface DsfSimResult {
   disclaimer: string[];
 }
 
+export type DsfSimMethod = "DP" | "TDP" | "Installment";
+
 interface DsfAllParamsData {
   harga_kredit?: number;
   installmentRounded: number;
@@ -38,13 +40,24 @@ export interface DsfSimParams {
   unitPrice: number;
   dpPercent: number;
   tenor: number;
+  simulationType?: DsfSimMethod;
+  simulationValue?: number;
   brand?: string;
   model?: string;
   year?: number;
 }
 
 function buildDsfSimulationPayload(params: DsfSimParams) {
-  const { unitPrice, dpPercent, tenor, brand = "Unknown", model = "Unknown", year = 2020 } = params;
+  const {
+    unitPrice,
+    dpPercent,
+    tenor,
+    simulationType = "DP",
+    simulationValue = dpPercent,
+    brand = "Unknown",
+    model = "Unknown",
+    year = 2020,
+  } = params;
 
   return {
     UnitPrice: unitPrice,
@@ -72,8 +85,8 @@ function buildDsfSimulationPayload(params: DsfSimParams) {
       BeaPolis: 50000,
       AdminFee: 5500000,
     },
-    SimulationType: "DP",
-    SimulationValue: dpPercent,
+    SimulationType: simulationType,
+    SimulationValue: simulationValue,
     TenorInMonths: tenor,
   };
 }

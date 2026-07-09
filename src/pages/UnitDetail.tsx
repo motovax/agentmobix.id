@@ -26,10 +26,16 @@ import {
 } from "../lib/installment";
 import {
   resolveMobixCreditSimulation,
+  type DsfSimMethod,
   type DsfSimResult,
 } from "../lib/dsf";
 
 const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
+const MIN_DP_PERCENT = 15;
+const MAX_DP_PERCENT = 60;
+const TDP_RANGE_MAX_PERCENT = 80;
+const MIN_INSTALLMENT_RATE = 0.005;
+const MAX_INSTALLMENT_RATE = 0.05;
 
 function maskPersonName(value: string) {
   const words = value.trim().split(/\s+/);
@@ -87,11 +93,16 @@ export function UnitDetail() {
   );
 
   const [dpPercent, setDpPercent] = useState(15);
+  const [simulationMethod, setSimulationMethod] = useState<DsfSimMethod>("DP");
   const [tenor, setTenor] = useState<Tenor>(60);
   const [activeThumb, setActiveThumb] = useState(0);
   const [showAllThumbs, setShowAllThumbs] = useState(false);
   const [lightbox, setLightbox] = useState(false);
   const [dpAmountInput, setDpAmountInput] = useState("");
+  const [tdpAmount, setTdpAmount] = useState(0);
+  const [tdpAmountInput, setTdpAmountInput] = useState("");
+  const [monthlyAmount, setMonthlyAmount] = useState(0);
+  const [monthlyAmountInput, setMonthlyAmountInput] = useState("");
   const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
   const [simLoading, setSimLoading] = useState(false);
   const [simError, setSimError] = useState(false);
@@ -102,6 +113,32 @@ export function UnitDetail() {
 
   const price = unit?.harga ?? 0;
   const baseCreditPrice = unit?.harga_kredit || price;
+  const creditPriceForBounds = baseCreditPrice || price;
+  const minTdpAmount = Math.max(
+    0,
+    Math.round(unit?.tdp && unit.tdp > 0 ? unit.tdp : creditPriceForBounds * (MIN_DP_PERCENT / 100)),
+  );
+  const maxTdpAmount = Math.max(
+    minTdpAmount,
+    Math.round(creditPriceForBounds * (TDP_RANGE_MAX_PERCENT / 100)),
+  );
+  const minMonthlyAmount = Math.max(0, Math.round(creditPriceForBounds * MIN_INSTALLMENT_RATE));
+  const maxMonthlyAmount = Math.max(
+    minMonthlyAmount,
+    Math.round(creditPriceForBounds * MAX_INSTALLMENT_RATE),
+  );
+  const tdpSimulationAmount =
+    tdpAmount > 0
+      ? tdpAmount
+      : unit?.tdp && unit.tdp > 0
+        ? unit.tdp
+        : minTdpAmount;
+  const monthlySimulationAmount =
+    monthlyAmount > 0
+      ? monthlyAmount
+      : unit?.cicilan && unit.cicilan > 0
+        ? Math.round(unit.cicilan)
+        : minMonthlyAmount;
 
   const dsfCreditPrice = simResult?.hargaKredit;
   const dsfDp = simResult?.downPaymentRounded;
@@ -151,11 +188,19 @@ export function UnitDetail() {
     return currencyFormatter.format(Math.max(0, Math.round(value || 0)));
   }
 
+  function clampValue(value: number, min: number, max: number) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function parseCurrencyInput(value: string) {
+    return Number(value.replace(/\D/g, ""));
+  }
+
   function toDpPercentFromAmount(amount: number) {
-    if (!displayCreditPrice) return 15;
+    if (!displayCreditPrice) return MIN_DP_PERCENT;
     const next = Math.round((amount / displayCreditPrice) * 100);
-    if (Number.isNaN(next)) return 15;
-    return Math.min(60, Math.max(15, next));
+    if (Number.isNaN(next)) return MIN_DP_PERCENT;
+    return clampValue(next, MIN_DP_PERCENT, MAX_DP_PERCENT);
   }
 
   useEffect(() => {
@@ -165,6 +210,22 @@ export function UnitDetail() {
     }
     setDpAmountInput(formatDpValue(displayDp));
   }, [displayCreditPrice, displayDp]);
+
+  useEffect(() => {
+    if (!tdpAmount) {
+      setTdpAmountInput("");
+      return;
+    }
+    setTdpAmountInput(formatDpValue(tdpAmount));
+  }, [tdpAmount]);
+
+  useEffect(() => {
+    if (!monthlyAmount) {
+      setMonthlyAmountInput("");
+      return;
+    }
+    setMonthlyAmountInput(formatDpValue(monthlyAmount));
+  }, [monthlyAmount]);
 
   function handleDpAmountChange(e: ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value.replace(/\D/g, "");
@@ -185,6 +246,73 @@ export function UnitDetail() {
     const nextPercent = toDpPercentFromAmount(amount);
     setDpPercent(nextPercent);
     setDpAmountInput(formatDpValue(downPayment(displayCreditPrice, nextPercent)));
+  }
+
+  function handleSimulationMethodChange(e: ChangeEvent<HTMLSelectElement>) {
+    const nextMethod = e.target.value as DsfSimMethod;
+    setSimulationMethod(nextMethod);
+
+    if (nextMethod === "DP") {
+      setDpPercent(clampValue(displayDpPercent, MIN_DP_PERCENT, MAX_DP_PERCENT));
+      return;
+    }
+
+    if (nextMethod === "TDP") {
+      setTdpAmount(
+        clampValue(
+          displayTdp ?? tdpSimulationAmount,
+          minTdpAmount,
+          maxTdpAmount,
+        ),
+      );
+      return;
+    }
+
+    setMonthlyAmount(
+      clampValue(
+        displayMonthly ?? monthlySimulationAmount,
+        minMonthlyAmount,
+        maxMonthlyAmount,
+      ),
+    );
+  }
+
+  function handleTdpAmountChange(e: ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value.replace(/\D/g, "");
+    if (!raw) {
+      setTdpAmountInput("");
+      return;
+    }
+    const nextAmount = clampValue(parseCurrencyInput(raw), minTdpAmount, maxTdpAmount);
+    setTdpAmount(nextAmount);
+    setTdpAmountInput(formatDpValue(nextAmount));
+  }
+
+  function handleTdpAmountBlur() {
+    const nextAmount = clampValue(tdpAmount || tdpSimulationAmount, minTdpAmount, maxTdpAmount);
+    setTdpAmount(nextAmount);
+    setTdpAmountInput(formatDpValue(nextAmount));
+  }
+
+  function handleMonthlyAmountChange(e: ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value.replace(/\D/g, "");
+    if (!raw) {
+      setMonthlyAmountInput("");
+      return;
+    }
+    const nextAmount = clampValue(parseCurrencyInput(raw), minMonthlyAmount, maxMonthlyAmount);
+    setMonthlyAmount(nextAmount);
+    setMonthlyAmountInput(formatDpValue(nextAmount));
+  }
+
+  function handleMonthlyAmountBlur() {
+    const nextAmount = clampValue(
+      monthlyAmount || monthlySimulationAmount,
+      minMonthlyAmount,
+      maxMonthlyAmount,
+    );
+    setMonthlyAmount(nextAmount);
+    setMonthlyAmountInput(formatDpValue(nextAmount));
   }
 
   function refreshDsfSimulation() {
@@ -209,6 +337,13 @@ export function UnitDetail() {
         {
           unitPrice: baseCreditPrice,
           dpPercent,
+          simulationType: simulationMethod,
+          simulationValue:
+            simulationMethod === "TDP"
+              ? tdpSimulationAmount
+              : simulationMethod === "Installment"
+                ? monthlySimulationAmount
+                : dpPercent,
           tenor,
           brand: unit?.brand,
           model: unit?.type,
@@ -232,6 +367,9 @@ export function UnitDetail() {
     price,
     baseCreditPrice,
     dpPercent,
+    simulationMethod,
+    tdpSimulationAmount,
+    monthlySimulationAmount,
     tenor,
     unit?.brand,
     unit?.type,
@@ -243,6 +381,12 @@ export function UnitDetail() {
     setActiveThumb(0);
     setShowAllThumbs(false);
     setLightbox(false);
+    setSimulationMethod("DP");
+    setDpPercent(MIN_DP_PERCENT);
+    setTdpAmount(0);
+    setTdpAmountInput("");
+    setMonthlyAmount(0);
+    setMonthlyAmountInput("");
     pageRef.current?.scrollTo({ top: 0 });
   }, [slug]);
 
@@ -538,45 +682,151 @@ export function UnitDetail() {
             </div>
 
             <div className="mb-3.5">
-              <div className="mb-1.5 flex items-center justify-between text-[12px] font-semibold text-mid">
-                <span>DP (Down Payment)</span>
-                <span className="text-teal-deep">
-                  {displayDp
-                    ? `${Math.round(displayDpPercent * 10) / 10}% · ${formatRupiah(displayDp)}`
-                    : simPending
-                      ? "Menghitung..."
-                      : "Maaf, ada kendala sistem"}
-                </span>
-              </div>
-              <div className="mb-2 flex items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
-                <span className="pr-2 text-[13px] font-semibold text-muted">Rp</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={dpAmountInput}
-                  onChange={handleDpAmountChange}
-                  onBlur={handleDpAmountBlur}
-                  disabled={!displayCreditPrice}
-                  className="w-full bg-transparent text-[14px] font-bold text-ink outline-none disabled:opacity-60"
-                  placeholder={simPending ? "Menghitung..." : ""}
-                  aria-label="Total uang muka"
-                />
-              </div>
-              <input
-                type="range"
-                min={15}
-                max={60}
-                step={1}
-                value={dpPercent}
-                onChange={(e) => setDpPercent(Number(e.target.value))}
-                aria-label="Persentase uang muka"
-                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#E0E7E9] accent-ink"
-              />
-              <div className="mt-1.5 flex items-center justify-between text-[10px] font-semibold text-muted">
-                <span>15%</span>
-                <span>60%</span>
-              </div>
+              <label className="mb-1.5 block text-[12px] font-semibold text-mid">
+                Pilih metode
+              </label>
+              <select
+                value={simulationMethod}
+                onChange={handleSimulationMethodChange}
+                className="w-full rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-[13px] font-bold text-ink outline-none"
+                aria-label="Pilih metode simulasi kredit"
+              >
+                <option value="DP">DP</option>
+                <option value="TDP">TDP</option>
+                <option value="Installment">Cicilan</option>
+              </select>
             </div>
+
+            {simulationMethod === "DP" && (
+              <div className="mb-3.5">
+                <div className="mb-1.5 flex items-center justify-between text-[12px] font-semibold text-mid">
+                  <span>DP (Down Payment)</span>
+                  <span className="text-teal-deep">
+                    {displayDp
+                      ? `${Math.round(displayDpPercent * 10) / 10}% · ${formatRupiah(displayDp)}`
+                      : simPending
+                        ? "Menghitung..."
+                        : "Maaf, ada kendala sistem"}
+                  </span>
+                </div>
+                <div className="mb-2 flex items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+                  <span className="pr-2 text-[13px] font-semibold text-muted">Rp</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={dpAmountInput}
+                    onChange={handleDpAmountChange}
+                    onBlur={handleDpAmountBlur}
+                    disabled={!displayCreditPrice}
+                    className="w-full bg-transparent text-[14px] font-bold text-ink outline-none disabled:opacity-60"
+                    placeholder={simPending ? "Menghitung..." : ""}
+                    aria-label="Total uang muka"
+                  />
+                </div>
+                <input
+                  type="range"
+                  min={MIN_DP_PERCENT}
+                  max={MAX_DP_PERCENT}
+                  step={1}
+                  value={dpPercent}
+                  onChange={(e) => setDpPercent(Number(e.target.value))}
+                  aria-label="Persentase uang muka"
+                  className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#E0E7E9] accent-ink"
+                />
+                <div className="mt-1.5 flex items-center justify-between text-[10px] font-semibold text-muted">
+                  <span>{MIN_DP_PERCENT}%</span>
+                  <span>{MAX_DP_PERCENT}%</span>
+                </div>
+              </div>
+            )}
+
+            {simulationMethod === "TDP" && (
+              <div className="mb-3.5">
+                <div className="mb-1.5 flex items-center justify-between gap-3 text-[12px] font-semibold text-mid">
+                  <span>Total Bayar Pertama</span>
+                  <span className="text-right text-teal-deep">
+                    {displayTdp
+                      ? formatRupiah(displayTdp)
+                      : simPending
+                        ? "Menghitung..."
+                        : "Maaf, ada kendala sistem"}
+                  </span>
+                </div>
+                <div className="mb-2 flex items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+                  <span className="pr-2 text-[13px] font-semibold text-muted">Rp</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={tdpAmountInput}
+                    onChange={handleTdpAmountChange}
+                    onBlur={handleTdpAmountBlur}
+                    disabled={!price}
+                    className="w-full bg-transparent text-[14px] font-bold text-ink outline-none disabled:opacity-60"
+                    placeholder={simPending ? "Menghitung..." : ""}
+                    aria-label="Total bayar pertama"
+                  />
+                </div>
+                <input
+                  type="range"
+                  min={minTdpAmount}
+                  max={maxTdpAmount}
+                  step={100000}
+                  value={tdpSimulationAmount}
+                  onChange={(e) => setTdpAmount(Number(e.target.value))}
+                  disabled={!price}
+                  aria-label="Nominal total bayar pertama"
+                  className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#E0E7E9] accent-ink disabled:opacity-60"
+                />
+                <div className="mt-1.5 flex items-center justify-between text-[10px] font-semibold text-muted">
+                  <span>{formatRupiah(minTdpAmount)}</span>
+                  <span>{formatRupiah(maxTdpAmount)}</span>
+                </div>
+              </div>
+            )}
+
+            {simulationMethod === "Installment" && (
+              <div className="mb-3.5">
+                <div className="mb-1.5 flex items-center justify-between gap-3 text-[12px] font-semibold text-mid">
+                  <span>Cicilan per bulan</span>
+                  <span className="text-right text-teal-deep">
+                    {displayMonthly
+                      ? formatRupiah(displayMonthly)
+                      : simPending
+                        ? "Menghitung..."
+                        : "Maaf, ada kendala sistem"}
+                  </span>
+                </div>
+                <div className="mb-2 flex items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+                  <span className="pr-2 text-[13px] font-semibold text-muted">Rp</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={monthlyAmountInput}
+                    onChange={handleMonthlyAmountChange}
+                    onBlur={handleMonthlyAmountBlur}
+                    disabled={!price}
+                    className="w-full bg-transparent text-[14px] font-bold text-ink outline-none disabled:opacity-60"
+                    placeholder={simPending ? "Menghitung..." : ""}
+                    aria-label="Cicilan per bulan"
+                  />
+                </div>
+                <input
+                  type="range"
+                  min={minMonthlyAmount}
+                  max={maxMonthlyAmount}
+                  step={10000}
+                  value={monthlySimulationAmount}
+                  onChange={(e) => setMonthlyAmount(Number(e.target.value))}
+                  disabled={!price}
+                  aria-label="Nominal cicilan per bulan"
+                  className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#E0E7E9] accent-ink disabled:opacity-60"
+                />
+                <div className="mt-1.5 flex items-center justify-between text-[10px] font-semibold text-muted">
+                  <span>{formatRupiah(minMonthlyAmount)}</span>
+                  <span>{formatRupiah(maxMonthlyAmount)}</span>
+                </div>
+              </div>
+            )}
 
             <div className="mb-3.5">
               <div className="mb-2 text-[12px] font-semibold text-mid">Tenor (bulan)</div>
