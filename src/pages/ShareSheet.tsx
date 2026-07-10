@@ -23,15 +23,9 @@ import {
 } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
 import { formatJt, formatRupiah } from "../lib/format";
+import { estimateBuilderCommission } from "../lib/commission";
 
 /* ---- business logic ---- */
-
-function komisiDeal(deal: number, asli: number): number {
-  if (!deal || !asli) return 0;
-  if (deal < asli) return 1_000_000;
-  if (deal === asli) return 2_000_000;
-  return deal - asli;
-}
 
 /* ---- canvas overlay composition ---- */
 
@@ -224,10 +218,6 @@ export function ShareSheet() {
   const [selectedIdxes, setSelectedIdxes] = useState<number[]>([0]);
   const [previewIdx, setPreviewIdx] = useState(0);
 
-  // editable price
-  const [dealHarga, setDealHarga] = useState(0);
-  const [priceInput, setPriceInput] = useState("");
-
   // canvas-composed files without price/TDP overlay — for download
   const [composedFiles, setComposedFiles] = useState<File[]>([]);
   const [composing, setComposing] = useState(false);
@@ -247,12 +237,14 @@ export function ShareSheet() {
   const shareDp = positiveParamNumber(searchParams, "dp") ?? null;
   const shareDpPercent = positiveParamNumber(searchParams, "dp_pct") ?? null;
   const shareCreditPrice = positiveParamNumber(searchParams, "harga_kredit") ?? unit?.harga_kredit ?? null;
+  const sharePrice = positiveParamNumber(searchParams, "harga") ?? unit?.harga ?? 0;
+  const shareCommission =
+    positiveParamNumber(searchParams, "komisi") ??
+    (unit && sharePrice ? estimateBuilderCommission(unit.harga, sharePrice) : 0);
 
   // init when unit loads
   useEffect(() => {
     if (!unit) return;
-    setDealHarga(unit.harga);
-    setPriceInput(new Intl.NumberFormat("id-ID").format(unit.harga));
     setSelectedIdxes([0]);
     setPreviewIdx(0);
     setCaptionText(
@@ -273,7 +265,7 @@ export function ShareSheet() {
     async function run() {
       const backendFiles = await buildShareImagesViaBackend(
         selectedGallery,
-        dealHarga,
+        sharePrice,
         shareTdp,
         false,
       );
@@ -287,7 +279,7 @@ export function ShareSheet() {
 
       const files = await buildShareImagesLocally(
         selectedGallery,
-        dealHarga,
+        sharePrice,
         shareTdp,
         false,
         blobCache.current,
@@ -305,7 +297,7 @@ export function ShareSheet() {
     return () => {
       alive = false;
     };
-  }, [unit, selectedIdxes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [unit, selectedIdxes.join(","), sharePrice, shareTdp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function prepareShareFiles() {
     if (!unit || !gallery.length) return [];
@@ -313,7 +305,7 @@ export function ShareSheet() {
     const selectedGallery = selectedIdxes
       .map((i) => gallery[i])
       .filter(Boolean);
-    const signature = `${selectedIdxes.join(",")}:${dealHarga}:${shareTdp}`;
+    const signature = `${selectedIdxes.join(",")}:${sharePrice}:${shareTdp}`;
 
     if (shareFiles.length > 0 && shareFilesSignature === signature) {
       return shareFiles;
@@ -324,7 +316,7 @@ export function ShareSheet() {
     try {
       const backendFiles = await buildShareImagesViaBackend(
         selectedGallery,
-        dealHarga,
+        sharePrice,
         shareTdp,
         false,
       );
@@ -334,7 +326,7 @@ export function ShareSheet() {
           ? backendFiles
           : await buildShareImagesLocally(
               selectedGallery,
-              dealHarga,
+              sharePrice,
               shareTdp,
               false,
               blobCache.current,
@@ -357,13 +349,6 @@ export function ShareSheet() {
       }
       return [...prev, i].sort((a, b) => a - b);
     });
-  }
-
-  function handlePriceChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const digits = e.target.value.replace(/\D/g, "");
-    const num = digits ? Number(digits) : 0;
-    setPriceInput(new Intl.NumberFormat("id-ID").format(num));
-    setDealHarga(num);
   }
 
   const link = unit ? `mobix.id/u/${unit.plate_no}` : "mobix.id";
@@ -453,7 +438,7 @@ export function ShareSheet() {
   const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
   const activeUrl = mobixImage(activeImg?.url, MOBIX_SHARE_WIDTH);
   const activePlaceholder = mobixImage(activeImg?.url, MOBIX_SHARE_WIDTH);
-  const komisi = unit ? komisiDeal(dealHarga, unit.harga) : 0;
+  const priceDelta = unit && sharePrice ? sharePrice - unit.harga : 0;
 
   return (
     <AppShell bg="bg-ink">
@@ -484,7 +469,7 @@ export function ShareSheet() {
           >
             {unit && (
               <div className="absolute bottom-3 left-3 rounded-lg bg-ink/85 px-3 py-1.5 text-[15px] font-bold text-surface">
-                Rp {formatJt(dealHarga || unit.harga)} · TDP {formatJt(shareTdp)}
+                Rp {formatJt(sharePrice || unit.harga)} · TDP {formatJt(shareTdp)}
               </div>
             )}
             <img
@@ -608,47 +593,36 @@ export function ShareSheet() {
           )}
         </div>
 
-        {/* editable price */}
-        <div className="mb-3 rounded-[14px] border border-line bg-surface px-3.5 py-3">
-          <div className="mb-1.5 text-[11px] font-bold text-muted">
-            Harga jual kamu (ubah sesuai deal)
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="shrink-0 text-[13px] font-semibold text-muted">Rp</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={priceInput}
-              onChange={handlePriceChange}
-              disabled={!unit}
-              className="min-w-0 flex-1 bg-transparent text-[16px] font-bold text-ink outline-none disabled:opacity-40"
-              placeholder="0"
-            />
-            {unit && dealHarga !== unit.harga && (
-              <button
-                onClick={() => {
-                  setDealHarga(unit.harga);
-                  setPriceInput(
-                    new Intl.NumberFormat("id-ID").format(unit.harga),
-                  );
-                }}
-                className="shrink-0 text-[11px] font-semibold text-muted underline"
-              >
-                Reset
-              </button>
+        {/* builder price */}
+        <div className="mb-3 flex items-center justify-between rounded-[14px] border border-line bg-surface px-3.5 py-3">
+          <div>
+            <div className="text-[13px] font-semibold text-mid">
+              Harga jual builder
+            </div>
+            {unit && priceDelta !== 0 && (
+              <div className="mt-0.5 text-[10px] text-muted">
+                Harga asli {formatRupiah(unit.harga)}
+              </div>
             )}
           </div>
+          {loading || !unit ? (
+            <Skeleton className="h-5 w-28" />
+          ) : (
+            <span className="text-[15px] font-bold text-ink">
+              {formatRupiah(sharePrice || unit.harga)}
+            </span>
+          )}
         </div>
 
         {/* est. komisi */}
         <div className="mb-[18px] flex items-center justify-between rounded-[14px] border border-line bg-surface px-3.5 py-3">
           <div>
             <div className="text-[13px] font-semibold text-mid">Est. komisi kamu</div>
-            {unit && dealHarga !== unit.harga && (
+            {unit && priceDelta !== 0 && (
               <div className="mt-0.5 text-[10px] text-muted">
-                {dealHarga < unit.harga
-                  ? "Harga di bawah asli"
-                  : `Selisih +${formatRupiah(dealHarga - unit.harga)}`}
+                {priceDelta > 0
+                  ? `Selisih +${formatRupiah(priceDelta)}`
+                  : `Selisih -${formatRupiah(Math.abs(priceDelta))}`}
               </div>
             )}
           </div>
@@ -657,10 +631,10 @@ export function ShareSheet() {
           ) : (
             <span
               className={`text-[15px] font-bold ${
-                komisi >= 2_000_000 ? "text-teal-deep" : "text-ink"
+                shareCommission >= 2_000_000 ? "text-teal-deep" : "text-ink"
               }`}
             >
-              {formatRupiah(komisi)}
+              {formatRupiah(shareCommission)}
             </span>
           )}
         </div>

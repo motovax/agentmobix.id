@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, KeyboardEvent } from "react";
 import { Splide, SplideSlide } from "@splidejs/react-splide";
 import "@splidejs/react-splide/css/core";
 import { Link, useParams } from "wouter";
@@ -30,6 +30,12 @@ import {
   type DsfSimMethod,
   type DsfSimResult,
 } from "../lib/dsf";
+import {
+  clampBuilderPrice,
+  estimateBuilderCommission,
+  MAX_BUILDER_PRICE_DROP,
+  minBuilderPrice,
+} from "../lib/commission";
 
 const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
 const MIN_DP_PERCENT = 15;
@@ -105,6 +111,8 @@ export function UnitDetail() {
   const [tdpAmountInput, setTdpAmountInput] = useState("");
   const [monthlyAmount, setMonthlyAmount] = useState(0);
   const [monthlyAmountInput, setMonthlyAmountInput] = useState("");
+  const [builderPrice, setBuilderPrice] = useState(0);
+  const [builderPriceInput, setBuilderPriceInput] = useState("");
   const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
   const [simLoading, setSimLoading] = useState(false);
   const [simError, setSimError] = useState(false);
@@ -115,7 +123,11 @@ export function UnitDetail() {
   const pageRef = useRef<HTMLElement>(null);
   const galleryRef = useRef<Splide>(null);
 
-  const price = unit?.harga ?? 0;
+  const originalPrice = unit?.harga ?? 0;
+  const price = builderPrice > 0 ? builderPrice : originalPrice;
+  const minimumBuilderPrice = minBuilderPrice(originalPrice);
+  const estimatedCommission = estimateBuilderCommission(originalPrice, price);
+  const priceDelta = price - originalPrice;
   const creditPriceForBounds = price;
   const minTdpAmount = Math.max(
     0,
@@ -178,11 +190,14 @@ export function UnitDetail() {
   const canShareSimulation =
     displayDp !== null &&
     displayMonthly !== null &&
-    displayTdp !== null;
+    displayTdp !== null &&
+    creditPriceForDisplay !== null;
   const currencyFormatter = new Intl.NumberFormat("id-ID");
   const shareHref = canShareSimulation
     ? `/share?${new URLSearchParams({
         u: unit?.slug ?? slug ?? "",
+        harga: String(Math.round(price)),
+        komisi: String(Math.round(estimatedCommission)),
         tenor: String(tenor),
         dp_pct: String(Math.round(displayDpPercent * 10) / 10),
         dp: String(Math.round(displayDp)),
@@ -206,12 +221,53 @@ export function UnitDetail() {
     return Number(value.replace(/\D/g, ""));
   }
 
+  function commitBuilderPrice(value: number) {
+    if (!originalPrice) return;
+    const nextPrice = clampBuilderPrice(value || originalPrice, originalPrice);
+    setBuilderPrice(nextPrice);
+    setBuilderPriceInput(formatDpValue(nextPrice));
+    setTdpAmount(0);
+    setTdpAmountInput("");
+    setMonthlyAmount(0);
+    setMonthlyAmountInput("");
+    setSimResult(null);
+    setSimError(false);
+    setSmartCreditPrice(null);
+    setSmartCreditPriceError(false);
+    setSimRunKey((current) => current + 1);
+  }
+
+  function handleBuilderPriceChange(e: ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value.replace(/\D/g, "");
+    if (!raw) {
+      setBuilderPriceInput("");
+      return;
+    }
+    setBuilderPriceInput(formatDpValue(Number(raw)));
+  }
+
+  function handleBuilderPriceBlur() {
+    commitBuilderPrice(parseCurrencyInput(builderPriceInput));
+  }
+
+  function handleBuilderPriceKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    }
+  }
+
   function toDpPercentFromAmount(amount: number) {
     if (!price) return MIN_DP_PERCENT;
     const next = Math.round((amount / price) * 100);
     if (Number.isNaN(next)) return MIN_DP_PERCENT;
     return clampValue(next, MIN_DP_PERCENT, MAX_DP_PERCENT);
   }
+
+  useEffect(() => {
+    if (!unit) return;
+    setBuilderPrice(unit.harga);
+    setBuilderPriceInput(formatDpValue(unit.harga));
+  }, [unit?.id, unit?.harga]);
 
   useEffect(() => {
     setDpPercentInput(String(Math.round(displayDpPercent * 10) / 10));
@@ -465,6 +521,8 @@ export function UnitDetail() {
     setSimulationMethod("DP");
     setDpPercent(MIN_DP_PERCENT);
     setDpPercentInput(String(MIN_DP_PERCENT));
+    setBuilderPrice(0);
+    setBuilderPriceInput("");
     setTdpAmount(0);
     setTdpAmountInput("");
     setMonthlyAmount(0);
@@ -721,6 +779,11 @@ export function UnitDetail() {
               <div className="-tracking-[0.02em] text-[24px] font-extrabold">
                 {price ? formatRupiah(price) : "Hubungi kami"}
               </div>
+              {priceDelta !== 0 && originalPrice > 0 && (
+                <div className="mt-0.5 text-[11px] font-semibold text-muted">
+                  Harga asli {formatRupiah(originalPrice)}
+                </div>
+              )}
               {smartCreditPriceLoading ? (
                 <div className="mt-1 text-[12px] font-semibold text-muted">
                   Harga Kredit : Menghitung...
@@ -736,12 +799,58 @@ export function UnitDetail() {
               ) : null}
             </div>
             <div className="text-right">
-              <div className="text-[10px] text-muted">Komisi</div>
+              <div className="text-[10px] text-muted">Est. komisi</div>
               <div className="text-[12px] font-bold text-teal-deep">
-                {(unit.aging ?? 0) > 60 ? "+Rp 2 juta" : "Mulai dari 2jt"}
+                {formatRupiah(estimatedCommission)}
               </div>
+              {priceDelta !== 0 && (
+                <div className="mt-0.5 text-[10px] font-semibold text-muted">
+                  {priceDelta > 0
+                    ? `+${formatRupiah(priceDelta)}`
+                    : `-${formatRupiah(Math.abs(priceDelta))}`}
+                </div>
+              )}
             </div>
           </div>
+          {originalPrice > 0 && (
+            <div className="mt-3 rounded-[14px] border border-line bg-surface px-3.5 py-3">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <label
+                  htmlFor="builder-price"
+                  className="text-[11px] font-bold text-muted"
+                >
+                  Harga jual builder
+                </label>
+                {price !== originalPrice && (
+                  <button
+                    type="button"
+                    onClick={() => commitBuilderPrice(originalPrice)}
+                    className="text-[11px] font-semibold text-muted underline"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+                <span className="shrink-0 text-[13px] font-semibold text-muted">Rp</span>
+                <input
+                  id="builder-price"
+                  type="text"
+                  inputMode="numeric"
+                  value={builderPriceInput}
+                  onChange={handleBuilderPriceChange}
+                  onBlur={handleBuilderPriceBlur}
+                  onKeyDown={handleBuilderPriceKeyDown}
+                  className="min-w-0 flex-1 bg-transparent text-[16px] font-bold text-ink outline-none"
+                  aria-label="Harga jual builder"
+                />
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] font-semibold text-muted">
+                <span>Minimum {formatRupiah(minimumBuilderPrice)}</span>
+                <span>Turun maks. {formatRupiah(MAX_BUILDER_PRICE_DROP)}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* SPEC GRID */}
