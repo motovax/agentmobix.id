@@ -364,7 +364,7 @@ export function ShareSheet() {
   const shareButtonLabel = pendingShareStep
     ? pendingShareStep.label
     : isMixedMediaSelected
-      ? "Bagikan video dulu"
+      ? "Share bertahap: video dulu"
       : "Bagikan Sekarang";
   const shareTenor = positiveParamNumber(searchParams, "tenor") ?? 60;
   const shareTdp = positiveParamNumber(searchParams, "tdp") ?? unit?.tdp ?? 0;
@@ -864,6 +864,11 @@ export function ShareSheet() {
             <div className="mt-1.5 text-[11px] text-muted">
               (klik media untuk share lebih dari 1)
             </div>
+            {isMixedMediaSelected && (
+              <div className="mt-1.5 rounded-lg bg-teal-tint px-2.5 py-2 text-[11px] font-semibold text-teal-deep">
+                WhatsApp membatasi foto+video dalam satu share. Bagikan bertahap: video + caption dulu, lalu foto.
+              </div>
+            )}
           </div>
         )}
 
