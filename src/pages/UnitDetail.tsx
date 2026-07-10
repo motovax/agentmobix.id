@@ -7,15 +7,18 @@ import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
 import { Photo, Skeleton } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
-import { ChevronLeft, ShareArrow, Chat, Check, Close } from "../components/icons";
+import { ChevronLeft, ShareArrow, Chat, Check, Close, Play } from "../components/icons";
 import {
   fetchUnitDetail,
   mobixImage,
+  mobixMedia,
   MOBIX_HERO_WIDTH,
   MOBIX_THUMBNAIL_WIDTH,
   titleCase,
   toCardUnit,
   deriveBadge,
+  type GalleryItem,
+  type VideoItem,
 } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
 import { formatRupiah, formatOdometer } from "../lib/format";
@@ -43,6 +46,10 @@ const MAX_DP_PERCENT = 60;
 const TDP_RANGE_MAX_PERCENT = 80;
 const MIN_INSTALLMENT_RATE = 0.005;
 const MAX_INSTALLMENT_RATE = 0.05;
+
+type UnitMedia =
+  | { kind: "image"; id: string; url: string; item: GalleryItem }
+  | { kind: "video"; id: string; url: string; item: VideoItem };
 
 function maskPersonName(value: string) {
   const words = value.trim().split(/\s+/);
@@ -587,12 +594,29 @@ export function UnitDetail() {
   }
 
   const gallery = unit.galeri ?? [];
-  const heroUrl = gallery[activeThumb]?.url;
-  const heroSrc = mobixImage(heroUrl, MOBIX_HERO_WIDTH);
+  const videos = unit.video ?? [];
+  const mediaItems: UnitMedia[] = [
+    ...gallery.map((item) => ({
+      kind: "image" as const,
+      id: `image-${item.id}`,
+      url: item.url,
+      item,
+    })),
+    ...videos.map((item) => ({
+      kind: "video" as const,
+      id: `video-${item.id}`,
+      url: item.url,
+      item,
+    })),
+  ];
+  const activeMedia = mediaItems[activeThumb] ?? mediaItems[0];
+  const heroSrc = activeMedia?.kind === "image"
+    ? mobixImage(activeMedia.url, MOBIX_HERO_WIDTH)
+    : mobixMedia(activeMedia?.url);
   const badge = deriveBadge({ odometer: unit.odometer, harga: price });
-  const thumbCount = Math.min(4, gallery.length);
+  const thumbCount = Math.min(4, mediaItems.length);
 
-  function selectPhoto(index: number) {
+  function selectMedia(index: number) {
     setActiveThumb(index);
     galleryRef.current?.go(index);
   }
@@ -614,19 +638,19 @@ export function UnitDetail() {
       <main ref={pageRef} className="min-h-screen overflow-y-auto sm:min-h-0">
         {/* GALLERY */}
         <div className="relative overflow-hidden">
-          {gallery.length > 0 ? (
+          {mediaItems.length > 0 ? (
             <Splide
               key={unit.slug}
               ref={galleryRef}
               className="unit-gallery-splide aspect-[4/3] cursor-zoom-in bg-hatch-lg"
               options={{
                 arrows: false,
-                drag: gallery.length > 1,
+                drag: mediaItems.length > 1,
                 gap: 0,
                 pagination: false,
                 perMove: 1,
                 perPage: 1,
-                rewind: gallery.length > 1,
+                rewind: mediaItems.length > 1,
                 slideFocus: false,
                 speed: 260,
                 waitForTransition: false,
@@ -634,19 +658,32 @@ export function UnitDetail() {
               onMoved={(_splide, index) => setActiveThumb(index)}
               onClick={(_splide, _slide, event) => {
                 event.preventDefault();
-                setLightbox(true);
+                if (activeMedia?.kind === "image") setLightbox(true);
               }}
-              aria-label={`Galeri foto ${unit.nama}`}
+              aria-label={`Galeri media ${unit.nama}`}
             >
-              {gallery.map((g, index) => (
-                <SplideSlide key={g.id}>
-                  <Photo
-                    large
-                    className="h-full w-full"
-                    src={mobixImage(g.url, MOBIX_HERO_WIDTH)}
-                    placeholderSrc={mobixImage(g.url, MOBIX_THUMBNAIL_WIDTH)}
-                    alt={index === activeThumb ? unit.nama : ""}
-                  />
+              {mediaItems.map((media, index) => (
+                <SplideSlide key={media.id}>
+                  {media.kind === "image" ? (
+                    <Photo
+                      large
+                      className="h-full w-full"
+                      src={mobixImage(media.url, MOBIX_HERO_WIDTH)}
+                      placeholderSrc={mobixImage(media.url, MOBIX_THUMBNAIL_WIDTH)}
+                      alt={index === activeThumb ? unit.nama : ""}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-black">
+                      <video
+                        className="h-full w-full object-contain"
+                        src={mobixMedia(media.url)}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  )}
                 </SplideSlide>
               ))}
             </Splide>
@@ -681,15 +718,15 @@ export function UnitDetail() {
           <span className="absolute bottom-3.5 left-3.5 rounded-lg bg-teal px-2.5 py-1 text-[16px] font-bold text-ink">
             {badge ?? "Tersedia"} · {unit.plate_no}
           </span>
-          {gallery.length > 0 && (
+          {mediaItems.length > 0 && (
             <div className="absolute bottom-3.5 right-3.5 rounded-lg bg-ink/80 px-2.5 py-[3px] text-[11px] font-semibold text-surface">
-              {activeThumb + 1} / {gallery.length}
+              {activeThumb + 1} / {mediaItems.length}
             </div>
           )}
         </div>
 
         {/* LIGHTBOX */}
-        {lightbox && (
+        {lightbox && activeMedia && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/95"
             onClick={() => setLightbox(false)}
@@ -701,53 +738,94 @@ export function UnitDetail() {
             >
               <Close size={16} />
             </button>
-            <img
-              src={heroSrc}
-              alt={unit.nama}
-              className="max-h-screen max-w-full object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
+            {activeMedia.kind === "image" ? (
+              <img
+                src={heroSrc}
+                alt={unit.nama}
+                className="max-h-screen max-w-full object-contain"
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <video
+                src={heroSrc}
+                controls
+                playsInline
+                autoPlay
+                className="max-h-screen max-w-full object-contain"
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
           </div>
         )}
 
         {/* THUMB STRIP */}
-        {gallery.length > 1 && (
+        {mediaItems.length > 1 && (
           <>
             <div className="scroll-x flex gap-2 overflow-x-auto px-4 py-3">
-              {gallery.slice(0, thumbCount).map((g, i) => (
+              {mediaItems.slice(0, thumbCount).map((media, i) => (
                 <button
-                  key={g.id}
-                  onClick={() => selectPhoto(i)}
-                  className={`h-12 flex-[0_0_64px] overflow-hidden rounded-lg ${
+                  key={media.id}
+                  onClick={() => selectMedia(i)}
+                  className={`relative h-12 flex-[0_0_64px] overflow-hidden rounded-lg ${
                     i === activeThumb ? "ring-2 ring-ink" : ""
                   }`}
                 >
-                  <Photo className="h-full w-full" src={mobixImage(g.url)} alt="" />
+                  {media.kind === "image" ? (
+                    <Photo className="h-full w-full" src={mobixImage(media.url)} alt="" />
+                  ) : (
+                    <>
+                      <video
+                        className="h-full w-full bg-black object-cover"
+                        src={mobixMedia(media.url)}
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-white">
+                        <Play size={18} />
+                      </span>
+                    </>
+                  )}
                 </button>
               ))}
-              {!showAllThumbs && gallery.length > thumbCount && (
+              {!showAllThumbs && mediaItems.length > thumbCount && (
                 <button
                   onClick={() => setShowAllThumbs(true)}
                   className="flex h-12 flex-[0_0_64px] items-center justify-center rounded-lg bg-ink text-[12px] font-bold text-surface"
                 >
-                  +{gallery.length - thumbCount}
+                  +{mediaItems.length - thumbCount}
                 </button>
               )}
             </div>
 
             {showAllThumbs && (
               <div className="grid grid-cols-4 gap-2 px-4 pb-3 pt-1">
-                {gallery.slice(thumbCount).map((g, index) => {
+                {mediaItems.slice(thumbCount).map((media, index) => {
                   const absoluteIndex = thumbCount + index;
                   return (
                     <button
-                      key={g.id}
-                      onClick={() => selectPhoto(absoluteIndex)}
-                      className={`h-12 overflow-hidden rounded-lg ${
+                      key={media.id}
+                      onClick={() => selectMedia(absoluteIndex)}
+                      className={`relative h-12 overflow-hidden rounded-lg ${
                         absoluteIndex === activeThumb ? "ring-2 ring-ink" : ""
                       }`}
                     >
-                      <Photo className="h-full w-full" src={mobixImage(g.url)} alt="" />
+                      {media.kind === "image" ? (
+                        <Photo className="h-full w-full" src={mobixImage(media.url)} alt="" />
+                      ) : (
+                        <>
+                          <video
+                            className="h-full w-full bg-black object-cover"
+                            src={mobixMedia(media.url)}
+                            muted
+                            playsInline
+                            preload="metadata"
+                          />
+                          <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-white">
+                            <Play size={18} />
+                          </span>
+                        </>
+                      )}
                     </button>
                   );
                 })}

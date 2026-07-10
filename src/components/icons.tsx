@@ -178,6 +178,14 @@ export function Download({ size = 20, className, strokeWidth = 1.5 }: IconProps)
   );
 }
 
+export function Play({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} viewBox="0 0 20 20" className={className}>
+      <path d="M7 4.5v11l8-5.5-8-5.5z" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function Close({ size = 16, className, strokeWidth = 1.7 }: IconProps) {
   return (
     <svg {...base(size)} viewBox="0 0 16 16" className={className}>

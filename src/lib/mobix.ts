@@ -55,6 +55,12 @@ export interface GalleryItem {
   slot?: string;
 }
 
+export interface VideoItem {
+  id: string;
+  url: string;
+  slot?: string;
+}
+
 export interface ProductDetail {
   id: string;
   nama: string;
@@ -67,6 +73,7 @@ export interface ProductDetail {
   lokasi: string;
   posisi: string;
   galeri: GalleryItem[];
+  video?: VideoItem[];
   kelengkapan_dokumen: Record<string, string>;
   deskripsi: string;
   spesifikasi: { label: string; value: string }[];
@@ -392,6 +399,22 @@ export function mobixImageFetchableWithWidth(
   const base = mobixImageFetchable(pathOrUrl);
   if (!base) return undefined;
   return withWidth(base, width);
+}
+
+/** Resolve a non-image media path/url (for example video) without image resize params. */
+export function mobixMedia(pathOrUrl: string | undefined): string | undefined {
+  if (!pathOrUrl) return undefined;
+  if (/^https?:\/\//.test(pathOrUrl)) return pathOrUrl;
+  return `${IMG_BASE}${pathOrUrl}`;
+}
+
+/** Fetchable media URL on the Mobix API origin, without image-specific query params. */
+export function mobixMediaFetchable(pathOrUrl: string | undefined): string | undefined {
+  if (!pathOrUrl) return undefined;
+  const path = /^https?:\/\//.test(pathOrUrl)
+    ? new URL(pathOrUrl).pathname + new URL(pathOrUrl).search
+    : pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
+  return `${API_BASE}${path}`;
 }
 
 /**

@@ -12,6 +12,7 @@ import {
   XTwitter,
   Check,
   Sparkles,
+  Play,
 } from "../components/icons";
 import {
   fetchUnitDetail,
@@ -19,15 +20,23 @@ import {
   MOBIX_SHARE_WIDTH,
   mobixImage,
   mobixImageFetchableWithWidth,
+  mobixMedia,
+  mobixMediaFetchable,
   suggestShareCaption,
   titleCase,
+  type GalleryItem,
   type ProductDetail,
+  type VideoItem,
 } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
 import { formatJt, formatRupiah } from "../lib/format";
 import { estimateBuilderCommission } from "../lib/commission";
 
 /* ---- business logic ---- */
+
+type ShareMedia =
+  | { kind: "image"; id: string; url: string; item: GalleryItem }
+  | { kind: "video"; id: string; url: string; item: VideoItem };
 
 /* ---- canvas overlay composition ---- */
 
@@ -79,6 +88,31 @@ async function fetchRawBlob(pathOrUrl: string, cache: Map<string, Blob>) {
   }
 }
 
+async function fetchRawMediaBlob(pathOrUrl: string, cache: Map<string, Blob>) {
+  if (cache.has(pathOrUrl)) return cache.get(pathOrUrl)!;
+  const src = mobixMediaFetchable(pathOrUrl);
+  if (!src) return null;
+  try {
+    const r = await fetch(src);
+    if (!r.ok) return null;
+    const blob = await r.blob();
+    if (blob) cache.set(pathOrUrl, blob);
+    return blob;
+  } catch {
+    return null;
+  }
+}
+
+function videoBlobToFile(blob: Blob, index: number) {
+  const type = blob.type || "video/mp4";
+  const ext = type.includes("quicktime")
+    ? "mov"
+    : type.includes("webm")
+      ? "webm"
+      : "mp4";
+  return new File([blob], `unit-video-${index + 1}.${ext}`, { type });
+}
+
 async function buildShareImagesViaBackend(
   selectedGallery: ProductDetail["galeri"],
   dealHarga: number,
@@ -122,6 +156,44 @@ async function buildShareImagesLocally(
   );
   const valid = blobs.filter(Boolean) as Blob[];
   return Promise.all(valid.map((blob) => composeOverlay(blob, dealHarga, tdp, includeOverlay)));
+}
+
+async function buildShareImages(
+  selectedGallery: ProductDetail["galeri"],
+  dealHarga: number,
+  tdp: number,
+  includeOverlay: boolean,
+  cache: Map<string, Blob>,
+) {
+  const backendFiles = await buildShareImagesViaBackend(
+    selectedGallery,
+    dealHarga,
+    tdp,
+    includeOverlay,
+  );
+
+  return backendFiles.length > 0
+    ? backendFiles
+    : buildShareImagesLocally(
+        selectedGallery,
+        dealHarga,
+        tdp,
+        includeOverlay,
+        cache,
+      );
+}
+
+async function buildShareVideos(
+  selectedVideos: VideoItem[],
+  cache: Map<string, Blob>,
+) {
+  const blobs = await Promise.all(
+    selectedVideos.map((video) => fetchRawMediaBlob(video.url, cache)),
+  );
+
+  return blobs
+    .map((blob, index) => (blob ? videoBlobToFile(blob, index) : null))
+    .filter(Boolean) as File[];
 }
 
 async function composeOverlay(
@@ -226,7 +298,7 @@ export function ShareSheet() {
   const [showChannels, setShowChannels] = useState(false);
   const [shareCaptionCopied, setShareCaptionCopied] = useState(false);
 
-  // multi-select gallery
+  // multi-select share media
   const [selectedIdxes, setSelectedIdxes] = useState<number[]>([0]);
   const [previewIdx, setPreviewIdx] = useState(0);
 
@@ -243,7 +315,22 @@ export function ShareSheet() {
   const captionSuggestionIndex = useRef(0);
 
   const gallery = unit?.galeri ?? [];
-  const activeImg = gallery[previewIdx] ?? gallery[0];
+  const videos = unit?.video ?? [];
+  const mediaItems: ShareMedia[] = [
+    ...gallery.map((item) => ({
+      kind: "image" as const,
+      id: `image-${item.id}`,
+      url: item.url,
+      item,
+    })),
+    ...videos.map((item) => ({
+      kind: "video" as const,
+      id: `video-${item.id}`,
+      url: item.url,
+      item,
+    })),
+  ];
+  const activeMedia = mediaItems[previewIdx] ?? mediaItems[0];
   const shareTenor = positiveParamNumber(searchParams, "tenor") ?? 60;
   const shareTdp = positiveParamNumber(searchParams, "tdp") ?? unit?.tdp ?? 0;
   const shareCicilan = positiveParamNumber(searchParams, "cicilan") ?? unit?.cicilan ?? 0;
@@ -275,40 +362,37 @@ export function ShareSheet() {
 
   // fetch raw blobs (cached) + compose download files whenever selection changes
   useEffect(() => {
-    if (!unit || !gallery.length) return;
+    if (!unit || !mediaItems.length) return;
     let alive = true;
     setComposing(true);
 
-    const selectedGallery = selectedIdxes
-      .map((i) => gallery[i])
+    const selectedMedia = selectedIdxes
+      .map((i) => mediaItems[i])
       .filter(Boolean);
+    const selectedGallery = selectedMedia
+      .filter((media): media is Extract<ShareMedia, { kind: "image" }> => media.kind === "image")
+      .map((media) => media.item);
+    const selectedVideos = selectedMedia
+      .filter((media): media is Extract<ShareMedia, { kind: "video" }> => media.kind === "video")
+      .map((media) => media.item);
 
     async function run() {
-      const backendFiles = await buildShareImagesViaBackend(
+      const imageFiles = selectedGallery.length
+        ? await buildShareImages(
         selectedGallery,
         sharePrice,
         shareTdp,
         false,
-      );
+            blobCache.current,
+          )
+        : [];
+      const videoFiles = selectedVideos.length
+        ? await buildShareVideos(selectedVideos, blobCache.current)
+        : [];
       if (!alive) return;
 
-      if (backendFiles.length > 0) {
-        setComposedFiles(backendFiles);
-        setComposing(false);
-        return;
-      }
-
-      const files = await buildShareImagesLocally(
-        selectedGallery,
-        sharePrice,
-        shareTdp,
-        false,
-        blobCache.current,
-      );
-      if (alive) {
-        setComposedFiles(files);
-        setComposing(false);
-      }
+      setComposedFiles([...imageFiles, ...videoFiles]);
+      setComposing(false);
     }
 
     run().catch(() => {
@@ -321,11 +405,17 @@ export function ShareSheet() {
   }, [unit, selectedIdxes.join(","), sharePrice, shareTdp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function prepareShareFiles() {
-    if (!unit || !gallery.length) return [];
+    if (!unit || !mediaItems.length) return [];
 
-    const selectedGallery = selectedIdxes
-      .map((i) => gallery[i])
+    const selectedMedia = selectedIdxes
+      .map((i) => mediaItems[i])
       .filter(Boolean);
+    const selectedGallery = selectedMedia
+      .filter((media): media is Extract<ShareMedia, { kind: "image" }> => media.kind === "image")
+      .map((media) => media.item);
+    const selectedVideos = selectedMedia
+      .filter((media): media is Extract<ShareMedia, { kind: "video" }> => media.kind === "video")
+      .map((media) => media.item);
     const signature = `${selectedIdxes.join(",")}:${sharePrice}:${shareTdp}`;
 
     if (shareFiles.length > 0 && shareFilesSignature === signature) {
@@ -335,23 +425,19 @@ export function ShareSheet() {
     setShareComposing(true);
 
     try {
-      const backendFiles = await buildShareImagesViaBackend(
-        selectedGallery,
-        sharePrice,
-        shareTdp,
-        false,
-      );
-
-      const files =
-        backendFiles.length > 0
-          ? backendFiles
-          : await buildShareImagesLocally(
-              selectedGallery,
-              sharePrice,
-              shareTdp,
-              false,
-              blobCache.current,
-            );
+      const imageFiles = selectedGallery.length
+        ? await buildShareImages(
+            selectedGallery,
+            sharePrice,
+            shareTdp,
+            false,
+            blobCache.current,
+          )
+        : [];
+      const videoFiles = selectedVideos.length
+        ? await buildShareVideos(selectedVideos, blobCache.current)
+        : [];
+      const files = [...imageFiles, ...videoFiles];
 
       setShareFiles(files);
       setShareFilesSignature(signature);
@@ -511,15 +597,22 @@ export function ShareSheet() {
       const url = URL.createObjectURL(f);
       const a = document.createElement("a");
       a.href = url;
-      a.download = composedFiles.length > 1 ? `unit-${i + 1}.jpg` : "unit.jpg";
+      const ext = f.type.startsWith("video/")
+        ? f.name.split(".").pop() || "mp4"
+        : "jpg";
+      a.download = composedFiles.length > 1 ? `unit-${i + 1}.${ext}` : `unit.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
     });
   }
 
   const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
-  const activeUrl = mobixImage(activeImg?.url, MOBIX_SHARE_WIDTH);
-  const activePlaceholder = mobixImage(activeImg?.url, MOBIX_SHARE_WIDTH);
+  const activeUrl = activeMedia?.kind === "video"
+    ? mobixMedia(activeMedia.url)
+    : mobixImage(activeMedia?.url, MOBIX_SHARE_WIDTH);
+  const activePlaceholder = activeMedia?.kind === "image"
+    ? mobixImage(activeMedia.url, MOBIX_SHARE_WIDTH)
+    : undefined;
   const priceDelta = unit && sharePrice ? sharePrice - unit.harga : 0;
 
   return (
@@ -542,6 +635,21 @@ export function ShareSheet() {
 
         {/* shareable preview */}
         <div className="mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
+          {activeMedia?.kind === "video" ? (
+            <div className="relative aspect-video bg-black">
+              <video
+                className="h-full w-full object-contain"
+                src={activeUrl}
+                controls
+                playsInline
+                preload="metadata"
+              />
+              <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-lg bg-ink/80 px-2.5 py-1 text-[11px] font-bold text-surface">
+                <Play size={13} />
+                Video
+              </div>
+            </div>
+          ) : (
           <Photo
             large
             className="aspect-video"
@@ -560,6 +668,7 @@ export function ShareSheet() {
               className="absolute right-3 top-3 h-[18px] w-auto opacity-90 [filter:brightness(0)_invert(1)]"
             />
           </Photo>
+          )}
           <div className="px-3.5 py-3">
             {loading || !unit ? (
               <div className="space-y-2">
@@ -591,24 +700,24 @@ export function ShareSheet() {
         </div>
 
         {/* gallery picker – multi-select */}
-        {gallery.length > 1 && (
+        {mediaItems.length > 1 && (
           <div className="mb-[18px]">
             <div className="mb-2 flex items-center justify-between">
               <div className="text-[11px] font-bold text-muted">
-                Pilih foto yang akan dishare
+                Pilih foto/video yang akan dishare
               </div>
               {selectedIdxes.length > 1 && (
                 <div className="text-[11px] font-bold text-teal-deep">
-                  {selectedIdxes.length} foto dipilih
+                  {selectedIdxes.length} media dipilih
                 </div>
               )}
             </div>
             <div className="scroll-x flex gap-2 overflow-x-auto pb-1">
-              {gallery.map((g, i) => {
+              {mediaItems.map((media, i) => {
                 const isSelected = selectedIdxes.includes(i);
                 return (
                   <button
-                    key={g.id}
+                    key={media.id}
                     onClick={() => handleGalleryTap(i)}
                     className={`relative h-[60px] flex-[0_0_80px] overflow-hidden rounded-[10px] border-2 transition-all ${
                       isSelected
@@ -616,11 +725,26 @@ export function ShareSheet() {
                         : "border-transparent opacity-60"
                     }`}
                   >
-                    <Photo
-                      className="h-full w-full"
-                      src={mobixImage(g.url)}
-                      alt=""
-                    />
+                    {media.kind === "image" ? (
+                      <Photo
+                        className="h-full w-full"
+                        src={mobixImage(media.url)}
+                        alt=""
+                      />
+                    ) : (
+                      <>
+                        <video
+                          className="h-full w-full bg-black object-cover"
+                          src={mobixMedia(media.url)}
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-white">
+                          <Play size={18} />
+                        </span>
+                      </>
+                    )}
                     {isSelected && (
                       <div className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-teal-deep">
                         <Check size={9} strokeWidth={2.8} className="text-white" />
@@ -631,7 +755,7 @@ export function ShareSheet() {
               })}
             </div>
             <div className="mt-1.5 text-[11px] text-muted">
-              (klik foto-foto untuk share foto lebih dari 1)
+              (klik media untuk share lebih dari 1)
             </div>
           </div>
         )}
@@ -784,7 +908,7 @@ export function ShareSheet() {
             className="flex w-full items-center justify-center gap-2.5 rounded-[18px] bg-teal-deep py-4 text-[15px] font-bold text-surface disabled:opacity-50"
           >
             {(composing || shareComposing) ? (
-              <span className="text-[13px] opacity-80">Menyiapkan gambar…</span>
+              <span className="text-[13px] opacity-80">Menyiapkan media...</span>
             ) : shareCaptionCopied ? (
               <>
                 <Check size={18} strokeWidth={2.4} />
@@ -796,7 +920,7 @@ export function ShareSheet() {
                 Bagikan Sekarang
                 {selectedIdxes.length > 1 && (
                   <span className="text-[12px] opacity-80">
-                    ({selectedIdxes.length} foto)
+                    ({selectedIdxes.length} media)
                   </span>
                 )}
               </>
@@ -813,10 +937,10 @@ export function ShareSheet() {
           >
             <Download className="text-ink" />
             <span className="flex-1 text-left text-[14px] font-semibold">
-              Download gambar siap-posting
+              Download media siap-posting
             </span>
             <span className="text-[12px] font-bold text-teal-deep">
-              {composedFiles.length > 1 ? `${composedFiles.length} JPG` : "JPG"}
+              {composedFiles.length > 1 ? `${composedFiles.length} file` : "File"}
             </span>
           </button>
         </div>
