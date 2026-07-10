@@ -679,7 +679,7 @@ export function ShareSheet() {
               value={captionText}
               onChange={(e) => setCaptionText(e.target.value)}
               rows={4}
-              className="w-full resize-none bg-transparent text-[12px] leading-[1.55] text-mid outline-none"
+              className="min-h-[96px] w-full resize-y bg-transparent text-[12px] leading-[1.55] text-mid outline-none"
             />
           )}
         </div>
