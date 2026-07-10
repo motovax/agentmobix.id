@@ -123,7 +123,7 @@ async function buildShareImagesViaBackend(
     .map((g) => g?.url)
     .filter((value): value is string => Boolean(value));
   const entries = await Promise.all(
-    sources.map(async (source) => {
+    sources.map(async (source, index) => {
       const blob = await composeShareImageViaBackend({
         source,
         price: dealHarga,
@@ -134,7 +134,7 @@ async function buildShareImagesViaBackend(
         crop: "cover",
       });
       if (!blob) return null;
-      return composeBlobToFile(blob, `unit.jpg`);
+      return composeBlobToFile(blob, `unit-photo-${index + 1}.jpg`);
     }),
   );
 
@@ -155,7 +155,11 @@ async function buildShareImagesLocally(
     sources.map((url) => fetchRawBlob(url, cache)),
   );
   const valid = blobs.filter(Boolean) as Blob[];
-  return Promise.all(valid.map((blob) => composeOverlay(blob, dealHarga, tdp, includeOverlay)));
+  return Promise.all(
+    valid.map((blob, index) =>
+      composeOverlay(blob, dealHarga, tdp, includeOverlay, "cover", `unit-photo-${index + 1}.jpg`),
+    ),
+  );
 }
 
 async function buildShareImages(
@@ -202,6 +206,7 @@ async function composeOverlay(
   tdp: number,
   includeOverlay = true,
   crop: "cover" | "contain" = "cover",
+  fileName = "unit.jpg",
 ): Promise<File> {
   const bitmap = await createImageBitmap(rawBlob);
   const W = 1280,
@@ -268,7 +273,7 @@ async function composeOverlay(
   return new Promise<File>((resolve) =>
     canvas.toBlob(
       (blob) =>
-        resolve(new File([blob!], "unit.jpg", { type: "image/jpeg" })),
+        resolve(new File([blob!], fileName, { type: "image/jpeg" })),
       "image/jpeg",
       0.92,
     ),
@@ -567,6 +572,13 @@ export function ShareSheet() {
       if (navigator.share && canShareFiles) {
         await navigator.share({
           files: filesToShare,
+          title: unit?.nama ?? "Mobix",
+        });
+        return;
+      }
+
+      if (navigator.share && !filesToShare.length) {
+        await navigator.share({
           title: unit?.nama ?? "Mobix",
           text: captionText,
         });
