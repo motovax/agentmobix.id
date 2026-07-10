@@ -1,4 +1,5 @@
 export const BASE_AGENT_COMMISSION = 2_000_000;
+export const MIN_AGENT_COMMISSION = 1_000_000;
 export const MAX_BUILDER_PRICE_DROP = 2_000_000;
 
 export function minBuilderPrice(originalPrice: number): number {
@@ -16,7 +17,7 @@ export function estimateBuilderCommission(
 ): number {
   if (!originalPrice || !builderPrice) return 0;
   return Math.max(
-    0,
+    MIN_AGENT_COMMISSION,
     Math.round(BASE_AGENT_COMMISSION + (builderPrice - originalPrice)),
   );
 }

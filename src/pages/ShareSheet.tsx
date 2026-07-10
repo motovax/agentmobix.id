@@ -238,19 +238,27 @@ export function ShareSheet() {
   const shareDpPercent = positiveParamNumber(searchParams, "dp_pct") ?? null;
   const shareCreditPrice = positiveParamNumber(searchParams, "harga_kredit") ?? unit?.harga_kredit ?? null;
   const sharePrice = positiveParamNumber(searchParams, "harga") ?? unit?.harga ?? 0;
+  const captionPrice = shareCreditPrice ?? sharePrice ?? unit?.harga ?? 0;
   const shareCommission =
     positiveParamNumber(searchParams, "komisi") ??
     (unit && sharePrice ? estimateBuilderCommission(unit.harga, sharePrice) : 0);
+  const autoCaption = unit
+    ? `${unit.nama} tangan pertama, KM ${Math.round(
+        unit.odometer / 1000,
+      )}rb. Harga ${formatRupiah(captionPrice)}. Cukup TDP ${formatJt(shareTdp)}, cicilan ${formatJt(
+        shareCicilan,
+      )}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${titleCase(
+        unit.lokasi || "Mobix",
+      )}, bisa cek langsung. Chat saya ya 🙌`
+    : "";
 
   // init when unit loads
   useEffect(() => {
     if (!unit) return;
     setSelectedIdxes([0]);
     setPreviewIdx(0);
-    setCaptionText(
-      `${unit.nama} tangan pertama, KM ${Math.round(unit.odometer / 1000)}rb. Cukup TDP ${formatJt(shareTdp)}, cicilan ${formatJt(shareCicilan)}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${titleCase(unit.lokasi || "Mobix")}, bisa cek langsung. Chat saya ya 🙌`,
-    );
-  }, [unit?.id, shareTdp, shareCicilan, shareTenor]);
+    setCaptionText(autoCaption);
+  }, [unit?.id, autoCaption]);
 
   // fetch raw blobs (cached) + compose download files whenever selection changes
   useEffect(() => {
@@ -352,15 +360,6 @@ export function ShareSheet() {
   }
 
   const link = unit ? `mobix.id/u/${unit.plate_no}` : "mobix.id";
-  const autoCaption = unit
-    ? `${unit.nama} tangan pertama, KM ${Math.round(
-        unit.odometer / 1000,
-      )}rb. Cukup TDP ${formatJt(shareTdp)}, cicilan ${formatJt(
-        shareCicilan,
-      )}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${titleCase(
-        unit.lokasi || "Mobix",
-      )}, bisa cek langsung. Chat saya ya 🙌`
-    : "";
 
   function showCopiedState(what: "caption" | "link", fromShare = false) {
     setCopied(what);
