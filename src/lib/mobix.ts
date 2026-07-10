@@ -108,6 +108,26 @@ export interface ShareImageRequest {
   crop?: ShareImageCrop;
 }
 
+export interface CaptionSuggestRequest {
+  slug?: string;
+  nama: string;
+  warna?: string;
+  tahun?: number;
+  kilometer?: number;
+  kategori?: string;
+  transmisi?: string;
+  cabang?: string;
+  harga_builder?: number;
+  harga_kredit?: number;
+  tdp?: number;
+  cicilan?: number;
+  tenor?: number;
+  dp?: number;
+  dp_pct?: number;
+  caption_saat_ini?: string;
+  style_hint?: string;
+}
+
 export interface ListRequest {
   merek?: string[];
   judul?: string[];
@@ -404,6 +424,15 @@ export async function composeShareImageViaBackend(
   } catch {
     return null;
   }
+}
+
+export async function suggestShareCaption(
+  request: CaptionSuggestRequest,
+): Promise<string> {
+  const env = await post<{ caption?: string }>("/caption-suggest", request);
+  const caption = env.data?.caption?.trim();
+  if (!caption) throw new Error("Caption AI kosong");
+  return caption;
 }
 
 /* ---- agent-program derivations (not present in the catalog API) ---- */

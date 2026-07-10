@@ -19,6 +19,7 @@ import {
   MOBIX_SHARE_WIDTH,
   mobixImage,
   mobixImageFetchableWithWidth,
+  suggestShareCaption,
   titleCase,
   type ProductDetail,
 } from "../lib/mobix";
@@ -204,6 +205,15 @@ async function composeOverlay(
 
 /* ---- component ---- */
 
+const CAPTION_STYLE_HINTS = [
+  "Premium, confident, and concise. Strong value statement for a serious buyer.",
+  "Warm family-oriented selling copy. Emphasize comfort, practicality, and clear credit package.",
+  "Direct WhatsApp sales style. Short, persuasive, and easy to forward.",
+  "Aspirational but factual. Make the unit feel desirable without adding unsupported claims.",
+  "Practical buyer angle. Emphasize ready unit, transparent package, and easy check-unit CTA.",
+  "Energetic social media caption. Attractive adjectives, natural CTA, no exaggerated claims.",
+];
+
 export function ShareSheet() {
   const search = useSearch();
   const searchParams = new URLSearchParams(search);
@@ -388,10 +398,12 @@ export function ShareSheet() {
     }
   }
 
-  function handleCaptionAiHelp() {
+  async function handleCaptionAiHelp() {
     if (!unit || captionSuggesting) return;
     setCaptionSuggesting(true);
 
+    const styleHint =
+      CAPTION_STYLE_HINTS[captionSuggestionIndex.current % CAPTION_STYLE_HINTS.length];
     const color = titleCase(unit.color || "");
     const branch = titleCase(unit.lokasi || "Mobix");
     const km = `${Math.round(unit.odometer / 1000)}rb`;
@@ -424,13 +436,36 @@ export function ShareSheet() {
       `${unit.nama} ready stock di ${branch}. Detail unit: ${specs}. Paket kredit sudah siap: harga kredit ${creditPrice}; TDP ${tdp}; cicilan ${installment}/bln; tenor ${shareTenor} bulan. Buat yang cari unit praktis, representatif, dan siap dipakai, ini salah satu pilihan yang menarik.`,
       `Pilihan menarik untuk kamu yang mau ${category} nyaman dan berkarakter: ${unit.nama}${colorInfo}, KM ${km}, ready di ${branch}. Harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Angkanya jelas, unitnya siap dicek, prosesnya bisa saya bantu sampai ketemu jadwal yang pas.`,
     ];
-    const nextCaption = variants[captionSuggestionIndex.current % variants.length];
-    captionSuggestionIndex.current += 1;
 
-    window.setTimeout(() => {
+    try {
+      const aiCaption = await suggestShareCaption({
+        slug: unit.slug,
+        nama: unit.nama,
+        warna: unit.color,
+        tahun: unit.year,
+        kilometer: unit.odometer,
+        kategori: unit.category,
+        transmisi: unit.transmisi,
+        cabang: branch,
+        harga_builder: sharePrice,
+        harga_kredit: captionPrice,
+        tdp: shareTdp,
+        cicilan: shareCicilan,
+        tenor: shareTenor,
+        dp: shareDp ?? undefined,
+        dp_pct: shareDpPercent ?? undefined,
+        caption_saat_ini: captionText || autoCaption,
+        style_hint: styleHint,
+      });
+      setCaptionText(aiCaption);
+      captionSuggestionIndex.current += 1;
+    } catch {
+      const nextCaption = variants[captionSuggestionIndex.current % variants.length];
+      captionSuggestionIndex.current += 1;
       setCaptionText(nextCaption);
+    } finally {
       setCaptionSuggesting(false);
-    }, 300);
+    }
   }
 
   function handleShare() {
