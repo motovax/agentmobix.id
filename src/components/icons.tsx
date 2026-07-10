@@ -151,6 +151,15 @@ export function Star({ size = 20, className }: IconProps) {
   );
 }
 
+export function Sparkles({ size = 18, className, strokeWidth = 1.6 }: IconProps) {
+  return (
+    <svg {...base(size)} viewBox="0 0 18 18" className={className}>
+      <path d="M7.8 2.5l1.1 3.1 3.1 1.1-3.1 1.1-1.1 3.1-1.1-3.1-3.1-1.1 3.1-1.1 1.1-3.1z" stroke="currentColor" strokeWidth={strokeWidth} strokeLinejoin="round" />
+      <path d="M13.2 10.8l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6.6-1.7z" stroke="currentColor" strokeWidth={strokeWidth} strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function Copy({ size = 20, className, strokeWidth = 1.5 }: IconProps) {
   return (
     <svg {...base(size)} viewBox="0 0 20 20" className={className}>

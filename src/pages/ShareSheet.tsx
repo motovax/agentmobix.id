@@ -11,6 +11,7 @@ import {
   Telegram,
   XTwitter,
   Check,
+  Sparkles,
 } from "../components/icons";
 import {
   fetchUnitDetail,
@@ -438,6 +439,18 @@ export function ShareSheet() {
   const activeUrl = mobixImage(activeImg?.url, MOBIX_SHARE_WIDTH);
   const activePlaceholder = mobixImage(activeImg?.url, MOBIX_SHARE_WIDTH);
   const priceDelta = unit && sharePrice ? sharePrice - unit.harga : 0;
+  const aiHelpText = unit
+    ? [
+        `Halo AI Mobix, bantu saya poles caption jualan untuk unit ${unit.nama}.`,
+        `Harga kredit: ${formatRupiah(captionPrice)}.`,
+        `Paket: TDP ${formatJt(shareTdp)}, cicilan ${formatJt(shareCicilan)}/bln, tenor ${shareTenor} bulan.`,
+        `Cabang: ${titleCase(unit.lokasi || "Mobix")}.`,
+        "",
+        "Caption saat ini:",
+        captionText || autoCaption,
+      ].join("\n")
+    : "";
+  const aiHelpHref = `https://wa.me/6285701959826?text=${encodeURIComponent(aiHelpText)}`;
 
   return (
     <AppShell bg="bg-ink">
@@ -555,11 +568,20 @@ export function ShareSheet() {
 
         {/* caption – editable */}
         <div className="mb-[18px] rounded-[14px] border border-line bg-surface px-3.5 py-3">
-          <div className="mb-1.5 flex items-center justify-between">
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
             <span className="text-[11px] font-bold text-muted">
               Caption (bisa diedit)
             </span>
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <a
+                href={aiHelpHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-indigo-50 px-2 text-[11px] font-bold text-indigo-700 no-underline"
+              >
+                <Sparkles size={13} />
+                Bantuan AI
+              </a>
               {unit && captionText !== autoCaption && (
                 <button
                   onClick={() => setCaptionText(autoCaption)}
