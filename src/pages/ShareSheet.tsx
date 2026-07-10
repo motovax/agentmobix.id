@@ -283,12 +283,12 @@ async function composeOverlay(
 /* ---- component ---- */
 
 const CAPTION_STYLE_HINTS = [
-  "Premium, confident, and concise. Strong value statement for a serious buyer.",
-  "Warm family-oriented selling copy. Emphasize comfort, practicality, and clear credit package.",
-  "Direct WhatsApp sales style. Short, persuasive, and easy to forward.",
-  "Aspirational but factual. Make the unit feel desirable without adding unsupported claims.",
-  "Practical buyer angle. Emphasize ready unit, transparent package, and easy check-unit CTA.",
-  "Energetic social media caption. Attractive adjectives, natural CTA, no exaggerated claims.",
+  "Straight to the point: unit, strongest buyer reason, credit package, CTA.",
+  "Short WhatsApp sales copy, max two sentences, no long description.",
+  "Make the car feel like a smart buy without listing too many specs.",
+  "Punchy and persuasive, sparks curiosity, easy to reply to.",
+  "Make TDP and installment feel attractive, but keep every number factual.",
+  "Energetic social caption, concise, persuasive, and not exaggerated.",
 ];
 
 export function ShareSheet() {
@@ -520,12 +520,12 @@ export function ShareSheet() {
     ].filter(Boolean).join(", ");
 
     const variants = [
-      `${unit.nama}${colorInfo}, KM ${km}. Pilihan cerdas buat yang cari ${category} nyaman, gagah, dan siap pakai dengan paket kredit yang sudah jelas: harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan.${dpInfo} Unit ready di cabang ${branch}, bisa cek langsung. Chat saya ya 🙌`,
-      `Ready ${unit.nama}${colorInfo} di cabang ${branch}. ${specs}. Unit elegan dengan paket yang enak dipertimbangkan: harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Cocok buat pemakaian harian, keluarga, atau upgrade kendaraan. Minat? Chat saya ya.`,
-      `${unit.nama} tampil solid, rapi, dan siap jalan. Detail: ${specs}. Harga kredit ${creditPrice}. Paket kreditnya ringan dan jelas: TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan.${dpInfo} Kalau kamu cari ${category} nyaman tanpa ribet, unit ini layak dicek di ${branch}.`,
-      `Cari ${category} yang nyaman, gagah, dan berkelas? ${unit.nama}${colorInfo} ini ready di ${branch}, KM ${km}. Dengan harga kredit ${creditPrice}, cukup TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan, unit ini jadi opsi menarik untuk langsung dipertimbangkan. Chat saya untuk cek unit.`,
-      `${unit.nama} ready stock di ${branch}. Detail unit: ${specs}. Paket kredit sudah siap: harga kredit ${creditPrice}; TDP ${tdp}; cicilan ${installment}/bln; tenor ${shareTenor} bulan. Buat yang cari unit praktis, representatif, dan siap dipakai, ini salah satu pilihan yang menarik.`,
-      `Pilihan menarik untuk kamu yang mau ${category} nyaman dan berkarakter: ${unit.nama}${colorInfo}, KM ${km}, ready di ${branch}. Harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Angkanya jelas, unitnya siap dicek, prosesnya bisa saya bantu sampai ketemu jadwal yang pas.`,
+      `${unit.nama}${colorInfo}, KM ${km}, incaran menarik buat yang mau ${category} siap dilirik. Harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan; ready di ${branch}, chat saya untuk cek unit.`,
+      `Mau ${category} yang paketnya jelas? ${unit.nama} ready di ${branch}: harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Minat, langsung chat saya.`,
+      `${unit.nama} opsi manis buat upgrade tanpa ribet: ${specs}. Harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan; cek unitnya di ${branch}.`,
+      `${unit.nama}${colorInfo} cepat bikin orang melirik, apalagi paketnya sudah jelas: harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Chat saya kalau mau cek.`,
+      `${unit.nama} ready di ${branch}, paket kreditnya ringan buat mulai dilirik: harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan.${dpInfo} Mau saya bantu cek unit?`,
+      `Cari ${category} praktis dan menarik? ${unit.nama}${colorInfo}, KM ${km}, bisa jadi pilihan pas dengan harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan.`,
     ];
 
     try {
