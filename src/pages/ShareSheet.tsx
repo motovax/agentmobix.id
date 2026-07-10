@@ -336,6 +336,23 @@ export function ShareSheet() {
     })),
   ];
   const activeMedia = mediaItems[previewIdx] ?? mediaItems[0];
+  const selectedMediaItems = selectedIdxes
+    .map((i) => mediaItems[i])
+    .filter((media): media is ShareMedia => Boolean(media));
+  const selectedImageCount = selectedMediaItems.filter((media) => media.kind === "image").length;
+  const selectedVideoCount = selectedMediaItems.filter((media) => media.kind === "video").length;
+  const selectedMediaLabel =
+    selectedImageCount > 0 && selectedVideoCount > 0
+      ? `${selectedImageCount} foto + ${selectedVideoCount} video dipilih`
+      : selectedVideoCount > 0
+        ? `${selectedVideoCount} video dipilih`
+        : `${selectedImageCount || selectedIdxes.length} foto dipilih`;
+  const selectedMediaButtonLabel =
+    selectedImageCount > 0 && selectedVideoCount > 0
+      ? `${selectedImageCount} foto + ${selectedVideoCount} video`
+      : selectedVideoCount > 0
+        ? `${selectedVideoCount} video`
+        : `${selectedImageCount || selectedIdxes.length} foto`;
   const shareTenor = positiveParamNumber(searchParams, "tenor") ?? 60;
   const shareTdp = positiveParamNumber(searchParams, "tdp") ?? unit?.tdp ?? 0;
   const shareCicilan = positiveParamNumber(searchParams, "cicilan") ?? unit?.cicilan ?? 0;
@@ -563,9 +580,23 @@ export function ShareSheet() {
     const share = async () => {
       const caption = captionText.trim();
       const filesToShare = await prepareShareFiles();
-      const canShareFiles =
-        filesToShare.length > 0 && !!navigator.canShare?.({ files: filesToShare });
       const title = unit?.nama ?? "Mobix";
+      const hasImageFiles = filesToShare.some((file) => file.type.startsWith("image/"));
+      const hasVideoFiles = filesToShare.some((file) => file.type.startsWith("video/"));
+      const hasMixedMediaFiles = hasImageFiles && hasVideoFiles;
+      const includeCaptionInFilePayload = Boolean(caption && !hasMixedMediaFiles);
+      const fileSharePayload: ShareData = {
+        files: filesToShare,
+        title,
+        ...(includeCaptionInFilePayload ? { text: caption } : {}),
+      };
+      const canShareFiles =
+        filesToShare.length > 0 &&
+        !!navigator.canShare?.(fileSharePayload);
+      const canShareFilesOnly =
+        filesToShare.length > 0 &&
+        !canShareFiles &&
+        !!navigator.canShare?.({ files: filesToShare, title });
 
       if (navigator.share && canShareFiles) {
         if (caption) {
@@ -573,11 +604,17 @@ export function ShareSheet() {
             if (ok) showCopiedState("caption", true);
           });
         }
-        await navigator.share({
-          files: filesToShare,
-          title,
-          ...(caption ? { text: caption } : {}),
-        });
+        await navigator.share(fileSharePayload);
+        return;
+      }
+
+      if (navigator.share && canShareFilesOnly) {
+        if (caption) {
+          void copyToClipboard(caption).then((ok) => {
+            if (ok) showCopiedState("caption", true);
+          });
+        }
+        await navigator.share({ files: filesToShare, title });
         return;
       }
 
@@ -729,11 +766,9 @@ export function ShareSheet() {
               <div className="text-[11px] font-bold text-muted">
                 Pilih foto/video yang akan dishare
               </div>
-              {selectedIdxes.length > 1 && (
-                <div className="text-[11px] font-bold text-teal-deep">
-                  {selectedIdxes.length} media dipilih
-                </div>
-              )}
+              <div className="text-right text-[11px] font-bold text-teal-deep">
+                {selectedMediaLabel}
+              </div>
             </div>
             <div className="scroll-x flex gap-2 overflow-x-auto pb-1">
               {mediaItems.map((media, i) => {
@@ -941,9 +976,9 @@ export function ShareSheet() {
               <>
                 <ShareArrow size={18} />
                 Bagikan Sekarang
-                {selectedIdxes.length > 1 && (
+                {selectedIdxes.length > 0 && (
                   <span className="text-[12px] opacity-80">
-                    ({selectedIdxes.length} media)
+                    ({selectedMediaButtonLabel})
                   </span>
                 )}
               </>
