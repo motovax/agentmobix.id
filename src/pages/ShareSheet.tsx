@@ -417,12 +417,12 @@ export function ShareSheet() {
     ].filter(Boolean).join(", ");
 
     const variants = [
-      `${unit.nama}${colorInfo}, KM ${km}. Harga kredit ${creditPrice}.${dpInfo} Cukup TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${branch}, bisa cek langsung. Cocok untuk kamu yang cari ${category} nyaman dan siap pakai. Chat saya ya 🙌`,
-      `Ready ${unit.nama}${colorInfo} di cabang ${branch}. ${specs}. Harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Unit siap dicek, cocok buat pemakaian harian maupun keluarga. Minat? Chat saya ya.`,
-      `${unit.nama} kondisi siap pakai, ${specs}. Harga kredit ${creditPrice}. Paket kredit ringan: TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan.${dpInfo} Unit ready di ${branch}. Bisa bantu atur jadwal cek unit.`,
-      `Cari ${category} yang nyaman dan tampil gagah? ${unit.nama}${colorInfo} ini ready di ${branch}, KM ${km}. Harga kredit ${creditPrice}, cukup TDP ${tdp} dengan cicilan ${installment}/bln tenor ${shareTenor} bulan. Chat saya untuk cek unit.`,
-      `${unit.nama} ready stock. Detail: ${specs}. Harga kredit ${creditPrice}; TDP ${tdp}; cicilan ${installment}/bln; tenor ${shareTenor} bulan. Lokasi unit cabang ${branch}. Kalau cocok, bisa langsung cek unit.`,
-      `Pilihan menarik: ${unit.nama}${colorInfo}, KM ${km}, ready di ${branch}. Harga kredit ${creditPrice}. Simulasi kredit: TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Unit siap dilihat, chat saya untuk info lanjut.`,
+      `${unit.nama}${colorInfo}, KM ${km}. Harga kredit ${creditPrice}.${dpInfo} Cukup TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Worth it buat kamu yang cari ${category} nyaman, gagah, dan siap pakai karena angka kreditnya sudah jelas. Unit ready di cabang ${branch}, bisa cek langsung. Chat saya ya 🙌`,
+      `Ready ${unit.nama}${colorInfo} di cabang ${branch}. ${specs}. Harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Worth it karena pilihannya lengkap: unit elegan, paket kredit transparan, dan bisa langsung dicek. Minat? Chat saya ya.`,
+      `${unit.nama} tampil solid dan siap pakai, ${specs}. Harga kredit ${creditPrice}. Paket kredit ringan: TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan.${dpInfo} Worth it untuk kamu yang butuh ${category} nyaman tanpa ribet hitung ulang. Unit ready di ${branch}.`,
+      `Cari ${category} yang nyaman, gagah, dan berkelas? ${unit.nama}${colorInfo} ini ready di ${branch}, KM ${km}. Harga kredit ${creditPrice}, cukup TDP ${tdp} dengan cicilan ${installment}/bln tenor ${shareTenor} bulan. Worth it karena paketnya sudah siap untuk langsung dipertimbangkan. Chat saya untuk cek unit.`,
+      `${unit.nama} ready stock. Detail: ${specs}. Harga kredit ${creditPrice}; TDP ${tdp}; cicilan ${installment}/bln; tenor ${shareTenor} bulan. Worth it buat yang cari unit rapi, praktis, dan siap cek di cabang ${branch}. Kalau cocok, bisa langsung atur jadwal lihat unit.`,
+      `Pilihan menarik: ${unit.nama}${colorInfo}, KM ${km}, ready di ${branch}. Harga kredit ${creditPrice}. Simulasi kredit: TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Worth it karena unitnya menarik, paketnya jelas, dan proses cek unit bisa langsung dibantu. Chat saya untuk info lanjut.`,
     ];
     const nextCaption = variants[captionSuggestionIndex.current % variants.length];
     captionSuggestionIndex.current += 1;
