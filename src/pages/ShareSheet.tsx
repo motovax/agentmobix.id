@@ -230,6 +230,7 @@ export function ShareSheet() {
   const [shareFilesSignature, setShareFilesSignature] = useState("");
 
   const blobCache = useRef<Map<string, Blob>>(new Map());
+  const captionSuggestionIndex = useRef(0);
 
   const gallery = unit?.galeri ?? [];
   const activeImg = gallery[previewIdx] ?? gallery[0];
@@ -397,14 +398,34 @@ export function ShareSheet() {
     const creditPrice = formatRupiah(captionPrice);
     const tdp = formatJt(shareTdp);
     const installment = formatJt(shareCicilan);
-    const category = unit.category ? titleCase(unit.category) : "mobil";
+    const category =
+      unit.category && unit.category.length <= 4
+        ? unit.category.toUpperCase()
+        : unit.category
+          ? titleCase(unit.category)
+          : "mobil";
     const dpInfo =
       shareDp && shareDpPercent
         ? ` DP ${formatRupiah(shareDp)} (${Math.round(shareDpPercent * 10) / 10}%).`
         : "";
     const colorInfo = color ? ` warna ${color}` : "";
+    const specs = [
+      unit.year ? `tahun ${unit.year}` : "",
+      unit.transmisi ? `transmisi ${titleCase(unit.transmisi)}` : "",
+      color ? `warna ${color}` : "",
+      `KM ${km}`,
+    ].filter(Boolean).join(", ");
 
-    const nextCaption = `${unit.nama}${colorInfo}, KM ${km}. Harga kredit ${creditPrice}.${dpInfo} Cukup TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${branch}, bisa cek langsung. Cocok untuk kamu yang cari ${category} nyaman dan siap pakai. Chat saya ya 🙌`;
+    const variants = [
+      `${unit.nama}${colorInfo}, KM ${km}. Harga kredit ${creditPrice}.${dpInfo} Cukup TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${branch}, bisa cek langsung. Cocok untuk kamu yang cari ${category} nyaman dan siap pakai. Chat saya ya 🙌`,
+      `Ready ${unit.nama}${colorInfo} di cabang ${branch}. ${specs}. Harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Unit siap dicek, cocok buat pemakaian harian maupun keluarga. Minat? Chat saya ya.`,
+      `${unit.nama} kondisi siap pakai, ${specs}. Harga kredit ${creditPrice}. Paket kredit ringan: TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan.${dpInfo} Unit ready di ${branch}. Bisa bantu atur jadwal cek unit.`,
+      `Cari ${category} yang nyaman dan tampil gagah? ${unit.nama}${colorInfo} ini ready di ${branch}, KM ${km}. Harga kredit ${creditPrice}, cukup TDP ${tdp} dengan cicilan ${installment}/bln tenor ${shareTenor} bulan. Chat saya untuk cek unit.`,
+      `${unit.nama} ready stock. Detail: ${specs}. Harga kredit ${creditPrice}; TDP ${tdp}; cicilan ${installment}/bln; tenor ${shareTenor} bulan. Lokasi unit cabang ${branch}. Kalau cocok, bisa langsung cek unit.`,
+      `Pilihan menarik: ${unit.nama}${colorInfo}, KM ${km}, ready di ${branch}. Harga kredit ${creditPrice}. Simulasi kredit: TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Unit siap dilihat, chat saya untuk info lanjut.`,
+    ];
+    const nextCaption = variants[captionSuggestionIndex.current % variants.length];
+    captionSuggestionIndex.current += 1;
 
     window.setTimeout(() => {
       setCaptionText(nextCaption);
