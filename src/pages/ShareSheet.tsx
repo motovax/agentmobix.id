@@ -212,6 +212,7 @@ export function ShareSheet() {
 
   const [copied, setCopied] = useState<"" | "caption" | "link">("");
   const [captionText, setCaptionText] = useState("");
+  const [captionSuggesting, setCaptionSuggesting] = useState(false);
   const [showChannels, setShowChannels] = useState(false);
   const [shareCaptionCopied, setShareCaptionCopied] = useState(false);
 
@@ -386,6 +387,31 @@ export function ShareSheet() {
     }
   }
 
+  function handleCaptionAiHelp() {
+    if (!unit || captionSuggesting) return;
+    setCaptionSuggesting(true);
+
+    const color = titleCase(unit.color || "");
+    const branch = titleCase(unit.lokasi || "Mobix");
+    const km = `${Math.round(unit.odometer / 1000)}rb`;
+    const creditPrice = formatRupiah(captionPrice);
+    const tdp = formatJt(shareTdp);
+    const installment = formatJt(shareCicilan);
+    const category = unit.category ? titleCase(unit.category) : "mobil";
+    const dpInfo =
+      shareDp && shareDpPercent
+        ? ` DP ${formatRupiah(shareDp)} (${Math.round(shareDpPercent * 10) / 10}%).`
+        : "";
+    const colorInfo = color ? ` warna ${color}` : "";
+
+    const nextCaption = `${unit.nama}${colorInfo}, KM ${km}. Harga kredit ${creditPrice}.${dpInfo} Cukup TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${branch}, bisa cek langsung. Cocok untuk kamu yang cari ${category} nyaman dan siap pakai. Chat saya ya 🙌`;
+
+    window.setTimeout(() => {
+      setCaptionText(nextCaption);
+      setCaptionSuggesting(false);
+    }, 300);
+  }
+
   function handleShare() {
     const share = async () => {
       if (captionText.trim() && (await copyToClipboard(captionText))) {
@@ -439,18 +465,6 @@ export function ShareSheet() {
   const activeUrl = mobixImage(activeImg?.url, MOBIX_SHARE_WIDTH);
   const activePlaceholder = mobixImage(activeImg?.url, MOBIX_SHARE_WIDTH);
   const priceDelta = unit && sharePrice ? sharePrice - unit.harga : 0;
-  const aiHelpText = unit
-    ? [
-        `Halo AI Mobix, bantu saya poles caption jualan untuk unit ${unit.nama}.`,
-        `Harga kredit: ${formatRupiah(captionPrice)}.`,
-        `Paket: TDP ${formatJt(shareTdp)}, cicilan ${formatJt(shareCicilan)}/bln, tenor ${shareTenor} bulan.`,
-        `Cabang: ${titleCase(unit.lokasi || "Mobix")}.`,
-        "",
-        "Caption saat ini:",
-        captionText || autoCaption,
-      ].join("\n")
-    : "";
-  const aiHelpHref = `https://wa.me/6285701959826?text=${encodeURIComponent(aiHelpText)}`;
 
   return (
     <AppShell bg="bg-ink">
@@ -573,15 +587,15 @@ export function ShareSheet() {
               Caption (bisa diedit)
             </span>
             <div className="flex flex-wrap items-center justify-end gap-2">
-              <a
-                href={aiHelpHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-indigo-50 px-2 text-[11px] font-bold text-indigo-700 no-underline"
+              <button
+                type="button"
+                onClick={handleCaptionAiHelp}
+                disabled={!unit || captionSuggesting}
+                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-indigo-50 px-2 text-[11px] font-bold text-indigo-700 disabled:opacity-50"
               >
                 <Sparkles size={13} />
-                Bantuan AI
-              </a>
+                {captionSuggesting ? "Mengolah..." : "Bantuan AI"}
+              </button>
               {unit && captionText !== autoCaption && (
                 <button
                   onClick={() => setCaptionText(autoCaption)}
