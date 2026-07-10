@@ -561,28 +561,39 @@ export function ShareSheet() {
 
   function handleShare() {
     const share = async () => {
-      if (captionText.trim() && (await copyToClipboard(captionText))) {
-        showCopiedState("caption", true);
-      }
-
+      const caption = captionText.trim();
       const filesToShare = await prepareShareFiles();
       const canShareFiles =
         filesToShare.length > 0 && !!navigator.canShare?.({ files: filesToShare });
+      const title = unit?.nama ?? "Mobix";
 
       if (navigator.share && canShareFiles) {
+        if (caption) {
+          void copyToClipboard(caption).then((ok) => {
+            if (ok) showCopiedState("caption", true);
+          });
+        }
         await navigator.share({
           files: filesToShare,
-          title: unit?.nama ?? "Mobix",
+          title,
+          ...(caption ? { text: caption } : {}),
         });
         return;
       }
 
       if (navigator.share && !filesToShare.length) {
+        if (caption && (await copyToClipboard(caption))) {
+          showCopiedState("caption", true);
+        }
         await navigator.share({
-          title: unit?.nama ?? "Mobix",
-          text: captionText,
+          title,
+          text: caption,
         });
         return;
+      }
+
+      if (caption && (await copyToClipboard(caption))) {
+        showCopiedState("caption", true);
       }
 
       setShowChannels((v) => !v);
