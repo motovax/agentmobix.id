@@ -47,7 +47,7 @@ const MAX_DP_PERCENT = 60;
 const TDP_RANGE_MAX_PERCENT = 80;
 const MIN_INSTALLMENT_RATE = 0.005;
 const MAX_INSTALLMENT_RATE = 0.05;
-const INSTALLMENT_RANGE_DP_GUARD_PERCENT = 12;
+const INSTALLMENT_RANGE_DP_GUARD_PERCENT = MIN_DP_PERCENT;
 
 type UnitMedia =
   | { kind: "image"; id: string; url: string; item: GalleryItem }
