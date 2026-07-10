@@ -41,6 +41,7 @@ type ShareMedia =
 type PendingShareStep = {
   files: File[];
   label: string;
+  includeCaption?: boolean;
 };
 
 /* ---- canvas overlay composition ---- */
@@ -359,6 +360,12 @@ export function ShareSheet() {
       : selectedVideoCount > 0
         ? `${selectedVideoCount} video`
         : `${selectedImageCount || selectedIdxes.length} foto`;
+  const isMixedMediaSelected = selectedImageCount > 0 && selectedVideoCount > 0;
+  const shareButtonLabel = pendingShareStep
+    ? pendingShareStep.label
+    : isMixedMediaSelected
+      ? "Bagikan video dulu"
+      : "Bagikan Sekarang";
   const shareTenor = positiveParamNumber(searchParams, "tenor") ?? 60;
   const shareTdp = positiveParamNumber(searchParams, "tdp") ?? unit?.tdp ?? 0;
   const shareCicilan = positiveParamNumber(searchParams, "cicilan") ?? unit?.cicilan ?? 0;
@@ -624,7 +631,7 @@ export function ShareSheet() {
         const shared = await sharePreparedFiles(
           pendingShareStep.files,
           title,
-          caption,
+          pendingShareStep.includeCaption === false ? "" : caption,
         );
         if (shared) {
           setPendingShareStep(null);
@@ -638,13 +645,14 @@ export function ShareSheet() {
       const hasMixedMediaFiles = imageFiles.length > 0 && videoFiles.length > 0;
 
       if (hasMixedMediaFiles) {
-        const shared = await sharePreparedFiles(imageFiles, title, caption);
+        const shared = await sharePreparedFiles(videoFiles, title, caption);
         if (shared) {
           setPendingShareStep({
-            files: videoFiles,
-            label: videoFiles.length > 1
-              ? `Lanjut bagikan ${videoFiles.length} video`
-              : "Lanjut bagikan video",
+            files: imageFiles,
+            label: imageFiles.length > 1
+              ? `Lanjut bagikan ${imageFiles.length} foto`
+              : "Lanjut bagikan foto",
+            includeCaption: false,
           });
           return;
         }
@@ -1011,7 +1019,7 @@ export function ShareSheet() {
             ) : pendingShareStep ? (
               <>
                 <ShareArrow size={18} />
-                {pendingShareStep.label}
+                {shareButtonLabel}
               </>
             ) : shareCaptionCopied ? (
               <>
@@ -1021,7 +1029,7 @@ export function ShareSheet() {
             ) : (
               <>
                 <ShareArrow size={18} />
-                Bagikan Sekarang
+                {shareButtonLabel}
                 {selectedIdxes.length > 0 && (
                   <span className="text-[12px] opacity-80">
                     ({selectedMediaButtonLabel})
