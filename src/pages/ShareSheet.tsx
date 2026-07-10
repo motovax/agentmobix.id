@@ -38,6 +38,11 @@ type ShareMedia =
   | { kind: "image"; id: string; url: string; item: GalleryItem }
   | { kind: "video"; id: string; url: string; item: VideoItem };
 
+type PendingShareStep = {
+  files: File[];
+  label: string;
+};
+
 /* ---- canvas overlay composition ---- */
 
 function roundRectPath(
@@ -302,6 +307,7 @@ export function ShareSheet() {
   const [captionSuggesting, setCaptionSuggesting] = useState(false);
   const [showChannels, setShowChannels] = useState(false);
   const [shareCaptionCopied, setShareCaptionCopied] = useState(false);
+  const [pendingShareStep, setPendingShareStep] = useState<PendingShareStep | null>(null);
 
   // multi-select share media
   const [selectedIdxes, setSelectedIdxes] = useState<number[]>([0]);
@@ -380,6 +386,7 @@ export function ShareSheet() {
     setSelectedIdxes([0]);
     setPreviewIdx(0);
     setCaptionText(autoCaption);
+    setPendingShareStep(null);
   }, [unit?.id, autoCaption]);
 
   // fetch raw blobs (cached) + compose download files whenever selection changes
@@ -470,6 +477,7 @@ export function ShareSheet() {
   }
 
   function handleGalleryTap(i: number) {
+    setPendingShareStep(null);
     setPreviewIdx(i);
     setSelectedIdxes((prev) => {
       if (prev.includes(i)) {
@@ -504,6 +512,37 @@ export function ShareSheet() {
     if (await copyToClipboard(text)) {
       showCopiedState(what);
     }
+  }
+
+  async function sharePreparedFiles(
+    files: File[],
+    title: string,
+    caption: string,
+  ) {
+    if (!navigator.share || files.length === 0) return false;
+
+    const payloadWithCaption: ShareData = {
+      files,
+      title,
+      ...(caption ? { text: caption } : {}),
+    };
+    const payloadFilesOnly: ShareData = { files, title };
+    const payload = navigator.canShare?.(payloadWithCaption)
+      ? payloadWithCaption
+      : navigator.canShare?.(payloadFilesOnly)
+        ? payloadFilesOnly
+        : null;
+
+    if (!payload) return false;
+
+    if (caption) {
+      void copyToClipboard(caption).then((ok) => {
+        if (ok) showCopiedState("caption", true);
+      });
+    }
+
+    await navigator.share(payload);
+    return true;
   }
 
   async function handleCaptionAiHelp() {
@@ -579,42 +618,39 @@ export function ShareSheet() {
   function handleShare() {
     const share = async () => {
       const caption = captionText.trim();
-      const filesToShare = await prepareShareFiles();
       const title = unit?.nama ?? "Mobix";
-      const hasImageFiles = filesToShare.some((file) => file.type.startsWith("image/"));
-      const hasVideoFiles = filesToShare.some((file) => file.type.startsWith("video/"));
-      const hasMixedMediaFiles = hasImageFiles && hasVideoFiles;
-      const includeCaptionInFilePayload = Boolean(caption && !hasMixedMediaFiles);
-      const fileSharePayload: ShareData = {
-        files: filesToShare,
-        title,
-        ...(includeCaptionInFilePayload ? { text: caption } : {}),
-      };
-      const canShareFiles =
-        filesToShare.length > 0 &&
-        !!navigator.canShare?.(fileSharePayload);
-      const canShareFilesOnly =
-        filesToShare.length > 0 &&
-        !canShareFiles &&
-        !!navigator.canShare?.({ files: filesToShare, title });
 
-      if (navigator.share && canShareFiles) {
-        if (caption) {
-          void copyToClipboard(caption).then((ok) => {
-            if (ok) showCopiedState("caption", true);
-          });
+      if (pendingShareStep) {
+        const shared = await sharePreparedFiles(
+          pendingShareStep.files,
+          title,
+          caption,
+        );
+        if (shared) {
+          setPendingShareStep(null);
+          return;
         }
-        await navigator.share(fileSharePayload);
-        return;
       }
 
-      if (navigator.share && canShareFilesOnly) {
-        if (caption) {
-          void copyToClipboard(caption).then((ok) => {
-            if (ok) showCopiedState("caption", true);
+      const filesToShare = await prepareShareFiles();
+      const imageFiles = filesToShare.filter((file) => file.type.startsWith("image/"));
+      const videoFiles = filesToShare.filter((file) => file.type.startsWith("video/"));
+      const hasMixedMediaFiles = imageFiles.length > 0 && videoFiles.length > 0;
+
+      if (hasMixedMediaFiles) {
+        const shared = await sharePreparedFiles(imageFiles, title, caption);
+        if (shared) {
+          setPendingShareStep({
+            files: videoFiles,
+            label: videoFiles.length > 1
+              ? `Lanjut bagikan ${videoFiles.length} video`
+              : "Lanjut bagikan video",
           });
+          return;
         }
-        await navigator.share({ files: filesToShare, title });
+      }
+
+      if (filesToShare.length > 0 && await sharePreparedFiles(filesToShare, title, caption)) {
         return;
       }
 
@@ -967,6 +1003,11 @@ export function ShareSheet() {
           >
             {(composing || shareComposing) ? (
               <span className="text-[13px] opacity-80">Menyiapkan media...</span>
+            ) : pendingShareStep ? (
+              <>
+                <ShareArrow size={18} />
+                {pendingShareStep.label}
+              </>
             ) : shareCaptionCopied ? (
               <>
                 <Check size={18} strokeWidth={2.4} />
