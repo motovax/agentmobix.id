@@ -246,19 +246,89 @@ export interface ListResult {
   totalPages: number;
 }
 
-export async function fetchUnits(req: ListRequest = {}): Promise<ListResult> {
-  const env = await post<ProductListItem[]>("/daftar-produk", {
-    ...(req.plate_no ? {} : { ada_foto: true }),
-    page: 1,
-    limit: 12,
-    ...req,
-  });
+const LIST_FALLBACK_CATEGORIES = ["HATCHBACK", "LCGC", "MPV", "PICKUP", "SUV", "TRUK", "VAN"];
+
+function listEnvelopeToResult(env: ApiEnvelope<ProductListItem[]>): ListResult {
   return {
     items: env.data ?? [],
     total: env.metadata.total_data ?? env.data?.length ?? 0,
     page: env.metadata.page ?? 1,
     totalPages: env.metadata.total_pages ?? 1,
   };
+}
+
+function buildListBody(req: ListRequest) {
+  return {
+    ...(req.plate_no ? {} : { ada_foto: true }),
+    page: 1,
+    limit: 12,
+    ...req,
+  };
+}
+
+function isNullableScanError(error: unknown) {
+  return error instanceof Error && /cannot scan NULL|can't scan into dest/i.test(error.message);
+}
+
+async function fetchUnitsByCategoryFallback(req: ListRequest): Promise<ListResult> {
+  const page = req.page ?? 1;
+  const limit = req.limit ?? 12;
+  const offset = (page - 1) * limit;
+  const fallbackLimit = page * limit;
+  const settled = await Promise.allSettled(
+    LIST_FALLBACK_CATEGORIES.map((category) =>
+      post<ProductListItem[]>("/daftar-produk", buildListBody({
+        ...req,
+        page: 1,
+        limit: fallbackLimit,
+        kategori: [category],
+      })),
+    ),
+  );
+
+  const fulfilled = settled
+    .filter((entry): entry is PromiseFulfilledResult<ApiEnvelope<ProductListItem[]>> =>
+      entry.status === "fulfilled",
+    )
+    .map((entry) => entry.value);
+
+  if (fulfilled.length === 0) {
+    throw new Error("Gagal memuat katalog");
+  }
+
+  const seen = new Set<string>();
+  const items = fulfilled
+    .flatMap((env) => env.data ?? [])
+    .filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    })
+    .slice(offset, offset + limit);
+  const total = fulfilled.reduce(
+    (sum, env) => sum + (env.metadata.total_data ?? env.data?.length ?? 0),
+    0,
+  );
+
+  return {
+    items,
+    total,
+    page,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  };
+}
+
+export async function fetchUnits(req: ListRequest = {}): Promise<ListResult> {
+  try {
+    return listEnvelopeToResult(
+      await post<ProductListItem[]>("/daftar-produk", buildListBody(req)),
+    );
+  } catch (error) {
+    if (isNullableScanError(error) && !req.kategori?.length && !req.plate_no) {
+      return fetchUnitsByCategoryFallback(req);
+    }
+    throw error;
+  }
 }
 
 export async function fetchUnitDetail(slug: string): Promise<ProductDetail> {
