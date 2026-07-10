@@ -218,6 +218,7 @@ export function ShareSheet() {
   const [copied, setCopied] = useState<"" | "caption" | "link">("");
   const [captionText, setCaptionText] = useState("");
   const [showChannels, setShowChannels] = useState(false);
+  const [shareCaptionCopied, setShareCaptionCopied] = useState(false);
 
   // multi-select gallery
   const [selectedIdxes, setSelectedIdxes] = useState<number[]>([0]);
@@ -376,18 +377,36 @@ export function ShareSheet() {
       )}, bisa cek langsung. Chat saya ya 🙌`
     : "";
 
-  async function copy(what: "caption" | "link", text: string) {
+  function showCopiedState(what: "caption" | "link", fromShare = false) {
+    setCopied(what);
+    if (fromShare) setShareCaptionCopied(true);
+    window.setTimeout(() => {
+      setCopied("");
+      if (fromShare) setShareCaptionCopied(false);
+    }, fromShare ? 2500 : 1500);
+  }
+
+  async function copyToClipboard(text: string) {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(what);
-      window.setTimeout(() => setCopied(""), 1500);
+      return true;
     } catch {
-      /* clipboard unavailable */
+      return false;
+    }
+  }
+
+  async function copy(what: "caption" | "link", text: string) {
+    if (await copyToClipboard(text)) {
+      showCopiedState(what);
     }
   }
 
   function handleShare() {
     const share = async () => {
+      if (captionText.trim() && (await copyToClipboard(captionText))) {
+        showCopiedState("caption", true);
+      }
+
       const filesToShare = await prepareShareFiles();
       const canShareFiles =
         filesToShare.length > 0 && !!navigator.canShare?.({ files: filesToShare });
@@ -395,6 +414,7 @@ export function ShareSheet() {
       if (navigator.share && canShareFiles) {
         await navigator.share({
           files: filesToShare,
+          title: unit?.nama ?? "Mobix",
           text: captionText,
         });
         return;
@@ -700,6 +720,11 @@ export function ShareSheet() {
           >
             {(composing || shareComposing) ? (
               <span className="text-[13px] opacity-80">Menyiapkan gambar…</span>
+            ) : shareCaptionCopied ? (
+              <>
+                <Check size={18} strokeWidth={2.4} />
+                Caption tersalin
+              </>
             ) : (
               <>
                 <ShareArrow size={18} />
