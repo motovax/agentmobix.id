@@ -25,6 +25,7 @@ import { formatRupiah, formatOdometer } from "../lib/format";
 import {
   TENOR_OPTIONS,
   downPayment,
+  monthlyInstallment,
   type Tenor,
 } from "../lib/installment";
 import {
@@ -46,6 +47,7 @@ const MAX_DP_PERCENT = 60;
 const TDP_RANGE_MAX_PERCENT = 80;
 const MIN_INSTALLMENT_RATE = 0.005;
 const MAX_INSTALLMENT_RATE = 0.05;
+const INSTALLMENT_RANGE_DP_GUARD_PERCENT = 12;
 
 type UnitMedia =
   | { kind: "image"; id: string; url: string; item: GalleryItem }
@@ -145,9 +147,19 @@ export function UnitDetail() {
     Math.round(creditPriceForBounds * (TDP_RANGE_MAX_PERCENT / 100)),
   );
   const minMonthlyAmount = Math.max(0, Math.round(creditPriceForBounds * MIN_INSTALLMENT_RATE));
+  const estimatedSafeMaxMonthlyAmount =
+    creditPriceForBounds > 0
+      ? Math.floor(
+          monthlyInstallment(
+            creditPriceForBounds,
+            INSTALLMENT_RANGE_DP_GUARD_PERCENT,
+            tenor,
+          ) / 10000,
+        ) * 10000
+      : 0;
   const maxMonthlyAmount = Math.max(
     minMonthlyAmount,
-    Math.round(creditPriceForBounds * MAX_INSTALLMENT_RATE),
+    estimatedSafeMaxMonthlyAmount || Math.round(creditPriceForBounds * MAX_INSTALLMENT_RATE),
   );
 
   const dsfDpPercent = simResult?.percentDownPayment;
@@ -322,6 +334,28 @@ export function UnitDetail() {
     displayMonthly,
     minTdpAmount,
     maxTdpAmount,
+    minMonthlyAmount,
+    maxMonthlyAmount,
+  ]);
+
+  useEffect(() => {
+    if (simulationMethod !== "Installment" || !price) return;
+
+    const nextAmount = clampValue(
+      monthlyAmount || displayMonthly || defaultMonthlyAmount,
+      minMonthlyAmount,
+      maxMonthlyAmount,
+    );
+
+    if (nextAmount !== monthlyAmount) {
+      setMonthlyAmount(nextAmount);
+    }
+  }, [
+    simulationMethod,
+    price,
+    monthlyAmount,
+    displayMonthly,
+    defaultMonthlyAmount,
     minMonthlyAmount,
     maxMonthlyAmount,
   ]);
