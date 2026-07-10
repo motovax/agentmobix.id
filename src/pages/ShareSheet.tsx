@@ -648,6 +648,11 @@ export function ShareSheet() {
           });
           return;
         }
+        if (caption && (await copyToClipboard(caption))) {
+          showCopiedState("caption", true);
+        }
+        setShowChannels((v) => !v);
+        return;
       }
 
       if (filesToShare.length > 0 && await sharePreparedFiles(filesToShare, title, caption)) {
