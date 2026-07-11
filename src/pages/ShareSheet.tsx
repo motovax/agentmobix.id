@@ -1017,29 +1017,31 @@ export function ShareSheet() {
           <button
             onClick={handleShare}
             disabled={!unit || composing || shareComposing}
-            className="flex w-full items-center justify-center gap-2.5 rounded-[18px] bg-teal-deep py-4 text-[15px] font-bold text-surface disabled:opacity-50"
+            className="flex min-h-[66px] w-full items-center justify-center gap-2.5 rounded-[18px] bg-teal-deep px-3 py-3.5 text-[15px] font-bold leading-tight text-surface disabled:opacity-50"
           >
             {(composing || shareComposing) ? (
               <span className="text-[13px] opacity-80">Menyiapkan media...</span>
             ) : pendingShareStep ? (
               <>
-                <ShareArrow size={18} />
-                {shareButtonLabel}
+                <ShareArrow className="shrink-0" size={18} />
+                <span className="min-w-0 text-center">{shareButtonLabel}</span>
               </>
             ) : shareCaptionCopied ? (
               <>
-                <Check size={18} strokeWidth={2.4} />
-                Caption tersalin
+                <Check className="shrink-0" size={18} strokeWidth={2.4} />
+                <span className="min-w-0 text-center">Caption tersalin</span>
               </>
             ) : (
               <>
-                <ShareArrow size={18} />
-                {shareButtonLabel}
-                {selectedIdxes.length > 0 && (
-                  <span className="text-[12px] opacity-80">
-                    ({selectedMediaButtonLabel})
-                  </span>
-                )}
+                <ShareArrow className="shrink-0" size={18} />
+                <span className="flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center">
+                  <span>{shareButtonLabel}</span>
+                  {selectedIdxes.length > 0 && (
+                    <span className="text-[12px] opacity-80">
+                      ({selectedMediaButtonLabel})
+                    </span>
+                  )}
+                </span>
               </>
             )}
           </button>
