@@ -48,6 +48,7 @@ export interface DsfSimParams {
   simulationType?: DsfSimMethod;
   simulationValue?: number;
   cashPriceTarget?: number;
+  paymentType?: "ADDB" | "ADDM";
   brand?: string;
   model?: string;
   year?: number;
@@ -61,6 +62,7 @@ function buildDsfSimulationPayload(params: DsfSimParams) {
     simulationType = "DP",
     simulationValue = dpPercent,
     cashPriceTarget,
+    paymentType = "ADDB",
     brand = "Unknown",
     model = "Unknown",
     year = 2020,
@@ -74,7 +76,7 @@ function buildDsfSimulationPayload(params: DsfSimParams) {
     Model: model,
     ManufacturedYear: String(year),
     LoanPackageName: "MOCIL SPC - PC",
-    PaymentType: "ADDB",
+    PaymentType: paymentType,
     Refund: {
       IsApplied: "YES",
       Showroom: "PT DIGITAL SUMBER SEJAHTERA MOTOR",

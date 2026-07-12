@@ -71,9 +71,13 @@ const DP_MINIM_ALL_IN_PERCENT: Record<Tenor, number> = {
   48: 0.925,
   60: 0.95,
 };
-const DP_MINIM_TABLE_TENORS: Tenor[] = [36, 48, 60];
+const DP_MINIM_TABLE_TENORS: Tenor[] = [60, 48, 36];
 
 type DpMinimRow = { tenor: Tenor; result: DsfSimResult | null };
+
+function dpMinimInstallmentCount(tenor: Tenor) {
+  return Math.max(1, tenor - 1);
+}
 
 function maskPersonName(value: string) {
   const words = value.trim().split(/\s+/);
@@ -256,12 +260,6 @@ export function UnitDetail() {
   const dpMinimMinDp = price > 0 ? Math.round(price * (1 - dpMinimLtv)) : 0;
   const dpMinimEffectiveDp =
     dpMinimDp > 0 ? Math.max(dpMinimDp, dpMinimMinDp) : dpMinimMinDp;
-  const dpMinimOtrKredit =
-    typeof simResult?.hargaKredit === "number" &&
-    Number.isFinite(simResult.hargaKredit) &&
-    simResult.hargaKredit > price + 999
-      ? simResult.hargaKredit
-      : null;
   const canShareSimulation =
     displayDp !== null &&
     displayMonthly !== null &&
@@ -639,6 +637,7 @@ export function UnitDetail() {
               dpPercent: MIN_DP_PERCENT,
               simulationType: "DP",
               simulationValue: MIN_DP_PERCENT,
+              paymentType: "ADDM",
               tenor,
               brand: unit?.brand,
               model: unit?.type,
@@ -701,6 +700,7 @@ export function UnitDetail() {
               dpPercent: MIN_DP_PERCENT,
               simulationType: "DP",
               simulationValue: MIN_DP_PERCENT,
+              paymentType: "ADDM",
               tenor: rowTenor,
               brand: unit?.brand,
               model: unit?.type,
@@ -1333,6 +1333,9 @@ export function UnitDetail() {
                   {DP_MINIM_TABLE_TENORS.map((rowTenor) => {
                     const row = dpMinimRows?.find((r) => r.tenor === rowTenor);
                     const res = row?.result ?? null;
+                    const rowTargetAllIn = Math.round(
+                      price * DP_MINIM_ALL_IN_PERCENT[rowTenor],
+                    );
                     const rowAllIn =
                       res && res.netDisbursement > 0
                         ? res.netDisbursement + Math.max(0, res.refundSupplier)
@@ -1362,13 +1365,13 @@ export function UnitDetail() {
                           <div className="flex items-center justify-between gap-2 text-[11px]">
                             <span className="font-semibold text-muted">All In Max</span>
                             <span className="font-bold text-ink">
-                              {pending ? "Menghitung..." : rowAllIn !== null ? formatRupiah(rowAllIn) : "-"}
+                              {pending ? "Menghitung..." : formatRupiah(rowTargetAllIn)}
                             </span>
                           </div>
                           <div className="flex items-center justify-between gap-2 text-[11px]">
                             <span className="font-semibold text-muted">Angsuran</span>
                             <span className="font-bold text-ink">
-                              {pending ? "..." : res ? `${formatRupiah(res.installmentRounded)} × ${rowTenor}` : "-"}
+                              {pending ? "..." : res ? `${formatRupiah(res.installmentRounded)} x ${dpMinimInstallmentCount(rowTenor)}` : "-"}
                             </span>
                           </div>
                           <div className="flex items-center justify-between gap-2 text-[11px]">
@@ -1515,32 +1518,6 @@ export function UnitDetail() {
                   </div>
                 ) : (
                   <div className="mt-2.5 space-y-2.5 border-t border-line pt-2.5">
-                    {dpMinimOtrKredit !== null && (
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-[12px] font-semibold text-mid">
-                          OTR Kredit
-                        </div>
-                        <div className="text-right text-[13px] font-extrabold text-ink">
-                          {formatRupiah(dpMinimOtrKredit)}
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-[12px] font-semibold text-mid">
-                        Cair Murni
-                      </div>
-                      <div className="text-right text-[13px] font-extrabold text-ink">
-                        {dpMinimCairMurni !== null ? formatRupiah(dpMinimCairMurni) : "-"}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-[12px] font-semibold text-mid">
-                        Refund
-                      </div>
-                      <div className="text-right text-[13px] font-extrabold text-ink">
-                        {dpMinimRefund !== null ? formatRupiah(dpMinimRefund) : "-"}
-                      </div>
-                    </div>
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-[12px] font-semibold text-mid">
                         Cair All In
@@ -1572,12 +1549,14 @@ export function UnitDetail() {
                         Cicilan/Bulan
                       </div>
                       <div className="text-right text-[13px] font-extrabold text-ink">
-                        {displayMonthly ? formatRupiah(displayMonthly) : "-"}
+                        {displayMonthly
+                          ? `${formatRupiah(displayMonthly)} x ${dpMinimInstallmentCount(tenor)}`
+                          : "-"}
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-[12px] font-semibold text-mid">
-                        Tenor
+                        Tenor Leasing
                       </div>
                       <div className="text-right text-[13px] font-extrabold text-ink">
                         {tenor} Bulan
