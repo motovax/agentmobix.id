@@ -224,10 +224,18 @@ export function UnitDetail() {
   const monthlySimulationAmount =
     monthlyAmount > 0 ? monthlyAmount : defaultMonthlyAmount;
   const simPending = price > 0 && simResult === null && !simError;
+  const simCreditPrice =
+    typeof simResult?.hargaKredit === "number" &&
+    Number.isFinite(simResult.hargaKredit) &&
+    simResult.hargaKredit > 0
+      ? simResult.hargaKredit
+      : null;
   const creditPriceForDisplay =
-    typeof smartCreditPrice === "number" &&
-    Number.isFinite(smartCreditPrice) &&
-    smartCreditPrice > 0
+    simTab === "dpminim" && simCreditPrice !== null
+      ? simCreditPrice
+      : typeof smartCreditPrice === "number" &&
+          Number.isFinite(smartCreditPrice) &&
+          smartCreditPrice > 0
       ? smartCreditPrice
       : null;
   const hasCreditPriceIssue =
@@ -260,10 +268,22 @@ export function UnitDetail() {
   const dpMinimMinDp = price > 0 ? Math.round(price * (1 - dpMinimLtv)) : 0;
   const dpMinimEffectiveDp =
     dpMinimDp > 0 ? Math.max(dpMinimDp, dpMinimMinDp) : dpMinimMinDp;
+  const shareDp =
+    simTab === "dpminim" && dpMinimTdpKonsumen !== null
+      ? dpMinimTdpKonsumen
+      : displayDp;
+  const shareDpPercent =
+    simTab === "dpminim" && shareDp !== null && price > 0
+      ? (shareDp / price) * 100
+      : displayDpPercent;
+  const shareTdp =
+    simTab === "dpminim" && dpMinimTdpKonsumen !== null
+      ? dpMinimTdpKonsumen
+      : displayTdp;
   const canShareSimulation =
-    displayDp !== null &&
+    shareDp !== null &&
     displayMonthly !== null &&
-    displayTdp !== null &&
+    shareTdp !== null &&
     creditPriceForDisplay !== null;
   const currencyFormatter = new Intl.NumberFormat("id-ID");
   const shareHref = canShareSimulation
@@ -272,13 +292,13 @@ export function UnitDetail() {
         harga: String(Math.round(price)),
         komisi: String(Math.round(estimatedCommission)),
         tenor: String(tenor),
-        dp_pct: String(Math.round(displayDpPercent * 10) / 10),
-        dp: String(Math.round(displayDp)),
+        dp_pct: String(Math.round(shareDpPercent * 10) / 10),
+        dp: String(Math.round(shareDp)),
         ...(creditPriceForDisplay
           ? { harga_kredit: String(Math.round(creditPriceForDisplay)) }
           : {}),
         cicilan: String(Math.round(displayMonthly)),
-        tdp: String(Math.round(displayTdp)),
+        tdp: String(Math.round(shareTdp)),
       }).toString()}`
     : null;
 
