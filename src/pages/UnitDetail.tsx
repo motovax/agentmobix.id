@@ -1355,10 +1355,10 @@ export function UnitDetail() {
                       >
                         <div className="text-center">
                           <div className="text-[17px] font-extrabold leading-none text-ink">
-                            {rowTenor}
+                            {dpMinimInstallmentCount(rowTenor)}
                           </div>
                           <div className="mt-0.5 text-[9px] font-bold tracking-wide text-muted">
-                            BULAN
+                            KALI
                           </div>
                         </div>
                         <div className="space-y-0.5">
@@ -1426,7 +1426,9 @@ export function UnitDetail() {
             {simTab !== "syariah" && (
               <>
                 <div className="mb-3.5">
-                  <div className="mb-2 text-[12px] font-semibold text-mid">Tenor (bulan)</div>
+                  <div className="mb-2 text-[12px] font-semibold text-mid">
+                    {simTab === "dpminim" ? "Jumlah angsuran" : "Tenor (bulan)"}
+                  </div>
                   <div className="grid grid-cols-5 gap-1.5">
                     {TENOR_OPTIONS.map((t) => {
                       const isActive = t === tenor;
@@ -1440,7 +1442,7 @@ export function UnitDetail() {
                               : "border border-[#D4DEDF] font-semibold text-muted"
                           }`}
                         >
-                          {t}
+                          {simTab === "dpminim" ? dpMinimInstallmentCount(t) : t}
                         </button>
                       );
                     })}
@@ -1556,10 +1558,10 @@ export function UnitDetail() {
                     </div>
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-[12px] font-semibold text-mid">
-                        Tenor Leasing
+                        Jumlah Angsuran
                       </div>
                       <div className="text-right text-[13px] font-extrabold text-ink">
-                        {tenor} Bulan
+                        {dpMinimInstallmentCount(tenor)}x
                       </div>
                     </div>
                   </div>
