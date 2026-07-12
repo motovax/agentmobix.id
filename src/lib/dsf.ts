@@ -151,30 +151,26 @@ export async function simulateKreditWithSignal(
 }
 
 /**
- * Cari OTR kredit (markup di atas harga cash) yang menghasilkan cicilan
- * mendekati target, dengan DP tetap di persentase yang diberikan. Cicilan
- * DSF ~linear terhadap unit price, jadi iterasi proporsional konvergen cepat.
- * `seedInstallment` = cicilan di harga cash (hemat satu call kalau diketahui).
+ * Reverse calculation ala paket leasing: cari OTR kredit (markup di atas
+ * harga cash) yang menghasilkan cair all-in (cair murni + refund) mendekati
+ * target. All-in DSF ~linear terhadap unit price, jadi iterasi proporsional
+ * konvergen cepat (2-3 call).
  */
-export async function findAllParamsForInstallment(
+export async function findAllParamsForAllIn(
   params: DsfSimParams,
-  targetInstallment: number,
-  seedInstallment?: number,
+  targetAllIn: number,
   signal?: AbortSignal,
 ): Promise<DsfSimResult | null> {
   const cashPrice = params.unitPrice;
-  if (!cashPrice || !targetInstallment) return null;
+  if (!cashPrice || !targetAllIn) return null;
 
   const clampPrice = (value: number) =>
     Math.min(
-      Math.max(Math.round(value / 1000) * 1000, cashPrice),
+      Math.max(Math.round(value / 1000) * 1000, 1000),
       cashPrice * 4,
     );
 
-  let price =
-    seedInstallment && seedInstallment > 0
-      ? clampPrice((cashPrice * targetInstallment) / seedInstallment)
-      : cashPrice;
+  let price = cashPrice;
   let best: DsfSimResult | null = null;
 
   for (let i = 0; i < 6; i += 1) {
@@ -182,14 +178,14 @@ export async function findAllParamsForInstallment(
       { ...params, unitPrice: price },
       signal,
     );
-    if (!result || !(result.installmentRounded > 0)) return best;
+    const allIn =
+      result && result.netDisbursement > 0
+        ? result.netDisbursement + Math.max(0, result.refundSupplier)
+        : 0;
+    if (!result || allIn <= 0) return best;
     best = { ...result, hargaKredit: price };
-    if (Math.abs(result.installmentRounded - targetInstallment) <= 5000) {
-      return best;
-    }
-    const next = clampPrice(
-      (price * targetInstallment) / result.installmentRounded,
-    );
+    if (Math.abs(allIn - targetAllIn) <= 200000) return best;
+    const next = clampPrice((price * targetAllIn) / allIn);
     if (next === price) return best;
     price = next;
   }

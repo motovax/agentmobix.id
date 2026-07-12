@@ -29,7 +29,7 @@ import {
   type Tenor,
 } from "../lib/installment";
 import {
-  findAllParamsForInstallment,
+  findAllParamsForAllIn,
   resolveSmartCreditPrice,
   simulateKreditWithSignal,
   type DsfSimMethod,
@@ -61,6 +61,19 @@ const SIM_TABS: { id: SimTab; label: string }[] = [
   { id: "dpminim", label: "DP Minim" },
   { id: "syariah", label: "Syariah" },
 ];
+
+// All In Max = persen dari harga cash per tenor (pola paket leasing:
+// ~95% @60bln, 92,5% @48bln, 90% @36bln; 12/24 ekstrapolasi langkah 2,5%).
+const DP_MINIM_ALL_IN_PERCENT: Record<Tenor, number> = {
+  12: 0.85,
+  24: 0.875,
+  36: 0.9,
+  48: 0.925,
+  60: 0.95,
+};
+const DP_MINIM_TABLE_TENORS: Tenor[] = [36, 48, 60];
+
+type DpMinimRow = { tenor: Tenor; result: DsfSimResult | null };
 
 function maskPersonName(value: string) {
   const words = value.trim().split(/\s+/);
@@ -130,9 +143,11 @@ export function UnitDetail() {
   const [tdpAmountInput, setTdpAmountInput] = useState("");
   const [monthlyAmount, setMonthlyAmount] = useState(0);
   const [monthlyAmountInput, setMonthlyAmountInput] = useState("");
-  const [dpMinimMonthly, setDpMinimMonthly] = useState(0);
-  const [dpMinimMonthlyInput, setDpMinimMonthlyInput] = useState("");
-  const [dpMinimBaseMonthly, setDpMinimBaseMonthly] = useState(0);
+  const [dpMinimDp, setDpMinimDp] = useState(0);
+  const [dpMinimDpInput, setDpMinimDpInput] = useState("");
+  const [dpMinimRows, setDpMinimRows] = useState<DpMinimRow[] | null>(null);
+  const [dpMinimTableLoading, setDpMinimTableLoading] = useState(false);
+  const [dpMinimTableKey, setDpMinimTableKey] = useState(0);
   const [builderPrice, setBuilderPrice] = useState(0);
   const [builderPriceInput, setBuilderPriceInput] = useState("");
   const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
@@ -235,13 +250,12 @@ export function UnitDetail() {
     dpMinimCairMurni !== null ? dpMinimCairMurni + (dpMinimRefund ?? 0) : null;
   const dpMinimTdpKonsumen =
     dpMinimAllIn !== null && price > 0 ? Math.max(0, price - dpMinimAllIn) : null;
-  const dpMinimSliderMax =
-    dpMinimBaseMonthly > 0
-      ? Math.floor((dpMinimBaseMonthly * 2) / 10000) * 10000
-      : maxMonthlyAmount;
-  const dpMinimMonthlyValue = dpMinimMonthly > 0 ? dpMinimMonthly : dpMinimBaseMonthly;
   const dpMinimSisaCair =
     dpMinimAllIn !== null && price > 0 ? Math.max(0, dpMinimAllIn - price) : null;
+  const dpMinimLtv = DP_MINIM_ALL_IN_PERCENT[tenor];
+  const dpMinimMinDp = price > 0 ? Math.round(price * (1 - dpMinimLtv)) : 0;
+  const dpMinimEffectiveDp =
+    dpMinimDp > 0 ? Math.max(dpMinimDp, dpMinimMinDp) : dpMinimMinDp;
   const dpMinimOtrKredit =
     typeof simResult?.hargaKredit === "number" &&
     Number.isFinite(simResult.hargaKredit) &&
@@ -291,8 +305,7 @@ export function UnitDetail() {
     setTdpAmountInput("");
     setMonthlyAmount(0);
     setMonthlyAmountInput("");
-    setDpMinimMonthly(0);
-    setDpMinimBaseMonthly(0);
+    setDpMinimDp(0);
     setSimResult(null);
     setSimError(false);
     setSmartCreditPrice(null);
@@ -361,14 +374,12 @@ export function UnitDetail() {
   }, [monthlyAmount]);
 
   useEffect(() => {
-    if (dpMinimMonthly > 0) {
-      setDpMinimMonthlyInput(formatDpValue(dpMinimMonthly));
+    if (dpMinimDp > 0) {
+      setDpMinimDpInput(formatDpValue(dpMinimDp));
       return;
     }
-    setDpMinimMonthlyInput(
-      dpMinimBaseMonthly > 0 ? formatDpValue(dpMinimBaseMonthly) : "",
-    );
-  }, [dpMinimMonthly, dpMinimBaseMonthly]);
+    setDpMinimDpInput(dpMinimMinDp > 0 ? formatDpValue(dpMinimMinDp) : "");
+  }, [dpMinimDp, dpMinimMinDp]);
 
   useEffect(() => {
     if (simulationMethod === "TDP" && !tdpAmount && displayTdp) {
@@ -451,8 +462,7 @@ export function UnitDetail() {
   function handleSimTabChange(nextTab: SimTab) {
     if (nextTab === simTab) return;
     setSimTab(nextTab);
-    setDpMinimMonthly(0);
-    setDpMinimBaseMonthly(0);
+    setDpMinimDp(0);
     if (nextTab === "syariah") return;
     setSimResult(null);
     setSimError(false);
@@ -462,30 +472,37 @@ export function UnitDetail() {
   function handleTenorSelect(nextTenor: Tenor) {
     setTenor(nextTenor);
     if (simTab === "dpminim") {
-      setDpMinimMonthly(0);
-      setDpMinimBaseMonthly(0);
+      setDpMinimDp(0);
     }
   }
 
-  function handleDpMinimMonthlyChange(e: ChangeEvent<HTMLInputElement>) {
+  function handleDpMinimRowSelect(nextTenor: Tenor) {
+    setTenor(nextTenor);
+    setDpMinimDp(0);
+    setSimResult(null);
+    setSimError(false);
+    setSimRunKey((value) => value + 1);
+  }
+
+  function handleDpMinimDpChange(e: ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value.replace(/\D/g, "");
     if (!raw) {
-      setDpMinimMonthlyInput("");
+      setDpMinimDpInput("");
       return;
     }
-    setDpMinimMonthlyInput(formatDpValue(Number(raw)));
+    setDpMinimDpInput(formatDpValue(Number(raw)));
   }
 
-  function handleDpMinimMonthlyBlur() {
-    const parsed = parseCurrencyInput(dpMinimMonthlyInput);
-    const fallback = dpMinimMonthly > 0 ? dpMinimMonthly : dpMinimBaseMonthly;
+  function handleDpMinimDpBlur() {
+    const parsed = parseCurrencyInput(dpMinimDpInput);
+    const fallback = dpMinimEffectiveDp;
     const nextAmount = clampValue(
       parsed || fallback,
-      minMonthlyAmount,
-      dpMinimSliderMax,
+      dpMinimMinDp,
+      Math.max(dpMinimMinDp, price),
     );
-    setDpMinimMonthly(nextAmount);
-    setDpMinimMonthlyInput(formatDpValue(nextAmount));
+    setDpMinimDp(nextAmount);
+    setDpMinimDpInput(formatDpValue(nextAmount));
   }
 
   function handleSimulationMethodChange(e: ChangeEvent<HTMLSelectElement>) {
@@ -614,14 +631,9 @@ export function UnitDetail() {
     setSimError(false);
     setSimLoading(true);
     const isDpMinim = simTab === "dpminim";
-    const dpMinimUseInstallment = isDpMinim && dpMinimMonthly > 0;
-    const dpMinimUseMarkup =
-      dpMinimUseInstallment &&
-      dpMinimBaseMonthly > 0 &&
-      dpMinimMonthly > dpMinimBaseMonthly;
     (async () => {
-      const result = dpMinimUseMarkup
-        ? await findAllParamsForInstallment(
+      const result = isDpMinim
+        ? await findAllParamsForAllIn(
             {
               unitPrice: price,
               dpPercent: MIN_DP_PERCENT,
@@ -632,24 +644,16 @@ export function UnitDetail() {
               model: unit?.type,
               year: unit?.year,
             },
-            dpMinimMonthly,
-            dpMinimBaseMonthly,
+            Math.max(0, price - dpMinimEffectiveDp),
             controller.signal,
           )
         : await simulateKreditWithSignal(
             {
               unitPrice: price,
-              dpPercent: isDpMinim ? MIN_DP_PERCENT : dpPercent,
-              simulationType: isDpMinim
-                ? dpMinimUseInstallment
-                  ? "Installment"
-                  : "DP"
-                : simulationMethod,
-              simulationValue: isDpMinim
-                ? dpMinimUseInstallment
-                  ? dpMinimMonthly
-                  : MIN_DP_PERCENT
-                : simulationMethod === "TDP"
+              dpPercent,
+              simulationType: simulationMethod,
+              simulationValue:
+                simulationMethod === "TDP"
                   ? tdpSimulationAmount
                   : simulationMethod === "Installment"
                     ? monthlySimulationAmount
@@ -665,15 +669,6 @@ export function UnitDetail() {
       setSimResult(result);
       setSimError(result === null);
       setSimLoading(false);
-      if (
-        isDpMinim &&
-        !dpMinimUseInstallment &&
-        result &&
-        Number.isFinite(result.installmentRounded) &&
-        result.installmentRounded > 0
-      ) {
-        setDpMinimBaseMonthly(result.installmentRounded);
-      }
     })();
     return () => {
       alive = false;
@@ -686,6 +681,50 @@ export function UnitDetail() {
     unit?.year,
     simRunKey,
   ]);
+
+  useEffect(() => {
+    if (simTab !== "dpminim" || !price) {
+      setDpMinimRows(null);
+      setDpMinimTableLoading(false);
+      return;
+    }
+    let alive = true;
+    const controller = new AbortController();
+    setDpMinimRows(null);
+    setDpMinimTableLoading(true);
+    (async () => {
+      const results = await Promise.all(
+        DP_MINIM_TABLE_TENORS.map((rowTenor) =>
+          findAllParamsForAllIn(
+            {
+              unitPrice: price,
+              dpPercent: MIN_DP_PERCENT,
+              simulationType: "DP",
+              simulationValue: MIN_DP_PERCENT,
+              tenor: rowTenor,
+              brand: unit?.brand,
+              model: unit?.type,
+              year: unit?.year,
+            },
+            Math.round(price * DP_MINIM_ALL_IN_PERCENT[rowTenor]),
+            controller.signal,
+          ),
+        ),
+      );
+      if (!alive) return;
+      setDpMinimRows(
+        DP_MINIM_TABLE_TENORS.map((rowTenor, index) => ({
+          tenor: rowTenor,
+          result: results[index],
+        })),
+      );
+      setDpMinimTableLoading(false);
+    })();
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [simTab, price, unit?.brand, unit?.type, unit?.year, dpMinimTableKey]);
 
   useEffect(() => {
     setActiveThumb(0);
@@ -701,8 +740,7 @@ export function UnitDetail() {
     setTdpAmountInput("");
     setMonthlyAmount(0);
     setMonthlyAmountInput("");
-    setDpMinimMonthly(0);
-    setDpMinimBaseMonthly(0);
+    setDpMinimDp(0);
     setSimResult(null);
     setSimError(false);
     setSmartCreditPrice(null);
@@ -1285,46 +1323,98 @@ export function UnitDetail() {
             {simTab === "dpminim" && (
               <>
                 <div className="mb-3.5 rounded-xl bg-field px-3.5 py-3 text-[11px] leading-[1.5] text-mid">
-                  Default di posisi DP paling minim pada harga cash. Turunkan
-                  cicilan → TDP bayar konsumen naik. Naikkan cicilan → OTR kredit
-                  di-markup otomatis, Cair All In makin tinggi, TDP bisa sampai 0
-                  dan sisanya cair sebagai dana tunai. Jual DP di atas angka TDP,
-                  selisihnya jadi insentif tambahan kamu.
+                  All In Max = plafon pencairan leasing per tenor. DP konsumen =
+                  harga cash − cair all in. Jual DP di atas angka itu, selisihnya
+                  jadi insentif tambahan kamu. Pilih tenor di tabel, atau atur DP
+                  sendiri lalu tekan Hitung.
                 </div>
+
+                <div className="mb-3.5 overflow-hidden rounded-[14px] border border-line">
+                  {DP_MINIM_TABLE_TENORS.map((rowTenor) => {
+                    const row = dpMinimRows?.find((r) => r.tenor === rowTenor);
+                    const res = row?.result ?? null;
+                    const rowAllIn =
+                      res && res.netDisbursement > 0
+                        ? res.netDisbursement + Math.max(0, res.refundSupplier)
+                        : null;
+                    const rowDp =
+                      rowAllIn !== null ? Math.max(0, price - rowAllIn) : null;
+                    const pending = dpMinimTableLoading && !res;
+                    const isActive = rowTenor === tenor && dpMinimDp === 0;
+                    return (
+                      <button
+                        key={rowTenor}
+                        type="button"
+                        onClick={() => handleDpMinimRowSelect(rowTenor)}
+                        className={`grid w-full grid-cols-[44px_minmax(0,1fr)] items-center gap-3 border-b border-line px-3.5 py-3 text-left last:border-b-0 ${
+                          isActive ? "bg-field" : "bg-surface"
+                        }`}
+                      >
+                        <div className="text-center">
+                          <div className="text-[17px] font-extrabold leading-none text-ink">
+                            {rowTenor}
+                          </div>
+                          <div className="mt-0.5 text-[9px] font-bold tracking-wide text-muted">
+                            BULAN
+                          </div>
+                        </div>
+                        <div className="space-y-0.5">
+                          <div className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className="font-semibold text-muted">All In Max</span>
+                            <span className="font-bold text-ink">
+                              {pending ? "Menghitung..." : rowAllIn !== null ? formatRupiah(rowAllIn) : "-"}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className="font-semibold text-muted">Angsuran</span>
+                            <span className="font-bold text-ink">
+                              {pending ? "..." : res ? `${formatRupiah(res.installmentRounded)} × ${rowTenor}` : "-"}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className="font-semibold text-muted">DP Konsumen</span>
+                            <span className="text-[13px] font-extrabold text-teal-deep">
+                              {pending ? "..." : rowDp !== null ? formatRupiah(rowDp) : "-"}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {!dpMinimTableLoading &&
+                  dpMinimRows !== null &&
+                  dpMinimRows.some((r) => r.result === null) && (
+                    <button
+                      type="button"
+                      onClick={() => setDpMinimTableKey((value) => value + 1)}
+                      className="mb-3.5 w-full rounded-[10px] border border-line px-3.5 py-2 text-[12px] font-bold text-ink"
+                    >
+                      Hitung ulang tabel
+                    </button>
+                  )}
+
                 <div className="mb-3.5">
                   <div className="mb-1.5 text-[12px] font-semibold text-mid">
-                    Cicilan per bulan
+                    DP Konsumen (Rp)
                   </div>
-                  <div className="mb-2 flex items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+                  <div className="mb-1 flex items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
                     <span className="pr-2 text-[13px] font-semibold text-muted">Rp</span>
                     <input
                       type="text"
                       inputMode="numeric"
-                      value={dpMinimMonthlyInput}
-                      onChange={handleDpMinimMonthlyChange}
-                      onBlur={handleDpMinimMonthlyBlur}
-                      disabled={!price || !dpMinimBaseMonthly}
+                      value={dpMinimDpInput}
+                      onChange={handleDpMinimDpChange}
+                      onBlur={handleDpMinimDpBlur}
+                      disabled={!price}
                       className="w-full bg-transparent text-[14px] font-bold text-ink outline-none disabled:opacity-60"
-                      placeholder={simPending || simLoading ? "Menghitung..." : ""}
-                      aria-label="Cicilan per bulan DP minim"
+                      aria-label="DP konsumen"
                     />
                   </div>
-                  <input
-                    type="range"
-                    min={minMonthlyAmount}
-                    max={dpMinimSliderMax}
-                    step={10000}
-                    value={dpMinimMonthlyValue || minMonthlyAmount}
-                    onChange={(e) => setDpMinimMonthly(Number(e.target.value))}
-                    disabled={!price || !dpMinimBaseMonthly}
-                    aria-label="Nominal cicilan per bulan DP minim"
-                    className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#E0E7E9] accent-ink disabled:opacity-60"
-                  />
-                  <div className="mt-1.5 flex items-center justify-between text-[10px] font-semibold text-muted">
-                    <span>{formatRupiah(minMonthlyAmount)}</span>
-                    <span>
-                      {dpMinimBaseMonthly > 0 ? formatRupiah(dpMinimSliderMax) : "-"}
-                    </span>
+                  <div className="text-[10px] font-semibold text-muted">
+                    Paling minim {formatRupiah(dpMinimMinDp)} (
+                    {Math.round((1 - dpMinimLtv) * 1000) / 10}% dari harga) —
+                    ubah lalu tekan Hitung.
                   </div>
                 </div>
               </>
