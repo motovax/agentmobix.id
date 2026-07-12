@@ -53,6 +53,14 @@ type UnitMedia =
   | { kind: "image"; id: string; url: string; item: GalleryItem }
   | { kind: "video"; id: string; url: string; item: VideoItem };
 
+type SimTab = "reguler" | "dpminim" | "syariah";
+
+const SIM_TABS: { id: SimTab; label: string }[] = [
+  { id: "reguler", label: "Reguler" },
+  { id: "dpminim", label: "DP Minim" },
+  { id: "syariah", label: "Syariah" },
+];
+
 function maskPersonName(value: string) {
   const words = value.trim().split(/\s+/);
 
@@ -109,6 +117,7 @@ export function UnitDetail() {
   );
 
   const [dpPercent, setDpPercent] = useState(15);
+  const [simTab, setSimTab] = useState<SimTab>("reguler");
   const [simulationMethod, setSimulationMethod] = useState<DsfSimMethod>("DP");
   const [tenor, setTenor] = useState<Tenor>(60);
   const [activeThumb, setActiveThumb] = useState(0);
@@ -206,6 +215,22 @@ export function UnitDetail() {
     simResult.adminFee > 0
       ? simResult.adminFee
       : 5500000;
+  const dpMinimCairMurni =
+    typeof simResult?.netDisbursement === "number" &&
+    Number.isFinite(simResult.netDisbursement) &&
+    simResult.netDisbursement > 0
+      ? simResult.netDisbursement
+      : null;
+  const dpMinimRefund =
+    typeof simResult?.refundSupplier === "number" &&
+    Number.isFinite(simResult.refundSupplier) &&
+    simResult.refundSupplier > 0
+      ? simResult.refundSupplier
+      : null;
+  const dpMinimAllIn =
+    dpMinimCairMurni !== null ? dpMinimCairMurni + (dpMinimRefund ?? 0) : null;
+  const dpMinimTdpKonsumen =
+    dpMinimAllIn !== null && price > 0 ? Math.max(0, price - dpMinimAllIn) : null;
   const canShareSimulation =
     displayDp !== null &&
     displayMonthly !== null &&
@@ -394,6 +419,15 @@ export function UnitDetail() {
     setDpAmountInput(formatDpValue(downPayment(price, nextPercent)));
   }
 
+  function handleSimTabChange(nextTab: SimTab) {
+    if (nextTab === simTab) return;
+    setSimTab(nextTab);
+    if (nextTab === "syariah") return;
+    setSimResult(null);
+    setSimError(false);
+    setSimRunKey((value) => value + 1);
+  }
+
   function handleSimulationMethodChange(e: ChangeEvent<HTMLSelectElement>) {
     const nextMethod = e.target.value as DsfSimMethod;
     setSimulationMethod(nextMethod);
@@ -519,14 +553,16 @@ export function UnitDetail() {
     setSimResult(null);
     setSimError(false);
     setSimLoading(true);
+    const isDpMinim = simTab === "dpminim";
     (async () => {
       const result = await simulateKreditWithSignal(
         {
           unitPrice: price,
-          dpPercent,
-          simulationType: simulationMethod,
-          simulationValue:
-            simulationMethod === "TDP"
+          dpPercent: isDpMinim ? MIN_DP_PERCENT : dpPercent,
+          simulationType: isDpMinim ? "DP" : simulationMethod,
+          simulationValue: isDpMinim
+            ? MIN_DP_PERCENT
+            : simulationMethod === "TDP"
               ? tdpSimulationAmount
               : simulationMethod === "Installment"
                 ? monthlySimulationAmount
@@ -559,6 +595,7 @@ export function UnitDetail() {
     setActiveThumb(0);
     setShowAllThumbs(false);
     setLightbox(false);
+    setSimTab("reguler");
     setSimulationMethod("DP");
     setDpPercent(MIN_DP_PERCENT);
     setDpPercentInput(String(MIN_DP_PERCENT));
@@ -989,23 +1026,42 @@ export function UnitDetail() {
               </span>
             </div>
 
-            <div className="mb-3.5">
-              <label className="mb-1.5 block text-[12px] font-semibold text-mid">
-                Pilih metode
-              </label>
-              <select
-                value={simulationMethod}
-                onChange={handleSimulationMethodChange}
-                className="w-full rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-[13px] font-bold text-ink outline-none"
-                aria-label="Pilih metode simulasi kredit"
-              >
-                <option value="DP">DP</option>
-                <option value="TDP">TDP</option>
-                <option value="Installment">Cicilan</option>
-              </select>
+            <div className="mb-3.5 grid grid-cols-3 gap-1 rounded-full border border-line bg-surface-2 p-1">
+              {SIM_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleSimTabChange(tab.id)}
+                  className={`rounded-full py-2 text-center text-[12px] ${
+                    simTab === tab.id
+                      ? "bg-ink font-bold text-surface"
+                      : "font-semibold text-muted"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
-            {simulationMethod === "DP" && (
+            {simTab === "reguler" && (
+              <div className="mb-3.5">
+                <label className="mb-1.5 block text-[12px] font-semibold text-mid">
+                  Pilih metode
+                </label>
+                <select
+                  value={simulationMethod}
+                  onChange={handleSimulationMethodChange}
+                  className="w-full rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-[13px] font-bold text-ink outline-none"
+                  aria-label="Pilih metode simulasi kredit"
+                >
+                  <option value="DP">DP</option>
+                  <option value="TDP">TDP</option>
+                  <option value="Installment">Cicilan</option>
+                </select>
+              </div>
+            )}
+
+            {simTab === "reguler" && simulationMethod === "DP" && (
               <div className="mb-3.5">
                 <div className="mb-1.5 text-[12px] font-semibold text-mid">
                   DP (Down Payment)
@@ -1054,7 +1110,7 @@ export function UnitDetail() {
               </div>
             )}
 
-            {simulationMethod === "TDP" && (
+            {simTab === "reguler" && simulationMethod === "TDP" && (
               <div className="mb-3.5">
                 <div className="mb-1.5 text-[12px] font-semibold text-mid">
                   Total Bayar Pertama
@@ -1091,7 +1147,7 @@ export function UnitDetail() {
               </div>
             )}
 
-            {simulationMethod === "Installment" && (
+            {simTab === "reguler" && simulationMethod === "Installment" && (
               <div className="mb-3.5">
                 <div className="mb-1.5 text-[12px] font-semibold text-mid">
                   Cicilan per bulan
@@ -1128,37 +1184,62 @@ export function UnitDetail() {
               </div>
             )}
 
-            <div className="mb-3.5">
-              <div className="mb-2 text-[12px] font-semibold text-mid">Tenor (bulan)</div>
-              <div className="grid grid-cols-5 gap-1.5">
-                {TENOR_OPTIONS.map((t) => {
-                  const isActive = t === tenor;
-                  return (
-                    <button
-                      key={t}
-                      onClick={() => setTenor(t)}
-                      className={`rounded-[9px] py-[9px] text-center text-[12px] ${
-                        isActive
-                          ? "border-2 border-ink bg-ink font-bold text-surface"
-                          : "border border-[#D4DEDF] font-semibold text-muted"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  );
-                })}
+            {simTab === "dpminim" && (
+              <div className="mb-3.5 rounded-xl bg-field px-3.5 py-3 text-[11px] leading-[1.5] text-mid">
+                DP kontrak otomatis pakai minimum ({MIN_DP_PERCENT}%). Cair All In =
+                Cair Murni + Refund. TDP Bayar Konsumen = harga cash − Cair All In.
+                Jual DP di atas angka itu, selisihnya jadi insentif tambahan kamu.
               </div>
-            </div>
+            )}
 
-            <button
-              type="button"
-              onClick={runDsfSimulation}
-              disabled={!price || simLoading}
-              className="mb-3 w-full rounded-[12px] bg-ink px-4 py-3 text-[13px] font-extrabold text-surface disabled:bg-ink/35"
-            >
-              {simLoading ? "Menghitung..." : "Hitung"}
-            </button>
+            {simTab !== "syariah" && (
+              <>
+                <div className="mb-3.5">
+                  <div className="mb-2 text-[12px] font-semibold text-mid">Tenor (bulan)</div>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {TENOR_OPTIONS.map((t) => {
+                      const isActive = t === tenor;
+                      return (
+                        <button
+                          key={t}
+                          onClick={() => setTenor(t)}
+                          className={`rounded-[9px] py-[9px] text-center text-[12px] ${
+                            isActive
+                              ? "border-2 border-ink bg-ink font-bold text-surface"
+                              : "border border-[#D4DEDF] font-semibold text-muted"
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
+                <button
+                  type="button"
+                  onClick={runDsfSimulation}
+                  disabled={!price || simLoading}
+                  className="mb-3 w-full rounded-[12px] bg-ink px-4 py-3 text-[13px] font-extrabold text-surface disabled:bg-ink/35"
+                >
+                  {simLoading ? "Menghitung..." : "Hitung"}
+                </button>
+              </>
+            )}
+
+            {simTab === "syariah" && (
+              <div className="rounded-[14px] border border-line bg-surface-2 p-5 text-center">
+                <div className="text-[22px]">🌙</div>
+                <div className="mt-1 text-[14px] font-extrabold text-ink">
+                  Coming Soon
+                </div>
+                <div className="mt-1 text-[12px] leading-[1.5] text-muted">
+                  Simulasi pembiayaan syariah segera hadir di Mobix.
+                </div>
+              </div>
+            )}
+
+            {simTab !== "syariah" && (
             <div
               className={`rounded-[14px] border border-line bg-surface-2 p-4 text-ink transition-opacity ${
                 simLoading ? "opacity-60" : ""
@@ -1187,6 +1268,75 @@ export function UnitDetail() {
                     Hitung ulang
                   </button>
                 </div>
+              ) : simTab === "dpminim" ? (
+                dpMinimAllIn === null ? (
+                  <div className="mt-2.5 border-t border-line pt-2.5">
+                    <div className="text-[13px] font-extrabold text-ink">
+                      Maaf, ada kendala sistem
+                    </div>
+                    <div className="mt-1 text-[11px] leading-[1.5] text-muted">
+                      Data refund belum tersedia dari DSF. Coba hitung ulang simulasi.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={runDsfSimulation}
+                      className="mt-3 rounded-[10px] bg-ink px-3.5 py-2 text-[12px] font-bold text-surface"
+                    >
+                      Hitung ulang
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-2.5 space-y-2.5 border-t border-line pt-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[12px] font-semibold text-mid">
+                        Cair Murni
+                      </div>
+                      <div className="text-right text-[13px] font-extrabold text-ink">
+                        {dpMinimCairMurni !== null ? formatRupiah(dpMinimCairMurni) : "-"}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[12px] font-semibold text-mid">
+                        Refund
+                      </div>
+                      <div className="text-right text-[13px] font-extrabold text-ink">
+                        {dpMinimRefund !== null ? formatRupiah(dpMinimRefund) : "-"}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[12px] font-semibold text-mid">
+                        Cair All In
+                      </div>
+                      <div className="text-right text-[13px] font-extrabold text-ink">
+                        {formatRupiah(dpMinimAllIn)}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[12px] font-semibold text-mid">
+                        TDP Bayar Konsumen
+                      </div>
+                      <div className="text-right text-[15px] font-extrabold text-teal-deep">
+                        {dpMinimTdpKonsumen !== null ? formatRupiah(dpMinimTdpKonsumen) : "-"}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[12px] font-semibold text-mid">
+                        Cicilan/Bulan
+                      </div>
+                      <div className="text-right text-[13px] font-extrabold text-ink">
+                        {displayMonthly ? formatRupiah(displayMonthly) : "-"}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[12px] font-semibold text-mid">
+                        Tenor
+                      </div>
+                      <div className="text-right text-[13px] font-extrabold text-ink">
+                        {tenor} Bulan
+                      </div>
+                    </div>
+                  </div>
+                )
               ) : (
                 <div className="mt-2.5 space-y-2.5 border-t border-line pt-2.5">
                   <div className="flex items-center justify-between gap-3">
@@ -1232,6 +1382,7 @@ export function UnitDetail() {
                 </div>
               )}
             </div>
+            )}
             <p className="m-0 mt-2 text-[11px] text-muted">
               Simulasi, syarat &amp; ketentuan berlaku. Komisi bersifat estimasi.
             </p>

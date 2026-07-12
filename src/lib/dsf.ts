@@ -15,6 +15,8 @@ export interface DsfSimResult {
   rateEffectiveTwoDigitPercent: string;
   adminFee: number;
   disclaimer: string[];
+  netDisbursement: number;
+  refundSupplier: number;
 }
 
 export type DsfSimMethod = "DP" | "TDP" | "Installment";
@@ -31,8 +33,11 @@ interface DsfAllParamsData {
   rateEffectiveTwoDigitPercent: string;
   adminFee: number;
   disclaimer?: string[];
+  netDisbursement?: number;
   refund?: {
     allInToSupplier?: number;
+    netDisbursement?: number;
+    refundSupplier?: number;
   };
 }
 
@@ -137,6 +142,8 @@ export async function simulateKreditWithSignal(
       rateEffectiveTwoDigitPercent: d.rateEffectiveTwoDigitPercent,
       adminFee: d.adminFee,
       disclaimer: d.disclaimer ?? [],
+      netDisbursement: d.netDisbursement ?? d.refund?.netDisbursement ?? 0,
+      refundSupplier: d.refund?.refundSupplier ?? 0,
     };
   } catch {
     return null;
