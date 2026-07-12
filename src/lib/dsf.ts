@@ -150,6 +150,52 @@ export async function simulateKreditWithSignal(
   }
 }
 
+/**
+ * Cari OTR kredit (markup di atas harga cash) yang menghasilkan cicilan
+ * mendekati target, dengan DP tetap di persentase yang diberikan. Cicilan
+ * DSF ~linear terhadap unit price, jadi iterasi proporsional konvergen cepat.
+ * `seedInstallment` = cicilan di harga cash (hemat satu call kalau diketahui).
+ */
+export async function findAllParamsForInstallment(
+  params: DsfSimParams,
+  targetInstallment: number,
+  seedInstallment?: number,
+  signal?: AbortSignal,
+): Promise<DsfSimResult | null> {
+  const cashPrice = params.unitPrice;
+  if (!cashPrice || !targetInstallment) return null;
+
+  const clampPrice = (value: number) =>
+    Math.min(
+      Math.max(Math.round(value / 1000) * 1000, cashPrice),
+      cashPrice * 4,
+    );
+
+  let price =
+    seedInstallment && seedInstallment > 0
+      ? clampPrice((cashPrice * targetInstallment) / seedInstallment)
+      : cashPrice;
+  let best: DsfSimResult | null = null;
+
+  for (let i = 0; i < 6; i += 1) {
+    const result = await simulateKreditWithSignal(
+      { ...params, unitPrice: price },
+      signal,
+    );
+    if (!result || !(result.installmentRounded > 0)) return best;
+    best = { ...result, hargaKredit: price };
+    if (Math.abs(result.installmentRounded - targetInstallment) <= 5000) {
+      return best;
+    }
+    const next = clampPrice(
+      (price * targetInstallment) / result.installmentRounded,
+    );
+    if (next === price) return best;
+    price = next;
+  }
+  return best;
+}
+
 export interface DsfCreditPriceResult {
   unitPrice: number;
   allInToSupplier: number;

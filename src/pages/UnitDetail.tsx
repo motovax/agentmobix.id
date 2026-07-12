@@ -29,6 +29,7 @@ import {
   type Tenor,
 } from "../lib/installment";
 import {
+  findAllParamsForInstallment,
   resolveSmartCreditPrice,
   simulateKreditWithSignal,
   type DsfSimMethod,
@@ -131,7 +132,7 @@ export function UnitDetail() {
   const [monthlyAmountInput, setMonthlyAmountInput] = useState("");
   const [dpMinimMonthly, setDpMinimMonthly] = useState(0);
   const [dpMinimMonthlyInput, setDpMinimMonthlyInput] = useState("");
-  const [dpMinimMaxMonthly, setDpMinimMaxMonthly] = useState(0);
+  const [dpMinimBaseMonthly, setDpMinimBaseMonthly] = useState(0);
   const [builderPrice, setBuilderPrice] = useState(0);
   const [builderPriceInput, setBuilderPriceInput] = useState("");
   const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
@@ -234,8 +235,19 @@ export function UnitDetail() {
     dpMinimCairMurni !== null ? dpMinimCairMurni + (dpMinimRefund ?? 0) : null;
   const dpMinimTdpKonsumen =
     dpMinimAllIn !== null && price > 0 ? Math.max(0, price - dpMinimAllIn) : null;
-  const dpMinimSliderMax = dpMinimMaxMonthly > 0 ? dpMinimMaxMonthly : maxMonthlyAmount;
-  const dpMinimMonthlyValue = dpMinimMonthly > 0 ? dpMinimMonthly : dpMinimMaxMonthly;
+  const dpMinimSliderMax =
+    dpMinimBaseMonthly > 0
+      ? Math.floor((dpMinimBaseMonthly * 2) / 10000) * 10000
+      : maxMonthlyAmount;
+  const dpMinimMonthlyValue = dpMinimMonthly > 0 ? dpMinimMonthly : dpMinimBaseMonthly;
+  const dpMinimSisaCair =
+    dpMinimAllIn !== null && price > 0 ? Math.max(0, dpMinimAllIn - price) : null;
+  const dpMinimOtrKredit =
+    typeof simResult?.hargaKredit === "number" &&
+    Number.isFinite(simResult.hargaKredit) &&
+    simResult.hargaKredit > price + 999
+      ? simResult.hargaKredit
+      : null;
   const canShareSimulation =
     displayDp !== null &&
     displayMonthly !== null &&
@@ -280,7 +292,7 @@ export function UnitDetail() {
     setMonthlyAmount(0);
     setMonthlyAmountInput("");
     setDpMinimMonthly(0);
-    setDpMinimMaxMonthly(0);
+    setDpMinimBaseMonthly(0);
     setSimResult(null);
     setSimError(false);
     setSmartCreditPrice(null);
@@ -354,9 +366,9 @@ export function UnitDetail() {
       return;
     }
     setDpMinimMonthlyInput(
-      dpMinimMaxMonthly > 0 ? formatDpValue(dpMinimMaxMonthly) : "",
+      dpMinimBaseMonthly > 0 ? formatDpValue(dpMinimBaseMonthly) : "",
     );
-  }, [dpMinimMonthly, dpMinimMaxMonthly]);
+  }, [dpMinimMonthly, dpMinimBaseMonthly]);
 
   useEffect(() => {
     if (simulationMethod === "TDP" && !tdpAmount && displayTdp) {
@@ -440,7 +452,7 @@ export function UnitDetail() {
     if (nextTab === simTab) return;
     setSimTab(nextTab);
     setDpMinimMonthly(0);
-    setDpMinimMaxMonthly(0);
+    setDpMinimBaseMonthly(0);
     if (nextTab === "syariah") return;
     setSimResult(null);
     setSimError(false);
@@ -451,7 +463,7 @@ export function UnitDetail() {
     setTenor(nextTenor);
     if (simTab === "dpminim") {
       setDpMinimMonthly(0);
-      setDpMinimMaxMonthly(0);
+      setDpMinimBaseMonthly(0);
     }
   }
 
@@ -466,7 +478,7 @@ export function UnitDetail() {
 
   function handleDpMinimMonthlyBlur() {
     const parsed = parseCurrencyInput(dpMinimMonthlyInput);
-    const fallback = dpMinimMonthly > 0 ? dpMinimMonthly : dpMinimSliderMax;
+    const fallback = dpMinimMonthly > 0 ? dpMinimMonthly : dpMinimBaseMonthly;
     const nextAmount = clampValue(
       parsed || fallback,
       minMonthlyAmount,
@@ -603,32 +615,52 @@ export function UnitDetail() {
     setSimLoading(true);
     const isDpMinim = simTab === "dpminim";
     const dpMinimUseInstallment = isDpMinim && dpMinimMonthly > 0;
+    const dpMinimUseMarkup =
+      dpMinimUseInstallment &&
+      dpMinimBaseMonthly > 0 &&
+      dpMinimMonthly > dpMinimBaseMonthly;
     (async () => {
-      const result = await simulateKreditWithSignal(
-        {
-          unitPrice: price,
-          dpPercent: isDpMinim ? MIN_DP_PERCENT : dpPercent,
-          simulationType: isDpMinim
-            ? dpMinimUseInstallment
-              ? "Installment"
-              : "DP"
-            : simulationMethod,
-          simulationValue: isDpMinim
-            ? dpMinimUseInstallment
-              ? dpMinimMonthly
-              : MIN_DP_PERCENT
-            : simulationMethod === "TDP"
-              ? tdpSimulationAmount
-              : simulationMethod === "Installment"
-                ? monthlySimulationAmount
-                : dpPercent,
-          tenor,
-          brand: unit?.brand,
-          model: unit?.type,
-          year: unit?.year,
-        },
-        controller.signal,
-      );
+      const result = dpMinimUseMarkup
+        ? await findAllParamsForInstallment(
+            {
+              unitPrice: price,
+              dpPercent: MIN_DP_PERCENT,
+              simulationType: "DP",
+              simulationValue: MIN_DP_PERCENT,
+              tenor,
+              brand: unit?.brand,
+              model: unit?.type,
+              year: unit?.year,
+            },
+            dpMinimMonthly,
+            dpMinimBaseMonthly,
+            controller.signal,
+          )
+        : await simulateKreditWithSignal(
+            {
+              unitPrice: price,
+              dpPercent: isDpMinim ? MIN_DP_PERCENT : dpPercent,
+              simulationType: isDpMinim
+                ? dpMinimUseInstallment
+                  ? "Installment"
+                  : "DP"
+                : simulationMethod,
+              simulationValue: isDpMinim
+                ? dpMinimUseInstallment
+                  ? dpMinimMonthly
+                  : MIN_DP_PERCENT
+                : simulationMethod === "TDP"
+                  ? tdpSimulationAmount
+                  : simulationMethod === "Installment"
+                    ? monthlySimulationAmount
+                    : dpPercent,
+              tenor,
+              brand: unit?.brand,
+              model: unit?.type,
+              year: unit?.year,
+            },
+            controller.signal,
+          );
       if (!alive) return;
       setSimResult(result);
       setSimError(result === null);
@@ -640,7 +672,7 @@ export function UnitDetail() {
         Number.isFinite(result.installmentRounded) &&
         result.installmentRounded > 0
       ) {
-        setDpMinimMaxMonthly(result.installmentRounded);
+        setDpMinimBaseMonthly(result.installmentRounded);
       }
     })();
     return () => {
@@ -670,7 +702,7 @@ export function UnitDetail() {
     setMonthlyAmount(0);
     setMonthlyAmountInput("");
     setDpMinimMonthly(0);
-    setDpMinimMaxMonthly(0);
+    setDpMinimBaseMonthly(0);
     setSimResult(null);
     setSimError(false);
     setSmartCreditPrice(null);
@@ -1253,10 +1285,11 @@ export function UnitDetail() {
             {simTab === "dpminim" && (
               <>
                 <div className="mb-3.5 rounded-xl bg-field px-3.5 py-3 text-[11px] leading-[1.5] text-mid">
-                  Default sudah di posisi DP paling minim (cicilan maksimum).
-                  Turunkan cicilan kalau konsumen minta angsuran ringan — TDP
-                  bayar konsumen ikut naik. Jual DP di atas angka TDP, selisihnya
-                  jadi insentif tambahan kamu.
+                  Default di posisi DP paling minim pada harga cash. Turunkan
+                  cicilan → TDP bayar konsumen naik. Naikkan cicilan → OTR kredit
+                  di-markup otomatis, Cair All In makin tinggi, TDP bisa sampai 0
+                  dan sisanya cair sebagai dana tunai. Jual DP di atas angka TDP,
+                  selisihnya jadi insentif tambahan kamu.
                 </div>
                 <div className="mb-3.5">
                   <div className="mb-1.5 text-[12px] font-semibold text-mid">
@@ -1270,7 +1303,7 @@ export function UnitDetail() {
                       value={dpMinimMonthlyInput}
                       onChange={handleDpMinimMonthlyChange}
                       onBlur={handleDpMinimMonthlyBlur}
-                      disabled={!price || !dpMinimMaxMonthly}
+                      disabled={!price || !dpMinimBaseMonthly}
                       className="w-full bg-transparent text-[14px] font-bold text-ink outline-none disabled:opacity-60"
                       placeholder={simPending || simLoading ? "Menghitung..." : ""}
                       aria-label="Cicilan per bulan DP minim"
@@ -1283,14 +1316,14 @@ export function UnitDetail() {
                     step={10000}
                     value={dpMinimMonthlyValue || minMonthlyAmount}
                     onChange={(e) => setDpMinimMonthly(Number(e.target.value))}
-                    disabled={!price || !dpMinimMaxMonthly}
+                    disabled={!price || !dpMinimBaseMonthly}
                     aria-label="Nominal cicilan per bulan DP minim"
                     className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#E0E7E9] accent-ink disabled:opacity-60"
                   />
                   <div className="mt-1.5 flex items-center justify-between text-[10px] font-semibold text-muted">
                     <span>{formatRupiah(minMonthlyAmount)}</span>
                     <span>
-                      {dpMinimMaxMonthly > 0 ? formatRupiah(dpMinimMaxMonthly) : "-"}
+                      {dpMinimBaseMonthly > 0 ? formatRupiah(dpMinimSliderMax) : "-"}
                     </span>
                   </div>
                 </div>
@@ -1392,6 +1425,16 @@ export function UnitDetail() {
                   </div>
                 ) : (
                   <div className="mt-2.5 space-y-2.5 border-t border-line pt-2.5">
+                    {dpMinimOtrKredit !== null && (
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-[12px] font-semibold text-mid">
+                          OTR Kredit
+                        </div>
+                        <div className="text-right text-[13px] font-extrabold text-ink">
+                          {formatRupiah(dpMinimOtrKredit)}
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-[12px] font-semibold text-mid">
                         Cair Murni
@@ -1424,6 +1467,16 @@ export function UnitDetail() {
                         {dpMinimTdpKonsumen !== null ? formatRupiah(dpMinimTdpKonsumen) : "-"}
                       </div>
                     </div>
+                    {dpMinimSisaCair !== null && dpMinimSisaCair > 0 && (
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-[12px] font-semibold text-mid">
+                          Sisa Cair (Dana Tunai)
+                        </div>
+                        <div className="text-right text-[13px] font-extrabold text-teal-deep">
+                          {formatRupiah(dpMinimSisaCair)}
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-[12px] font-semibold text-mid">
                         Cicilan/Bulan
