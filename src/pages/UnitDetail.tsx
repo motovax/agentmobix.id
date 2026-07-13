@@ -1087,7 +1087,7 @@ export function UnitDetail() {
               )}
               {simTab === "dpminim" ? (
                 <div className="mt-1 text-[12px] font-semibold text-teal-deep">
-                  DP Konsumen : {shareDp !== null ? formatRupiah(shareDp) : "Hitung DP Minim dulu"}
+                  TDP Konsumen : {shareDp !== null ? formatRupiah(shareDp) : "Hitung DP Minim dulu"}
                 </div>
               ) : smartCreditPriceLoading ? (
                 <div className="mt-1 text-[12px] font-semibold text-muted">
@@ -1395,7 +1395,7 @@ export function UnitDetail() {
                             </span>
                           </div>
                           <div className="flex items-center justify-between gap-2 text-[11px]">
-                            <span className="font-semibold text-muted">DP Konsumen</span>
+                            <span className="font-semibold text-muted">TDP Konsumen</span>
                             <span className="text-[13px] font-extrabold text-teal-deep">
                               {pending ? "..." : rowDp !== null ? formatRupiah(rowDp) : "-"}
                             </span>
@@ -1419,7 +1419,7 @@ export function UnitDetail() {
 
                 <div className="mb-3.5">
                   <div className="mb-1.5 text-[12px] font-semibold text-mid">
-                    DP Konsumen (Rp)
+                    TDP Konsumen (Rp)
                   </div>
                   <div className="mb-1 flex items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
                     <span className="pr-2 text-[13px] font-semibold text-muted">Rp</span>
@@ -1634,7 +1634,7 @@ export function UnitDetail() {
             )}
             <p className="m-0 mt-2 text-[11px] text-muted">
               {simTab === "dpminim"
-                ? "Disclaimer: DP Konsumen khusus opsi DP Minim. Simulasi, syarat & ketentuan berlaku. Komisi bersifat estimasi."
+                ? "Disclaimer: TDP Konsumen khusus opsi DP Minim. Simulasi, syarat & ketentuan berlaku. Komisi bersifat estimasi."
                 : "Simulasi, syarat & ketentuan berlaku. Komisi bersifat estimasi."}
             </p>
           </div>

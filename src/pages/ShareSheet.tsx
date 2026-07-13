@@ -375,7 +375,7 @@ export function ShareSheet() {
   const shareCreditPrice = positiveParamNumber(searchParams, "harga_kredit") ?? unit?.harga_kredit ?? null;
   const sharePrice = positiveParamNumber(searchParams, "harga") ?? unit?.harga ?? 0;
   const captionPrice = isDpMinimShare ? sharePrice : (shareCreditPrice ?? sharePrice ?? unit?.harga ?? 0);
-  const paymentLabel = isDpMinimShare ? "DP Konsumen" : "TDP";
+  const paymentLabel = isDpMinimShare ? "TDP Konsumen" : "TDP";
   const paymentValue = isDpMinimShare && shareDp ? shareDp : shareTdp;
   const shareCommission =
     positiveParamNumber(searchParams, "komisi") ??
@@ -806,7 +806,7 @@ export function ShareSheet() {
                     {!isDpMinimShare && shareCreditPrice && shareDp && " · "}
                     {shareDp && (
                       <>
-                        {isDpMinimShare ? "DP Konsumen" : "DP"} {formatRupiah(shareDp)}
+                        {isDpMinimShare ? "TDP Konsumen" : "DP"} {formatRupiah(shareDp)}
                         {shareDpPercent && ` (${Math.round(shareDpPercent * 10) / 10}%)`}
                       </>
                     )}
