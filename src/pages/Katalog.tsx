@@ -16,6 +16,17 @@ import { useAsync } from "../lib/useAsync";
 
 const LIMIT = 12;
 
+function catalogErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (/cannot scan NULL|can't scan into dest/i.test(message)) {
+    return "Kategori ini belum bisa dimuat karena ada data produk yang belum lengkap di API Mobix.";
+  }
+  if (/Mobix API 5\d\d/i.test(message)) {
+    return "Mobix API sedang bermasalah. Coba lagi beberapa saat.";
+  }
+  return message || "Gagal memuat katalog";
+}
+
 export function Katalog() {
   // "" = Semua; otherwise a live category code from /daftar-kategori
   const [activeCat, setActiveCat] = useState("");
@@ -73,7 +84,11 @@ export function Katalog() {
       })
       .catch((e: unknown) => {
         if (!alive) return;
-        setError(e instanceof Error ? e.message : "Gagal memuat katalog");
+        setItems([]);
+        setTotal(0);
+        setTotalPages(1);
+        setPage(1);
+        setError(catalogErrorMessage(e));
         setLoading(false);
       });
     return () => {

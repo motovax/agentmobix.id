@@ -322,9 +322,27 @@ export interface CabangDetail {
   stok_ready: number;
 }
 
+function isNullableScanError(error: unknown) {
+  return error instanceof Error && /cannot scan NULL|can't scan into dest/i.test(error.message);
+}
+
 /** Live filter values (GET endpoints, see /docs). */
 export async function fetchCategories(): Promise<string[]> {
-  return (await get<string[]>("/daftar-kategori")).data ?? [];
+  const categories = (await get<string[]>("/daftar-kategori")).data ?? [];
+  const checks = await Promise.allSettled(
+    categories.map((category) =>
+      post<ProductListItem[]>("/daftar-produk", buildListBody({
+        page: 1,
+        limit: 1,
+        kategori: [category],
+      })),
+    ),
+  );
+
+  return categories.filter((_, index) => {
+    const check = checks[index];
+    return check.status === "fulfilled" || !isNullableScanError(check.reason);
+  });
 }
 export async function fetchBrands(): Promise<string[]> {
   return (await get<string[]>("/daftar-merek")).data ?? [];
@@ -367,10 +385,6 @@ function buildListBody(req: ListRequest) {
     limit: 12,
     ...req,
   };
-}
-
-function isNullableScanError(error: unknown) {
-  return error instanceof Error && /cannot scan NULL|can't scan into dest/i.test(error.message);
 }
 
 async function fetchUnitsByCategoryFallback(req: ListRequest): Promise<ListResult> {
