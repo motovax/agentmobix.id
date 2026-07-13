@@ -62,8 +62,7 @@ const SIM_TABS: { id: SimTab; label: string }[] = [
   { id: "syariah", label: "Syariah" },
 ];
 
-// All In Max = persen dari harga cash per tenor (pola paket leasing:
-// ~95% @60bln, 92,5% @48bln, 90% @36bln; 12/24 ekstrapolasi langkah 2,5%).
+// Target pencairan leasing DP Minim per tenor.
 const DP_MINIM_ALL_IN_PERCENT: Record<Tenor, number> = {
   12: 0.85,
   24: 0.875,
@@ -71,12 +70,12 @@ const DP_MINIM_ALL_IN_PERCENT: Record<Tenor, number> = {
   48: 0.925,
   60: 0.95,
 };
-const DP_MINIM_TABLE_TENORS: Tenor[] = [60, 48, 36];
+const DP_MINIM_TABLE_TENORS: Tenor[] = [60, 48, 36, 24, 12];
 
 type DpMinimRow = { tenor: Tenor; result: DsfSimResult | null };
 
 function dpMinimInstallmentCount(tenor: Tenor) {
-  return Math.max(1, tenor - 1);
+  return tenor;
 }
 
 function maskPersonName(value: string) {
@@ -236,8 +235,8 @@ export function UnitDetail() {
       : typeof smartCreditPrice === "number" &&
           Number.isFinite(smartCreditPrice) &&
           smartCreditPrice > 0
-      ? smartCreditPrice
-      : null;
+        ? smartCreditPrice
+        : null;
   const hasCreditPriceIssue =
     price > 0 && !smartCreditPriceLoading && creditPriceForDisplay === null;
   const displayAdminFee =
@@ -284,11 +283,10 @@ export function UnitDetail() {
   const shareHref = canShareSimulation
     ? `/share?${new URLSearchParams({
         u: unit?.slug ?? slug ?? "",
-        ...(simulationMethod === "TDP" ? { sim: "dpminim" } : {}),
+        sim: simTab,
         harga: String(Math.round(price)),
         komisi: String(Math.round(estimatedCommission)),
         tenor: String(shareTenor),
-        sim: simTab,
         dp_pct: String(Math.round(shareDpPercent * 10) / 10),
         dp: String(Math.round(shareDp)),
         ...(simTab !== "dpminim" && creditPriceForDisplay
@@ -298,7 +296,6 @@ export function UnitDetail() {
         tdp: String(Math.round(shareTdp)),
       }).toString()}`
     : null;
-
   function formatDpValue(value: number) {
     return currencyFormatter.format(Math.max(0, Math.round(value || 0)));
   }
@@ -654,7 +651,7 @@ export function UnitDetail() {
               dpPercent: MIN_DP_PERCENT,
               simulationType: "DP",
               simulationValue: MIN_DP_PERCENT,
-              paymentType: "ADDM",
+              paymentType: "ADDB",
               tenor,
               brand: unit?.brand,
               model: unit?.type,
@@ -695,6 +692,13 @@ export function UnitDetail() {
     unit?.brand,
     unit?.type,
     unit?.year,
+    simTab,
+    simulationMethod,
+    dpPercent,
+    tdpAmount,
+    monthlyAmount,
+    tenor,
+    dpMinimDp,
     simRunKey,
   ]);
 
@@ -717,7 +721,7 @@ export function UnitDetail() {
               dpPercent: MIN_DP_PERCENT,
               simulationType: "DP",
               simulationValue: MIN_DP_PERCENT,
-              paymentType: "ADDM",
+              paymentType: "ADDB",
               tenor: rowTenor,
               brand: unit?.brand,
               model: unit?.type,
@@ -1344,10 +1348,8 @@ export function UnitDetail() {
             {simTab === "dpminim" && (
               <>
                 <div className="mb-3.5 rounded-xl bg-field px-3.5 py-3 text-[11px] leading-[1.5] text-mid">
-                  All In Max = plafon pencairan leasing per tenor. DP konsumen =
-                  harga cash − cair all in. Jual DP di atas angka itu, selisihnya
-                  jadi insentif tambahan kamu. Pilih tenor di tabel, atau atur DP
-                  sendiri lalu tekan Hitung.
+                  Pilih tenor di tabel untuk melihat opsi DP minimum dan angsuran.
+                  Kamu juga bisa atur DP konsumen sendiri lalu tekan Hitung.
                 </div>
 
                 <div className="mb-3.5 overflow-hidden rounded-[14px] border border-line">
@@ -1384,7 +1386,7 @@ export function UnitDetail() {
                         </div>
                         <div className="space-y-0.5">
                           <div className="flex items-center justify-between gap-2 text-[11px]">
-                            <span className="font-semibold text-muted">All In Max</span>
+                            <span className="font-semibold text-muted">Cair Leasing</span>
                             <span className="font-bold text-ink">
                               {pending ? "Menghitung..." : formatRupiah(rowTargetAllIn)}
                             </span>

@@ -384,21 +384,28 @@ export function ShareSheet() {
   const sharePrice = positiveParamNumber(searchParams, "harga") ?? unit?.harga ?? 0;
   const captionPrice = shareCreditPrice ?? sharePrice ?? unit?.harga ?? 0;
   const shouldHidePriceInCaption = isDpMinimShare;
+  const packageTitle = isDpMinimShare ? "DP Minim" : "Kredit";
   const paymentLabel = isDpMinimShare ? "TDP Konsumen" : "TDP";
   const paymentValue = isDpMinimShare && shareDp ? shareDp : shareTdp;
   const shareCommission =
     positiveParamNumber(searchParams, "komisi") ??
     (unit && sharePrice ? estimateBuilderCommission(unit.harga, sharePrice) : 0);
   const autoCaption = unit
-    ? `${unit.nama}, KM ${Math.round(
-        unit.odometer / 1000,
-      )}rb. ${
-        shouldHidePriceInCaption ? "" : `Harga ${formatRupiah(captionPrice)}. `
-      }Cukup TDP ${formatJt(shareTdp)}, cicilan ${formatJt(
-        shareCicilan,
-      )}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${titleCase(
-        unit.lokasi || "Mobix",
-      )}, bisa cek langsung. Chat saya ya 🙌`
+    ? isDpMinimShare
+      ? `${unit.nama}, KM ${Math.round(
+          unit.odometer / 1000,
+        )}rb. Paket DP Minim ${formatJt(paymentValue)}, cicilan ${formatJt(
+          shareCicilan,
+        )}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${titleCase(
+          unit.lokasi || "Mobix",
+        )}, bisa cek langsung. Chat saya ya`
+      : `${unit.nama}, KM ${Math.round(
+          unit.odometer / 1000,
+        )}rb. Harga ${formatRupiah(captionPrice)}. Cukup TDP ${formatJt(shareTdp)}, cicilan ${formatJt(
+          shareCicilan,
+        )}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${titleCase(
+          unit.lokasi || "Mobix",
+        )}, bisa cek langsung. Chat saya ya`
     : "";
 
   // init when unit loads
@@ -577,7 +584,9 @@ export function ShareSheet() {
     const km = `${Math.round(unit.odometer / 1000)}rb`;
     const tdp = formatJt(shareTdp);
     const installment = formatJt(shareCicilan);
-    const creditPackage = `TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan`;
+    const creditPackage = isDpMinimShare
+      ? `paket DP Minim ${formatJt(paymentValue)}, cicilan ${installment}/bln tenor ${shareTenor} bulan`
+      : `TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan`;
     const packageWithPrice = shouldHidePriceInCaption
       ? creditPackage
       : `harga kredit ${formatRupiah(captionPrice)}, ${creditPackage}`;
@@ -627,7 +636,7 @@ export function ShareSheet() {
         dp_pct: shareDpPercent ?? undefined,
         caption_saat_ini: captionText || autoCaption,
         style_hint: shouldHidePriceInCaption
-          ? `${styleHint} Do not mention any vehicle price or credit price; mention only TDP, installment, and tenor for the credit package.`
+          ? `${styleHint} Do not mention any vehicle price or credit price; mention paket DP Minim or TDP konsumen, installment, and tenor only.`
           : styleHint,
       });
       setCaptionText(shouldHidePriceInCaption ? stripPriceFromCaption(aiCaption) : aiCaption);
@@ -644,7 +653,7 @@ export function ShareSheet() {
   function handleShare() {
     const share = async () => {
       const caption = captionText.trim();
-      const title = unit?.nama ?? "Mobix";
+      const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
 
       if (pendingShareStep) {
         const shared = await sharePreparedFiles(
@@ -807,7 +816,7 @@ export function ShareSheet() {
               <>
                 <div className="text-[14px] font-bold">{unit.nama}</div>
                 <div className="mt-0.5 text-[12px] text-muted">
-                  Cicilan dari {formatRupiah(shareCicilan)}/bln · {shareTenor} bln ·{" "}
+                  {packageTitle} {formatRupiah(shareTdp)} · Cicilan {formatRupiah(shareCicilan)}/bln · {shareTenor} bln ·{" "}
                   {titleCase(unit.lokasi || "Mobix")}
                 </div>
                 {(shareCreditPrice || shareDp) && (
