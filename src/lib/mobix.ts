@@ -174,6 +174,11 @@ function plateAreaPrefix(q: string): string {
   return area ? `${area}%` : q;
 }
 
+function plateCandidateQuery(q: string): string {
+  const normalized = normalizePlateValue(q);
+  return normalized.length < 4 ? normalizePlateQuery(normalized) : plateAreaPrefix(normalized);
+}
+
 function levenshteinDistance(a: string, b: string): number {
   const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
   const curr = Array<number>(b.length + 1);
@@ -406,9 +411,10 @@ async function fetchUnitsByFuzzyPlate(req: ListRequest): Promise<ListResult> {
   const offset = (page - 1) * limit;
   const env = await post<ProductListItem[]>("/daftar-produk", buildListBody({
     ...req,
+    ada_foto: true,
     page: 1,
     limit: PLATE_FUZZY_CANDIDATE_LIMIT,
-    plate_no: plateAreaPrefix(query),
+    plate_no: plateCandidateQuery(query),
   }));
 
   const ranked = (env.data ?? [])
