@@ -70,7 +70,7 @@ const DP_MINIM_ALL_IN_PERCENT: Record<Tenor, number> = {
   48: 0.925,
   60: 0.95,
 };
-const DP_MINIM_TABLE_TENORS: Tenor[] = [60, 48, 36, 24, 12];
+const DP_MINIM_TABLE_TENORS: Tenor[] = [60, 48, 36];
 
 type DpMinimRow = { tenor: Tenor; result: DsfSimResult | null };
 
@@ -475,6 +475,9 @@ export function UnitDetail() {
     if (nextTab === simTab) return;
     setSimTab(nextTab);
     setDpMinimDp(0);
+    if (nextTab === "dpminim" && !DP_MINIM_TABLE_TENORS.includes(tenor)) {
+      setTenor(DP_MINIM_TABLE_TENORS[0]);
+    }
     if (nextTab === "syariah") return;
     setSimResult(null);
     setSimError(false);
@@ -1452,8 +1455,8 @@ export function UnitDetail() {
                   <div className="mb-2 text-[12px] font-semibold text-mid">
                     {simTab === "dpminim" ? "Jumlah angsuran" : "Tenor (bulan)"}
                   </div>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {TENOR_OPTIONS.map((t) => {
+                  <div className={`grid gap-1.5 ${simTab === "dpminim" ? "grid-cols-3" : "grid-cols-5"}`}>
+                    {(simTab === "dpminim" ? DP_MINIM_TABLE_TENORS : TENOR_OPTIONS).map((t) => {
                       const isActive = t === tenor;
                       return (
                         <button
