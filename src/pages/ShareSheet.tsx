@@ -366,6 +366,7 @@ export function ShareSheet() {
     : isMixedMediaSelected
       ? "Share bertahap: video dulu"
       : "Bagikan Sekarang";
+  const isDpMinimShare = searchParams.get("sim") === "dpminim";
   const shareTenor = positiveParamNumber(searchParams, "tenor") ?? 60;
   const shareTdp = positiveParamNumber(searchParams, "tdp") ?? unit?.tdp ?? 0;
   const shareCicilan = positiveParamNumber(searchParams, "cicilan") ?? unit?.cicilan ?? 0;
@@ -373,14 +374,16 @@ export function ShareSheet() {
   const shareDpPercent = positiveParamNumber(searchParams, "dp_pct") ?? null;
   const shareCreditPrice = positiveParamNumber(searchParams, "harga_kredit") ?? unit?.harga_kredit ?? null;
   const sharePrice = positiveParamNumber(searchParams, "harga") ?? unit?.harga ?? 0;
-  const captionPrice = shareCreditPrice ?? sharePrice ?? unit?.harga ?? 0;
+  const captionPrice = isDpMinimShare ? sharePrice : (shareCreditPrice ?? sharePrice ?? unit?.harga ?? 0);
+  const paymentLabel = isDpMinimShare ? "DP Konsumen" : "TDP";
+  const paymentValue = isDpMinimShare && shareDp ? shareDp : shareTdp;
   const shareCommission =
     positiveParamNumber(searchParams, "komisi") ??
     (unit && sharePrice ? estimateBuilderCommission(unit.harga, sharePrice) : 0);
   const autoCaption = unit
-    ? `${unit.nama} tangan pertama, KM ${Math.round(
+    ? `${unit.nama}, KM ${Math.round(
         unit.odometer / 1000,
-      )}rb. Harga ${formatRupiah(captionPrice)}. Cukup TDP ${formatJt(shareTdp)}, cicilan ${formatJt(
+      )}rb. Harga ${formatRupiah(captionPrice)}. ${paymentLabel} ${formatJt(paymentValue)}, cicilan ${formatJt(
         shareCicilan,
       )}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${titleCase(
         unit.lokasi || "Mobix",
@@ -562,7 +565,7 @@ export function ShareSheet() {
     const branch = titleCase(unit.lokasi || "Mobix");
     const km = `${Math.round(unit.odometer / 1000)}rb`;
     const creditPrice = formatRupiah(captionPrice);
-    const tdp = formatJt(shareTdp);
+    const payment = formatJt(paymentValue);
     const installment = formatJt(shareCicilan);
     const category =
       unit.category && unit.category.length <= 4
@@ -582,14 +585,20 @@ export function ShareSheet() {
       `KM ${km}`,
     ].filter(Boolean).join(", ");
 
-    const variants = [
-      `${unit.nama}${colorInfo}, KM ${km}, incaran menarik buat yang mau ${category} siap dilirik. Harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan; ready di ${branch}, chat saya untuk cek unit.`,
-      `Mau ${category} yang paketnya jelas? ${unit.nama} ready di ${branch}: harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Minat, langsung chat saya.`,
-      `${unit.nama} opsi manis buat upgrade tanpa ribet: ${specs}. Harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan; cek unitnya di ${branch}.`,
-      `${unit.nama}${colorInfo} cepat bikin orang melirik, apalagi paketnya sudah jelas: harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Chat saya kalau mau cek.`,
-      `${unit.nama} ready di ${branch}, paket kreditnya ringan buat mulai dilirik: harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan.${dpInfo} Mau saya bantu cek unit?`,
-      `Cari ${category} praktis dan menarik? ${unit.nama}${colorInfo}, KM ${km}, bisa jadi pilihan pas dengan harga kredit ${creditPrice}, TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan.`,
-    ];
+    const variants = isDpMinimShare
+      ? [
+          `${unit.nama}${colorInfo}, KM ${km}, ready di ${branch}. ${paymentLabel} ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Chat saya untuk cek unitnya.`,
+          `Mau ${category} dengan paket DP minim? ${unit.nama} ready di ${branch}: ${paymentLabel} ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan.`,
+          `${unit.nama} opsi menarik buat upgrade: ${specs}. ${paymentLabel} ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan; cek unitnya di ${branch}.`,
+        ]
+      : [
+          `${unit.nama}${colorInfo}, KM ${km}, incaran menarik buat yang mau ${category} siap dilirik. Harga kredit ${creditPrice}, TDP ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan; ready di ${branch}, chat saya untuk cek unit.`,
+          `Mau ${category} yang paketnya jelas? ${unit.nama} ready di ${branch}: harga kredit ${creditPrice}, TDP ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Minat, langsung chat saya.`,
+          `${unit.nama} opsi manis buat upgrade tanpa ribet: ${specs}. Harga kredit ${creditPrice}, TDP ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan; cek unitnya di ${branch}.`,
+          `${unit.nama}${colorInfo} cepat bikin orang melirik, apalagi paketnya sudah jelas: harga kredit ${creditPrice}, TDP ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Chat saya kalau mau cek.`,
+          `${unit.nama} ready di ${branch}, paket kreditnya ringan buat mulai dilirik: harga kredit ${creditPrice}, TDP ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan.${dpInfo} Mau saya bantu cek unit?`,
+          `Cari ${category} praktis dan menarik? ${unit.nama}${colorInfo}, KM ${km}, bisa jadi pilihan pas dengan harga kredit ${creditPrice}, TDP ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan.`,
+        ];
 
     try {
       const aiCaption = await suggestShareCaption({
@@ -602,7 +611,7 @@ export function ShareSheet() {
         transmisi: unit.transmisi,
         cabang: branch,
         harga_builder: sharePrice,
-        harga_kredit: captionPrice,
+        harga_kredit: isDpMinimShare ? undefined : captionPrice,
         tdp: shareTdp,
         cicilan: shareCicilan,
         tenor: shareTenor,
@@ -768,7 +777,7 @@ export function ShareSheet() {
           >
             {unit && (
               <div className="absolute bottom-3 left-3 rounded-lg bg-ink/85 px-3 py-1.5 text-[15px] font-bold text-surface">
-                Rp {formatJt(sharePrice || unit.harga)} · TDP {formatJt(shareTdp)}
+                Rp {formatJt(sharePrice || unit.harga)} · {paymentLabel} {formatJt(paymentValue)}
               </div>
             )}
             <img
@@ -793,11 +802,11 @@ export function ShareSheet() {
                 </div>
                 {(shareCreditPrice || shareDp) && (
                   <div className="mt-1 text-[11px] text-muted">
-                    {shareCreditPrice && <>Harga kredit {formatRupiah(shareCreditPrice)}</>}
-                    {shareCreditPrice && shareDp && " · "}
+                    {!isDpMinimShare && shareCreditPrice && <>Harga kredit {formatRupiah(shareCreditPrice)}</>}
+                    {!isDpMinimShare && shareCreditPrice && shareDp && " · "}
                     {shareDp && (
                       <>
-                        DP {formatRupiah(shareDp)}
+                        {isDpMinimShare ? "DP Konsumen" : "DP"} {formatRupiah(shareDp)}
                         {shareDpPercent && ` (${Math.round(shareDpPercent * 10) / 10}%)`}
                       </>
                     )}

@@ -268,33 +268,29 @@ export function UnitDetail() {
   const dpMinimMinDp = price > 0 ? Math.round(price * (1 - dpMinimLtv)) : 0;
   const dpMinimEffectiveDp =
     dpMinimDp > 0 ? Math.max(dpMinimDp, dpMinimMinDp) : dpMinimMinDp;
-  const shareDp =
-    simTab === "dpminim" && dpMinimTdpKonsumen !== null
-      ? dpMinimTdpKonsumen
-      : displayDp;
+  const shareDp = simTab === "dpminim" ? dpMinimTdpKonsumen : displayDp;
   const shareDpPercent =
     simTab === "dpminim" && shareDp !== null && price > 0
       ? (shareDp / price) * 100
       : displayDpPercent;
-  const shareTdp =
-    simTab === "dpminim" && dpMinimTdpKonsumen !== null
-      ? dpMinimTdpKonsumen
-      : displayTdp;
+  const shareTdp = simTab === "dpminim" ? dpMinimTdpKonsumen : displayTdp;
   const canShareSimulation =
     shareDp !== null &&
     displayMonthly !== null &&
     shareTdp !== null &&
     creditPriceForDisplay !== null;
   const currencyFormatter = new Intl.NumberFormat("id-ID");
+  const shareTenor = simTab === "dpminim" ? dpMinimInstallmentCount(tenor) : tenor;
   const shareHref = canShareSimulation
     ? `/share?${new URLSearchParams({
         u: unit?.slug ?? slug ?? "",
         harga: String(Math.round(price)),
         komisi: String(Math.round(estimatedCommission)),
-        tenor: String(tenor),
+        tenor: String(shareTenor),
+        sim: simTab,
         dp_pct: String(Math.round(shareDpPercent * 10) / 10),
         dp: String(Math.round(shareDp)),
-        ...(creditPriceForDisplay
+        ...(simTab !== "dpminim" && creditPriceForDisplay
           ? { harga_kredit: String(Math.round(creditPriceForDisplay)) }
           : {}),
         cicilan: String(Math.round(displayMonthly)),
@@ -1089,7 +1085,11 @@ export function UnitDetail() {
                   Harga asli {formatRupiah(originalPrice)}
                 </div>
               )}
-              {smartCreditPriceLoading ? (
+              {simTab === "dpminim" ? (
+                <div className="mt-1 text-[12px] font-semibold text-teal-deep">
+                  DP Konsumen : {shareDp !== null ? formatRupiah(shareDp) : "Hitung DP Minim dulu"}
+                </div>
+              ) : smartCreditPriceLoading ? (
                 <div className="mt-1 text-[12px] font-semibold text-muted">
                   Harga Kredit : Menghitung...
                 </div>
@@ -1633,7 +1633,9 @@ export function UnitDetail() {
             </div>
             )}
             <p className="m-0 mt-2 text-[11px] text-muted">
-              Simulasi, syarat &amp; ketentuan berlaku. Komisi bersifat estimasi.
+              {simTab === "dpminim"
+                ? "Disclaimer: DP Konsumen khusus opsi DP Minim. Simulasi, syarat & ketentuan berlaku. Komisi bersifat estimasi."
+                : "Simulasi, syarat & ketentuan berlaku. Komisi bersifat estimasi."}
             </p>
           </div>
         </div>
