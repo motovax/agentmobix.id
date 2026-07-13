@@ -79,6 +79,14 @@ function positiveParamNumber(params: URLSearchParams, key: string): number | nul
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
+function stripPriceFromCaption(caption: string) {
+  return caption
+    .replace(/\b(?:dengan\s+)?harga(?:\s+kredit)?\s+(?:Rp\s*)?[\d.,]+(?:\s*(?:jt|juta|miliar))?[,.]?\s*/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+,/g, ",")
+    .trim();
+}
+
 async function fetchRawBlob(pathOrUrl: string, cache: Map<string, Blob>) {
   if (cache.has(pathOrUrl)) return cache.get(pathOrUrl)!;
   const src = mobixImageFetchableWithWidth(pathOrUrl, 2560);
@@ -374,7 +382,8 @@ export function ShareSheet() {
   const shareDpPercent = positiveParamNumber(searchParams, "dp_pct") ?? null;
   const shareCreditPrice = positiveParamNumber(searchParams, "harga_kredit") ?? unit?.harga_kredit ?? null;
   const sharePrice = positiveParamNumber(searchParams, "harga") ?? unit?.harga ?? 0;
-  const captionPrice = isDpMinimShare ? sharePrice : (shareCreditPrice ?? sharePrice ?? unit?.harga ?? 0);
+  const captionPrice = shareCreditPrice ?? sharePrice ?? unit?.harga ?? 0;
+  const shouldHidePriceInCaption = isDpMinimShare;
   const paymentLabel = isDpMinimShare ? "TDP Konsumen" : "TDP";
   const paymentValue = isDpMinimShare && shareDp ? shareDp : shareTdp;
   const shareCommission =
@@ -383,7 +392,9 @@ export function ShareSheet() {
   const autoCaption = unit
     ? `${unit.nama}, KM ${Math.round(
         unit.odometer / 1000,
-      )}rb. Harga ${formatRupiah(captionPrice)}. ${paymentLabel} ${formatJt(paymentValue)}, cicilan ${formatJt(
+      )}rb. ${
+        shouldHidePriceInCaption ? "" : `Harga ${formatRupiah(captionPrice)}. `
+      }Cukup TDP ${formatJt(shareTdp)}, cicilan ${formatJt(
         shareCicilan,
       )}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${titleCase(
         unit.lokasi || "Mobix",
@@ -564,9 +575,12 @@ export function ShareSheet() {
     const color = titleCase(unit.color || "");
     const branch = titleCase(unit.lokasi || "Mobix");
     const km = `${Math.round(unit.odometer / 1000)}rb`;
-    const creditPrice = formatRupiah(captionPrice);
-    const payment = formatJt(paymentValue);
+    const tdp = formatJt(shareTdp);
     const installment = formatJt(shareCicilan);
+    const creditPackage = `TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan`;
+    const packageWithPrice = shouldHidePriceInCaption
+      ? creditPackage
+      : `harga kredit ${formatRupiah(captionPrice)}, ${creditPackage}`;
     const category =
       unit.category && unit.category.length <= 4
         ? unit.category.toUpperCase()
@@ -574,7 +588,7 @@ export function ShareSheet() {
           ? titleCase(unit.category)
           : "mobil";
     const dpInfo =
-      shareDp && shareDpPercent
+      shareDp && shareDpPercent && !shouldHidePriceInCaption
         ? ` DP ${formatRupiah(shareDp)} (${Math.round(shareDpPercent * 10) / 10}%).`
         : "";
     const colorInfo = color ? ` warna ${color}` : "";
@@ -585,20 +599,14 @@ export function ShareSheet() {
       `KM ${km}`,
     ].filter(Boolean).join(", ");
 
-    const variants = isDpMinimShare
-      ? [
-          `${unit.nama}${colorInfo}, KM ${km}, ready di ${branch}. ${paymentLabel} ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Chat saya untuk cek unitnya.`,
-          `Mau ${category} dengan paket DP minim? ${unit.nama} ready di ${branch}: ${paymentLabel} ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan.`,
-          `${unit.nama} opsi menarik buat upgrade: ${specs}. ${paymentLabel} ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan; cek unitnya di ${branch}.`,
-        ]
-      : [
-          `${unit.nama}${colorInfo}, KM ${km}, incaran menarik buat yang mau ${category} siap dilirik. Harga kredit ${creditPrice}, TDP ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan; ready di ${branch}, chat saya untuk cek unit.`,
-          `Mau ${category} yang paketnya jelas? ${unit.nama} ready di ${branch}: harga kredit ${creditPrice}, TDP ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Minat, langsung chat saya.`,
-          `${unit.nama} opsi manis buat upgrade tanpa ribet: ${specs}. Harga kredit ${creditPrice}, TDP ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan; cek unitnya di ${branch}.`,
-          `${unit.nama}${colorInfo} cepat bikin orang melirik, apalagi paketnya sudah jelas: harga kredit ${creditPrice}, TDP ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan. Chat saya kalau mau cek.`,
-          `${unit.nama} ready di ${branch}, paket kreditnya ringan buat mulai dilirik: harga kredit ${creditPrice}, TDP ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan.${dpInfo} Mau saya bantu cek unit?`,
-          `Cari ${category} praktis dan menarik? ${unit.nama}${colorInfo}, KM ${km}, bisa jadi pilihan pas dengan harga kredit ${creditPrice}, TDP ${payment}, cicilan ${installment}/bln tenor ${shareTenor} bulan.`,
-        ];
+    const variants = [
+      `${unit.nama}${colorInfo}, KM ${km}, incaran menarik buat yang mau ${category} siap dilirik. ${packageWithPrice}; ready di ${branch}, chat saya untuk cek unit.`,
+      `Mau ${category} yang paketnya jelas? ${unit.nama} ready di ${branch}: ${packageWithPrice}. Minat, langsung chat saya.`,
+      `${unit.nama} opsi manis buat upgrade tanpa ribet: ${specs}. ${packageWithPrice}; cek unitnya di ${branch}.`,
+      `${unit.nama}${colorInfo} cepat bikin orang melirik, apalagi paketnya sudah jelas: ${packageWithPrice}. Chat saya kalau mau cek.`,
+      `${unit.nama} ready di ${branch}, paket kreditnya ringan buat mulai dilirik: ${packageWithPrice}.${dpInfo} Mau saya bantu cek unit?`,
+      `Cari ${category} praktis dan menarik? ${unit.nama}${colorInfo}, KM ${km}, bisa jadi pilihan pas dengan ${packageWithPrice}.`,
+    ];
 
     try {
       const aiCaption = await suggestShareCaption({
@@ -618,9 +626,11 @@ export function ShareSheet() {
         dp: shareDp ?? undefined,
         dp_pct: shareDpPercent ?? undefined,
         caption_saat_ini: captionText || autoCaption,
-        style_hint: styleHint,
+        style_hint: shouldHidePriceInCaption
+          ? `${styleHint} Do not mention any vehicle price or credit price; mention only TDP, installment, and tenor for the credit package.`
+          : styleHint,
       });
-      setCaptionText(aiCaption);
+      setCaptionText(shouldHidePriceInCaption ? stripPriceFromCaption(aiCaption) : aiCaption);
       captionSuggestionIndex.current += 1;
     } catch {
       const nextCaption = variants[captionSuggestionIndex.current % variants.length];

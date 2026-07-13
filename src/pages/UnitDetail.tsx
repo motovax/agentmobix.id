@@ -284,6 +284,7 @@ export function UnitDetail() {
   const shareHref = canShareSimulation
     ? `/share?${new URLSearchParams({
         u: unit?.slug ?? slug ?? "",
+        ...(simulationMethod === "TDP" ? { sim: "dpminim" } : {}),
         harga: String(Math.round(price)),
         komisi: String(Math.round(estimatedCommission)),
         tenor: String(shareTenor),
