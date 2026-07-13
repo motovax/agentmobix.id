@@ -169,14 +169,10 @@ function normalizePlateValue(q: string): string {
   return q.replace(/[^A-Z0-9]/gi, "").toUpperCase();
 }
 
-function plateAreaPrefix(q: string): string {
-  const area = normalizePlateValue(q).match(/^[A-Z]{1,2}/)?.[0] ?? "";
-  return area ? `${area}%` : q;
-}
-
 function plateCandidateQuery(q: string): string {
   const normalized = normalizePlateValue(q);
-  return normalized.length < 4 ? normalizePlateQuery(normalized) : plateAreaPrefix(normalized);
+  const stem = normalized.match(/^[A-Z]{1,2}\d/)?.[0] ?? "";
+  return stem ? `${stem}%` : normalizePlateQuery(normalized);
 }
 
 function levenshteinDistance(a: string, b: string): number {
