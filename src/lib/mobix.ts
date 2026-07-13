@@ -165,6 +165,55 @@ function normalizePlateQuery(q: string): string {
   return `${q.replace(/\s+/g, "").toUpperCase()}%`;
 }
 
+function normalizePlateValue(q: string): string {
+  return q.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+}
+
+function plateAreaPrefix(q: string): string {
+  const area = normalizePlateValue(q).match(/^[A-Z]{1,2}/)?.[0] ?? "";
+  return area ? `${area}%` : q;
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  const curr = Array<number>(b.length + 1);
+
+  for (let i = 1; i <= a.length; i += 1) {
+    curr[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(
+        curr[j - 1] + 1,
+        prev[j] + 1,
+        prev[j - 1] + cost,
+      );
+    }
+    prev.splice(0, prev.length, ...curr);
+  }
+
+  return prev[b.length];
+}
+
+function fuzzyPlateScore(query: string, plateNo: string): number | null {
+  const needle = normalizePlateValue(query);
+  const plate = normalizePlateValue(plateNo);
+  if (!needle || !plate) return null;
+  if (plate === needle) return 0;
+  if (plate.startsWith(needle)) return 1;
+  if (plate.includes(needle)) return 2;
+
+  const prefix = plate.slice(0, needle.length);
+  const prefixPlusOne = plate.slice(0, Math.min(plate.length, needle.length + 1));
+  const distance = Math.min(
+    levenshteinDistance(needle, prefix),
+    levenshteinDistance(needle, prefixPlusOne),
+    levenshteinDistance(needle, plate),
+  );
+  const maxDistance = needle.length >= 6 ? 2 : needle.length >= 4 ? 1 : 0;
+
+  return distance <= maxDistance ? 10 + distance : null;
+}
+
 const BAHAN_BAKAR_MAP: Record<string, string> = {
   bensin: "bensin",
   bbm: "bensin",
@@ -278,6 +327,7 @@ export interface ListResult {
 }
 
 const LIST_FALLBACK_CATEGORIES = ["HATCHBACK", "LCGC", "MPV", "PICKUP", "SUV", "TRUK", "VAN"];
+const PLATE_FUZZY_CANDIDATE_LIMIT = 500;
 
 function listEnvelopeToResult(env: ApiEnvelope<ProductListItem[]>): ListResult {
   return {
@@ -349,7 +399,48 @@ async function fetchUnitsByCategoryFallback(req: ListRequest): Promise<ListResul
   };
 }
 
+async function fetchUnitsByFuzzyPlate(req: ListRequest): Promise<ListResult> {
+  const query = normalizePlateValue(req.plate_no ?? "");
+  const page = req.page ?? 1;
+  const limit = req.limit ?? 12;
+  const offset = (page - 1) * limit;
+  const env = await post<ProductListItem[]>("/daftar-produk", buildListBody({
+    ...req,
+    page: 1,
+    limit: PLATE_FUZZY_CANDIDATE_LIMIT,
+    plate_no: plateAreaPrefix(query),
+  }));
+
+  const ranked = (env.data ?? [])
+    .map((item, index) => ({
+      item,
+      index,
+      score: fuzzyPlateScore(query, item.plate_no),
+    }))
+    .filter((entry): entry is { item: ProductListItem; index: number; score: number } =>
+      entry.score !== null,
+    )
+    .sort((a, b) =>
+      a.score - b.score ||
+      normalizePlateValue(a.item.plate_no).length - normalizePlateValue(b.item.plate_no).length ||
+      a.index - b.index,
+    );
+  const items = ranked.slice(offset, offset + limit).map((entry) => entry.item);
+  const total = ranked.length;
+
+  return {
+    items,
+    total,
+    page,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  };
+}
+
 export async function fetchUnits(req: ListRequest = {}): Promise<ListResult> {
+  if (req.plate_no) {
+    return fetchUnitsByFuzzyPlate(req);
+  }
+
   try {
     return listEnvelopeToResult(
       await post<ProductListItem[]>("/daftar-produk", buildListBody(req)),
