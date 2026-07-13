@@ -135,6 +135,27 @@ export interface CaptionSuggestRequest {
   style_hint?: string;
 }
 
+export interface AIBackgroundRequest {
+  source: string;
+  slug?: string;
+  nama?: string;
+  merek?: string;
+  warna?: string;
+  tahun?: number;
+  angle_hint?: string;
+  force?: boolean;
+}
+
+export interface AIBackgroundResponse {
+  job_id: string;
+  source_key: string;
+  status: "queued" | "processing" | "done" | "failed";
+  progress: number;
+  image_url?: string;
+  cached: boolean;
+  message?: string;
+}
+
 export interface ListRequest {
   merek?: string[];
   judul?: string[];
@@ -553,6 +574,22 @@ export async function suggestShareCaption(
   const caption = env.data?.caption?.trim();
   if (!caption) throw new Error("Caption AI kosong");
   return caption;
+}
+
+export async function generateAIBackground(
+  request: AIBackgroundRequest,
+): Promise<AIBackgroundResponse> {
+  const env = await post<AIBackgroundResponse>("/ai-background", request);
+  return env.data;
+}
+
+export async function fetchAIBackgroundStatus(
+  jobId: string,
+): Promise<AIBackgroundResponse> {
+  const env = await get<AIBackgroundResponse>(
+    `/ai-background/status?job_id=${encodeURIComponent(jobId)}`,
+  );
+  return env.data;
 }
 
 /* ---- agent-program derivations (not present in the catalog API) ---- */
