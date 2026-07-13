@@ -156,9 +156,13 @@ export interface ListRequest {
   plate_no?: string;
 }
 
-/** Returns true if the query looks like an Indonesian plate number (e.g. B2697FOD, D 1234 ABC). */
+/** Returns true if the query looks like a full or partial Indonesian plate number. */
 export function isPlateQuery(q: string): boolean {
-  return /^[A-Z]{1,2}\s*\d{1,4}\s*[A-Z]{1,3}$/i.test(q.trim());
+  return /^[A-Z]{1,2}\s*\d{1,4}\s*[A-Z]{0,3}$/i.test(q.trim());
+}
+
+function normalizePlateQuery(q: string): string {
+  return `${q.replace(/\s+/g, "").toUpperCase()}%`;
 }
 
 const BAHAN_BAKAR_MAP: Record<string, string> = {
@@ -199,7 +203,7 @@ export function classifyQuery(q: string): QueryClassification {
   const trimmed = q.trim();
   const lower = trimmed.toLowerCase();
 
-  if (isPlateQuery(trimmed)) return { param: "plate_no", value: trimmed };
+  if (isPlateQuery(trimmed)) return { param: "plate_no", value: normalizePlateQuery(trimmed) };
   if (BAHAN_BAKAR_MAP[lower]) return { param: "bahan_bakar", value: [BAHAN_BAKAR_MAP[lower]] };
   if (TRANSMISI_MAP[lower]) return { param: "transmisi", value: [TRANSMISI_MAP[lower]] };
   if (KNOWN_BRANDS.includes(lower)) return { param: "merek", value: [trimmed] };
