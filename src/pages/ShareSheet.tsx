@@ -640,6 +640,14 @@ export function ShareSheet() {
   async function handleGenerateAiBackground(force = false) {
     if (!unit || aiBackgroundStatus === "generating" || selectedImageMedia.length === 0) return;
 
+    const activeIsSelectedImage = activeMedia?.kind === "image" && selectedImageMedia.some((media) => media.id === activeMedia.id);
+    if (!activeIsSelectedImage) {
+      const firstSelectedImageIdx = mediaItems.findIndex((media) => media.id === selectedImageMedia[0].id);
+      if (firstSelectedImageIdx >= 0) {
+        setPreviewIdx(firstSelectedImageIdx);
+      }
+    }
+
     setAiBackgroundStatus("generating");
     setAiBackgroundError("");
     setAiBackgroundProgress(6);
@@ -919,6 +927,10 @@ export function ShareSheet() {
   const selectedAiBackgroundComplete =
     selectedImageMedia.length > 0 && selectedAiBackgroundCount === selectedImageMedia.length;
   const aiBackgroundDone = selectedAiBackgroundCount > 0 && aiBackgroundStatus !== "generating";
+  const aiBackgroundPreviewMedia =
+    activeMedia?.kind === "image" && selectedImageMedia.some((media) => media.id === activeMedia.id)
+      ? activeMedia
+      : selectedImageMedia[0];
   const showAiOriginalToggle = activeMedia?.kind === "image" && activeHasAiBackground;
 
   return (
@@ -1100,10 +1112,10 @@ export function ShareSheet() {
           {aiBackgroundStatus === "generating" && (
             <div className="mt-3 overflow-hidden rounded-[12px] bg-ink">
               <div className="relative aspect-video">
-                {activeMedia?.kind === "image" && (
+                {aiBackgroundPreviewMedia && (
                   <Photo
                     className="h-full w-full opacity-45"
-                    src={mobixImage(activeMedia.url, MOBIX_SHARE_WIDTH)}
+                    src={mobixImage(aiBackgroundPreviewMedia.url, MOBIX_SHARE_WIDTH)}
                     alt=""
                   />
                 )}
