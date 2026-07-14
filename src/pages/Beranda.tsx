@@ -145,7 +145,7 @@ export function Beranda() {
 
   return (
     <AppShell>
-      <main className="pb-[180px]">
+      <main className="pb-[calc(110px+env(safe-area-inset-bottom))]">
         {/* SEARCH HEADER */}
         <header
           className="rounded-[40px] rounded-b-[26px] px-[18px] pb-[18px] pt-5 text-surface"
@@ -244,6 +244,29 @@ export function Beranda() {
             ))}
           </div>
         </section>
+
+        {/* CTA ADMIN */}
+        <div className="mx-[18px] mt-[22px] grid grid-cols-[1fr_auto_1fr] items-center rounded-3xl border border-line bg-surface px-4 py-3 shadow-nav">
+          <a
+            href={`https://wa.me/6285701959826?text=${encodeURIComponent("Halo Admin, mau tanya-tanya soal program agen Mobix dulu boleh? 🙏")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 px-2 py-1.5 text-[14px] font-bold text-teal-deep no-underline"
+          >
+            <Chat size={22} />
+            Tanya Admin
+          </a>
+          <div className="h-9 w-px bg-line" />
+          <a
+            href={`https://wa.me/6285701959826?text=${encodeURIComponent("saya mau minta hitungan leasing\n1. Dp minim\n2. Cicilan ringan\n3. Cair All in")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 px-2 py-1.5 text-[14px] font-bold text-teal-deep no-underline"
+          >
+            <Calculator size={22} />
+            Minta Hitungan
+          </a>
+        </div>
 
         {/* HOT DEALS */}
         <section className="pt-[22px]">
@@ -344,28 +367,6 @@ export function Beranda() {
           </a>
         </footer>
       </main>
-
-      <div className="fixed bottom-[120px] left-1/2 z-20 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[1fr_auto_1fr] items-center rounded-3xl border border-line bg-surface px-4 py-3 shadow-nav">
-        <a
-          href={`https://wa.me/6285701959826?text=${encodeURIComponent("Halo Admin, mau tanya-tanya soal program agen Mobix dulu boleh? 🙏")}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-2 px-2 py-1.5 text-[14px] font-bold text-teal-deep no-underline"
-        >
-          <Chat size={22} />
-          Tanya Admin
-        </a>
-        <div className="h-9 w-px bg-line" />
-        <a
-          href={`https://wa.me/6285701959826?text=${encodeURIComponent("saya mau minta hitungan leasing\n1. Dp minim\n2. Cicilan ringan\n3. Cair All in")}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-2 px-2 py-1.5 text-[14px] font-bold text-teal-deep no-underline"
-        >
-          <Calculator size={22} />
-          Minta Hitungan
-        </a>
-      </div>
 
       <BottomNav active="beranda" />
     </AppShell>
