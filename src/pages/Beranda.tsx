@@ -1,4 +1,5 @@
-import { Link } from "wouter";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { BottomNav } from "../components/BottomNav";
 import { Search, Chat, Calculator } from "../components/icons";
@@ -7,6 +8,7 @@ import {
   fetchUnits,
   fetchCategories,
   prettyCategory,
+  classifyQuery,
   toCardUnit,
   type CardUnit,
 } from "../lib/mobix";
@@ -18,7 +20,6 @@ const BUDGET_CHIPS = [
   { label: "Rp100–150jt", href: "/katalog?harga_min=100000000&harga_max=150000000" },
   { label: "Rp150–200jt", href: "/katalog?harga_min=150000000&harga_max=200000000" },
   { label: "> Rp200jt", href: "/katalog?harga_min=200000000" },
-  { label: "Tahun ≥ 2021", href: "/katalog" },
   { label: "Matic", href: "/katalog?transmisi=AUTOMATIC" },
 ];
 
@@ -132,7 +133,53 @@ function RecSkeleton() {
   );
 }
 
+function buildQueryRequest(q: string) {
+  const c = classifyQuery(q);
+  return {
+    judul:       c.param === "judul"       ? c.value : undefined,
+    merek:       c.param === "merek"       ? c.value : undefined,
+    bahan_bakar: c.param === "bahan_bakar" ? c.value : undefined,
+    transmisi:   c.param === "transmisi"   ? c.value : undefined,
+    plate_no:    c.param === "plate_no"    ? c.value : undefined,
+  };
+}
+
 export function Beranda() {
+  const [, navigate] = useLocation();
+  const [query, setQuery] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [searchResults, setSearchResults] = useState<CardUnit[] | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedQ(query.trim()), 350);
+    return () => window.clearTimeout(t);
+  }, [query]);
+
+  useEffect(() => {
+    if (!debouncedQ) {
+      setSearchResults(null);
+      setSearchLoading(false);
+      return;
+    }
+    let alive = true;
+    setSearchLoading(true);
+    fetchUnits({ limit: 5, ...buildQueryRequest(debouncedQ) })
+      .then((r) => {
+        if (!alive) return;
+        setSearchResults(r.items.map(toCardUnit));
+        setSearchLoading(false);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setSearchResults([]);
+        setSearchLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [debouncedQ]);
+
   const categories = useAsync(fetchCategories, []);
   const hot = useAsync(
     () => fetchUnits({ limit: 6, aging_awal: 61 }).then((r) => r.items.map(toCardUnit)),
@@ -164,15 +211,64 @@ export function Beranda() {
           <p className="m-0 mb-3.5 text-[12px] text-white/65">
             2.400+ unit ready · inspeksi 175 titik · garansi mesin
           </p>
-          <Link
-            href="/katalog?focus=1"
-            className="flex items-center gap-2.5 rounded-2xl bg-surface px-3.5 py-[13px] text-[13.5px] font-medium text-placeholder no-underline shadow-[0_8px_24px_-10px_rgba(14,27,30,0.3)]"
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (query.trim()) navigate(`/katalog?q=${encodeURIComponent(query.trim())}`);
+            }}
+            className="flex items-center gap-2.5 rounded-2xl bg-surface px-3.5 py-[13px] shadow-[0_8px_24px_-10px_rgba(14,27,30,0.3)]"
           >
             <Search size={16} strokeWidth={2} className="flex-shrink-0 text-teal-deep" />
-            <span>
-              Cari <b className="font-semibold text-ink">Avanza</b>, Brio, Xpander…
-            </span>
-          </Link>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Cari Avanza, Brio, Xpander…"
+              enterKeyHint="search"
+              className="min-w-0 flex-1 bg-transparent text-[13.5px] font-medium text-ink outline-none placeholder:text-placeholder"
+            />
+          </form>
+          {debouncedQ && (
+            <div className="mt-2 overflow-hidden rounded-2xl bg-surface shadow-[0_8px_24px_-10px_rgba(14,27,30,0.3)]">
+              {searchLoading && (
+                <div className="px-3.5 py-3 text-[12px] text-muted">Mencari…</div>
+              )}
+              {!searchLoading &&
+                (searchResults ?? []).map((u) => (
+                  <Link
+                    key={u.id}
+                    href={`/unit/${u.slug}`}
+                    className="flex items-center gap-2.5 border-b border-line px-3 py-2.5 text-inherit no-underline last:border-b-0"
+                  >
+                    <Photo
+                      className="h-10 w-14 flex-shrink-0 overflow-hidden rounded-lg"
+                      src={u.thumbnail}
+                      alt={u.title}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="line-clamp-1 text-[12.5px] font-bold text-ink">
+                        {u.title}
+                      </div>
+                      <div className="text-[11px] text-muted">
+                        Rp {formatJt(u.price)} · {u.year} · {u.branch}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              {!searchLoading && (searchResults ?? []).length === 0 && (
+                <div className="px-3.5 py-3 text-[12px] text-muted">
+                  Tidak ada unit cocok "{debouncedQ}".
+                </div>
+              )}
+              {!searchLoading && (searchResults ?? []).length > 0 && (
+                <Link
+                  href={`/katalog?q=${encodeURIComponent(debouncedQ)}`}
+                  className="block border-t border-line px-3.5 py-2.5 text-center text-[12px] font-bold text-teal-deep no-underline"
+                >
+                  Lihat semua hasil di katalog →
+                </Link>
+              )}
+            </div>
+          )}
           <div className="scroll-x mt-3 flex gap-2 overflow-x-auto pb-0.5">
             {BUDGET_CHIPS.map((c) => (
               <Link

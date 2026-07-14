@@ -327,8 +327,22 @@ function isNullableScanError(error: unknown) {
   return error instanceof Error && /cannot scan NULL|can't scan into dest/i.test(error.message);
 }
 
+// Cached: both Beranda and Katalog request categories on mount, and each
+// uncached call fans out one probe request per category.
+let categoriesPromise: Promise<string[]> | null = null;
+
 /** Live filter values (GET endpoints, see /docs). */
-export async function fetchCategories(): Promise<string[]> {
+export function fetchCategories(): Promise<string[]> {
+  if (!categoriesPromise) {
+    categoriesPromise = fetchCategoriesUncached().catch((error) => {
+      categoriesPromise = null;
+      throw error;
+    });
+  }
+  return categoriesPromise;
+}
+
+async function fetchCategoriesUncached(): Promise<string[]> {
   const categories = (await get<string[]>("/daftar-kategori")).data ?? [];
   const checks = await Promise.allSettled(
     categories.map((category) =>
@@ -369,6 +383,7 @@ export interface ListResult {
 
 const LIST_FALLBACK_CATEGORIES = ["HATCHBACK", "LCGC", "MPV", "PICKUP", "SUV", "TRUK", "VAN"];
 const PLATE_FUZZY_CANDIDATE_LIMIT = 500;
+const PRICE_FILTER_CANDIDATE_LIMIT = 500;
 
 function listEnvelopeToResult(env: ApiEnvelope<ProductListItem[]>): ListResult {
   return {
@@ -474,9 +489,65 @@ async function fetchUnitsByFuzzyPlate(req: ListRequest): Promise<ListResult> {
   };
 }
 
+// The API's harga_awal/harga_akhir filter matches against a different price
+// column than the `harga` it returns (out-of-range units slip through, cheap
+// units go missing), so price ranges are filtered client-side instead. The
+// server also caps each page at 100 items, so candidates are walked page by
+// page up to PRICE_FILTER_CANDIDATE_LIMIT.
+async function fetchUnitsByPriceRange(req: ListRequest): Promise<ListResult> {
+  const { harga_awal, harga_akhir, ...rest } = req;
+  const page = req.page ?? 1;
+  const limit = req.limit ?? 12;
+  const offset = (page - 1) * limit;
+
+  const candidatePageSize = 100;
+  const seen = new Set<string>();
+  const candidates: ProductListItem[] = [];
+  let candidatePage = 1;
+  let candidateTotalPages = 1;
+  do {
+    const res = await fetchUnits({
+      ...rest,
+      // Without an explicit sort the API returns a random order per request,
+      // which makes pagination leak/duplicate units across pages.
+      sort: rest.sort?.length ? rest.sort : ["brand", "type"],
+      page: candidatePage,
+      limit: candidatePageSize,
+    });
+    for (const item of res.items) {
+      if (!seen.has(item.id)) {
+        seen.add(item.id);
+        candidates.push(item);
+      }
+    }
+    candidateTotalPages = res.totalPages;
+    candidatePage += 1;
+  } while (
+    candidatePage <= candidateTotalPages &&
+    candidates.length < PRICE_FILTER_CANDIDATE_LIMIT
+  );
+
+  const matched = candidates.filter(
+    (item) =>
+      (harga_awal === undefined || item.harga >= harga_awal) &&
+      (harga_akhir === undefined || item.harga <= harga_akhir),
+  );
+
+  return {
+    items: matched.slice(offset, offset + limit),
+    total: matched.length,
+    page,
+    totalPages: Math.max(1, Math.ceil(matched.length / limit)),
+  };
+}
+
 export async function fetchUnits(req: ListRequest = {}): Promise<ListResult> {
   if (req.plate_no) {
     return fetchUnitsByFuzzyPlate(req);
+  }
+
+  if (req.harga_awal !== undefined || req.harga_akhir !== undefined) {
+    return fetchUnitsByPriceRange(req);
   }
 
   try {
