@@ -23,14 +23,14 @@ const BUDGET_CHIPS = [
 ];
 
 const BRANDS = [
-  { label: "Toyota", mono: "T" },
-  { label: "Honda", mono: "H" },
-  { label: "Daihatsu", mono: "D" },
-  { label: "Suzuki", mono: "S" },
-  { label: "Mitsubishi", mono: "M" },
-  { label: "Nissan", mono: "N" },
-  { label: "Hyundai", mono: "Hy" },
-  { label: "Lainnya", mono: "+" },
+  { label: "Toyota", logo: "/brands/toyota.png" },
+  { label: "Honda", logo: "/brands/honda.png" },
+  { label: "Daihatsu", logo: "/brands/daihatsu.png" },
+  { label: "Suzuki", logo: "/brands/suzuki.png" },
+  { label: "Mitsubishi", logo: "/brands/mitsubishi.png" },
+  { label: "Nissan", logo: "/brands/nissan.png" },
+  { label: "Hyundai", logo: "/brands/hyundai.png" },
+  { label: "Lainnya", logo: null },
 ];
 
 function HotDealCard({ unit }: { unit: CardUnit }) {
@@ -40,9 +40,6 @@ function HotDealCard({ unit }: { unit: CardUnit }) {
       className="block w-[236px] flex-shrink-0 snap-start overflow-hidden rounded-[18px] border border-line bg-surface text-inherit no-underline"
     >
       <Photo className="h-32" src={unit.thumbnail} alt={unit.title}>
-        <span className="absolute left-2 top-2 rounded-full bg-danger-bg px-2.5 py-1 text-[10px] font-extrabold text-danger">
-          Ekstra komisi
-        </span>
         <span className="absolute right-2 top-2 rounded-full bg-ink/75 px-2 py-1 text-[10px] font-bold text-surface">
           {unit.year}
         </span>
@@ -230,8 +227,17 @@ export function Beranda() {
                 href={b.label === "Lainnya" ? "/katalog" : `/katalog?q=${encodeURIComponent(b.label)}`}
                 className="flex flex-col items-center gap-1.5 rounded-[18px] border border-line bg-surface px-1 pb-2.5 pt-3 no-underline"
               >
-                <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-line bg-field text-[14px] font-extrabold text-mid">
-                  {b.mono}
+                <span className="flex h-[34px] w-[34px] items-center justify-center overflow-hidden rounded-full border border-line bg-surface">
+                  {b.logo ? (
+                    <img
+                      src={b.logo}
+                      alt={b.label}
+                      loading="lazy"
+                      className="h-full w-full object-contain p-1"
+                    />
+                  ) : (
+                    <span className="text-[14px] font-extrabold text-mid">+</span>
+                  )}
                 </span>
                 <span className="text-[10.5px] font-semibold text-muted">{b.label}</span>
               </Link>
