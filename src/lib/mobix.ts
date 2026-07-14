@@ -35,6 +35,7 @@ export interface ProductListItem {
   transmisi: string;
   jarakTempuh: string; // already formatted, e.g. "56746 KM"
   bahanBakar: string;
+  thumbnail_depan?: string | null; // relative "/unit-file-serve?path=..."
   thumbnail: string; // relative "/unit-file-serve?path=..."
   plate_no: string;
   type: string;
@@ -673,7 +674,7 @@ export function toCardUnit(item: ProductListItem): CardUnit {
     km: item.odometer,
     year: item.year,
     badge: deriveBadge(item),
-    thumbnail: mobixImage(item.thumbnail),
+    thumbnail: mobixImage(item.thumbnail_depan?.trim() || item.thumbnail),
     komisiLabel: (item.aging ?? 0) > 60 ? "+Rp 2 juta" : "Mulai dari 2jt",
   };
 }
