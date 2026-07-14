@@ -10,7 +10,7 @@ import {
   toCardUnit,
   type CardUnit,
 } from "../lib/mobix";
-import { formatJt, formatRpJt, formatKm } from "../lib/format";
+import { formatJt, formatKm } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
 const BUDGET_CHIPS = [
@@ -66,7 +66,7 @@ function HotDealCard({ unit }: { unit: CardUnit }) {
           </span>
         </div>
         <div className="mt-2.5 inline-block rounded-[10px] border border-teal-tint-border bg-teal-tint px-2.5 py-1 text-[10.5px] font-extrabold text-teal-deep">
-          Komisi agen {formatRpJt(unit.komisi)}
+          Komisi {unit.komisiLabel}
         </div>
       </div>
     </Link>
@@ -101,7 +101,7 @@ function RecCard({ unit }: { unit: CardUnit }) {
           </span>
         </div>
         <div className="mt-2 inline-block rounded-[10px] border border-teal-tint-border bg-teal-tint px-2 py-1 text-[10px] font-extrabold text-teal-deep">
-          Komisi {formatRpJt(unit.komisi)}
+          Komisi {unit.komisiLabel}
         </div>
       </div>
     </Link>
