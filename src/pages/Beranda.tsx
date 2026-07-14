@@ -195,7 +195,7 @@ export function Beranda() {
       <main className="pb-[calc(110px+env(safe-area-inset-bottom))]">
         {/* SEARCH HEADER */}
         <header
-          className="rounded-[40px] rounded-b-[26px] px-[18px] pb-[18px] pt-5 text-surface"
+          className="rounded-b-[26px] px-[18px] pb-[18px] pt-5 text-surface"
           style={{ background: "linear-gradient(155deg,#0E1B1E,#1B3438)" }}
         >
           <div className="text-[20px] font-extrabold -tracking-[0.02em]">
