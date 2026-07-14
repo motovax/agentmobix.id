@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "wouter";
+import { useEffect, useRef, useState } from "react";
+import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { UnitRow } from "../components/UnitRow";
 import { SkeletonRow } from "../components/ui";
@@ -17,10 +17,37 @@ import { useAsync } from "../lib/useAsync";
 const LIMIT = 12;
 
 export function Katalog() {
-  // "" = Semua; otherwise a live category code from /daftar-kategori
-  const [activeCat, setActiveCat] = useState("");
-  const [query, setQuery] = useState("");
-  const [debounced, setDebounced] = useState("");
+  // One-shot filters handed in from a homepage shortcut (chip/search tap),
+  // e.g. /katalog?kategori=MPV&q=Toyota&harga_max=150000000&focus=1
+  const initialSearch = useSearch();
+  const [activeCat, setActiveCat] = useState(
+    () => new URLSearchParams(initialSearch).get("kategori") ?? "",
+  );
+  const [query, setQuery] = useState(
+    () => new URLSearchParams(initialSearch).get("q") ?? "",
+  );
+  const [debounced, setDebounced] = useState(
+    () => new URLSearchParams(initialSearch).get("q") ?? "",
+  );
+  const [priceMin] = useState(() => {
+    const n = Number(new URLSearchParams(initialSearch).get("harga_min"));
+    return n > 0 ? n : undefined;
+  });
+  const [priceMax] = useState(() => {
+    const n = Number(new URLSearchParams(initialSearch).get("harga_max"));
+    return n > 0 ? n : undefined;
+  });
+  const [transmisiFilter] = useState(
+    () => new URLSearchParams(initialSearch).get("transmisi") || undefined,
+  );
+  const [autoFocus] = useState(
+    () => new URLSearchParams(initialSearch).get("focus") === "1",
+  );
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (autoFocus) searchInputRef.current?.focus();
+  }, [autoFocus]);
 
   const categories = useAsync(fetchCategories, []);
 
@@ -42,13 +69,18 @@ export function Katalog() {
   const classification = debounced ? classifyQuery(debounced) : null;
 
   function buildSearchParams() {
-    if (!classification) return {};
-    return {
+    const fromQuery = classification ? {
       judul:       classification.param === "judul"       ? classification.value : undefined,
       merek:       classification.param === "merek"       ? classification.value : undefined,
       bahan_bakar: classification.param === "bahan_bakar" ? classification.value : undefined,
       transmisi:   classification.param === "transmisi"   ? classification.value : undefined,
       plate_no:    classification.param === "plate_no"    ? classification.value : undefined,
+    } : {};
+    return {
+      ...fromQuery,
+      transmisi: fromQuery.transmisi ?? (transmisiFilter ? [transmisiFilter] : undefined),
+      harga_awal: priceMin,
+      harga_akhir: priceMax,
     };
   }
 
@@ -119,6 +151,7 @@ export function Katalog() {
           <div className="flex flex-1 items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-2.5">
             <Search className="text-muted" />
             <input
+              ref={searchInputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Cari merek, tipe, atau nopol…"

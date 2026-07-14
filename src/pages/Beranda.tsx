@@ -1,391 +1,342 @@
 import { Link } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { BottomNav } from "../components/BottomNav";
-import { UnitCard } from "../components/UnitCard";
+import { Search, Chat, Calculator } from "../components/icons";
+import { Photo, Skeleton } from "../components/ui";
 import {
-  Search,
-  Moon,
-  Chat,
-  Calculator,
-  Instagram,
-  Facebook,
-  YouTube,
-  TikTok,
-} from "../components/icons";
-import { SkeletonCard, Skeleton, ShimmerImg } from "../components/ui";
-import { TESTIMONIALS } from "../data/catalog";
-import { fetchUnits, toCardUnit } from "../lib/mobix";
-import { fetchHotDeals, cmsImageUrl, type HotDeal } from "../lib/cms";
+  fetchUnits,
+  fetchCategories,
+  prettyCategory,
+  toCardUnit,
+  type CardUnit,
+} from "../lib/mobix";
+import { formatJt, formatRpJt, formatKm } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
-const STATS = [
-  { label: "Komisi/unit", value: "Mulai dari 2jt" },
-  { label: "Stok ready", value: "185 unit" },
-  { label: "Cair dalam", value: "3 hari" },
+const BUDGET_CHIPS = [
+  { label: "< Rp100jt", href: "/katalog?harga_max=100000000" },
+  { label: "Rp100–150jt", href: "/katalog?harga_min=100000000&harga_max=150000000" },
+  { label: "Rp150–200jt", href: "/katalog?harga_min=150000000&harga_max=200000000" },
+  { label: "> Rp200jt", href: "/katalog?harga_min=200000000" },
+  { label: "Tahun ≥ 2021", href: "/katalog" },
+  { label: "Matic", href: "/katalog?transmisi=AUTOMATIC" },
 ];
 
-const STEPS = [
-  {
-    title: "Daftar lewat form pendek",
-    caption:
-      "Upload KTP dan tentukan rekening pencairan. Aktivasi otomatis dalam beberapa menit.",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <circle cx="9" cy="6" r="3" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M3 15c0-2.8 2.7-5 6-5s6 2.2 6 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    ),
-    tint: false,
-  },
-  {
-    title: "Share unit ke jaringan kamu",
-    caption:
-      "Tombol langsung ke WhatsApp, IG Story, Facebook, atau marketplace pilihan kamu.",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M3 9l6-6 6 6M9 3v12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-    tint: false,
-  },
-  {
-    title: "AI Mobix bantu follow-up",
-    caption:
-      "Minta foto detail, susun caption, atau estafetkan calon pembeli ke PIC cabang.",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M3 4h12v8H6l-3 3V4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      </svg>
-    ),
-    tint: false,
-  },
-  {
-    title: "Komisi cair ke rekening",
-    caption: "Tiga hari kerja setelah unit terjual.",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M2 9h14M11 5l5 4-5 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-    tint: true,
-  },
+const BRANDS = [
+  { label: "Toyota", mono: "T" },
+  { label: "Honda", mono: "H" },
+  { label: "Daihatsu", mono: "D" },
+  { label: "Suzuki", mono: "S" },
+  { label: "Mitsubishi", mono: "M" },
+  { label: "Nissan", mono: "N" },
+  { label: "Hyundai", mono: "Hy" },
+  { label: "Lainnya", mono: "+" },
 ];
 
-function PromoRow({ item }: { item: HotDeal }) {
-  const imgSrc = cmsImageUrl(item.thumbnail, "thumb");
+function HotDealCard({ unit }: { unit: CardUnit }) {
   return (
     <Link
-      href={`/promo/${item.slug}`}
-      className="flex items-start gap-3.5 text-inherit no-underline"
+      href={`/unit/${unit.slug}`}
+      className="block w-[236px] flex-shrink-0 snap-start overflow-hidden rounded-[18px] border border-line bg-surface text-inherit no-underline"
     >
-      <div className="relative h-20 w-[104px] flex-shrink-0 overflow-hidden rounded-[14px] bg-gradient-to-br from-teal-soft to-[#5AA8A6]">
-        <ShimmerImg
-          src={imgSrc}
-          alt={item.judul}
-          imgClassName="absolute inset-0 h-full w-full object-cover"
-        />
-      </div>
-      <div className="flex-1 min-w-0 pt-0.5">
-        <div className="text-[14px] font-semibold leading-[1.35] text-ink line-clamp-3">
-          {item.judul}
+      <Photo className="h-32" src={unit.thumbnail} alt={unit.title}>
+        <span className="absolute left-2 top-2 rounded-full bg-danger-bg px-2.5 py-1 text-[10px] font-extrabold text-danger">
+          Ekstra komisi
+        </span>
+        <span className="absolute right-2 top-2 rounded-full bg-ink/75 px-2 py-1 text-[10px] font-bold text-surface">
+          {unit.year}
+        </span>
+      </Photo>
+      <div className="px-3 pb-3 pt-2.5">
+        <div className="mb-1 line-clamp-2 text-[13px] font-bold leading-[1.25] text-ink">
+          {unit.title}
         </div>
-        {item.deskripsi && (
-          <div className="mt-1 text-[11px] text-muted line-clamp-2">{item.deskripsi}</div>
-        )}
+        <div className="-tracking-[0.01em] text-[15px] font-extrabold text-teal-deep">
+          Rp {formatJt(unit.price)}
+        </div>
+        <div className="mt-0.5 text-[10.5px] text-muted">
+          TDP {formatJt(unit.tdp)} · cicilan {formatJt(unit.cicilan)}/bln
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <span className="rounded-lg bg-field px-1.5 py-1 text-[10px] font-semibold text-muted">
+            {formatKm(unit.km)}
+          </span>
+          <span className="rounded-lg bg-field px-1.5 py-1 text-[10px] font-semibold text-muted">
+            {unit.transmisi}
+          </span>
+          <span className="rounded-lg bg-field px-1.5 py-1 text-[10px] font-semibold text-muted">
+            {unit.branch}
+          </span>
+        </div>
+        <div className="mt-2.5 inline-block rounded-[10px] border border-teal-tint-border bg-teal-tint px-2.5 py-1 text-[10.5px] font-extrabold text-teal-deep">
+          Komisi agen {formatRpJt(unit.komisi)}
+        </div>
       </div>
     </Link>
   );
 }
 
+function RecCard({ unit }: { unit: CardUnit }) {
+  return (
+    <Link
+      href={`/unit/${unit.slug}`}
+      className="block overflow-hidden rounded-[18px] border border-line bg-surface text-inherit no-underline"
+    >
+      <Photo className="h-[104px]" src={unit.thumbnail} alt={unit.title}>
+        <span className="absolute right-2 top-2 rounded-full bg-ink/75 px-2 py-1 text-[10px] font-bold text-surface">
+          {unit.year}
+        </span>
+      </Photo>
+      <div className="px-2.5 pb-2.5 pt-2">
+        <div className="mb-1 line-clamp-2 text-[12.5px] font-bold leading-[1.25] text-ink">
+          {unit.title}
+        </div>
+        <div className="-tracking-[0.01em] text-[14px] font-extrabold text-teal-deep">
+          Rp {formatJt(unit.price)}
+        </div>
+        <div className="mt-0.5 text-[10px] text-muted">TDP {formatJt(unit.tdp)}</div>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <span className="rounded-lg bg-field px-1.5 py-1 text-[10px] font-semibold text-muted">
+            {formatKm(unit.km)}
+          </span>
+          <span className="rounded-lg bg-field px-1.5 py-1 text-[10px] font-semibold text-muted">
+            {unit.transmisi}
+          </span>
+        </div>
+        <div className="mt-2 inline-block rounded-[10px] border border-teal-tint-border bg-teal-tint px-2 py-1 text-[10px] font-extrabold text-teal-deep">
+          Komisi {formatRpJt(unit.komisi)}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function HotDealSkeleton() {
+  return (
+    <div className="w-[236px] flex-shrink-0 overflow-hidden rounded-[18px] border border-line bg-surface">
+      <Skeleton className="h-32 rounded-none" />
+      <div className="space-y-2 p-3">
+        <Skeleton className="h-3 w-32" />
+        <Skeleton className="h-4 w-24" />
+      </div>
+    </div>
+  );
+}
+
+function RecSkeleton() {
+  return (
+    <div className="overflow-hidden rounded-[18px] border border-line bg-surface">
+      <Skeleton className="h-[104px] rounded-none" />
+      <div className="space-y-2 p-2.5">
+        <Skeleton className="h-2.5 w-20" />
+        <Skeleton className="h-3.5 w-16" />
+      </div>
+    </div>
+  );
+}
+
 export function Beranda() {
-  const featured = useAsync(
-    () => fetchUnits({ limit: 8 }).then((r) => r.items.map(toCardUnit)),
+  const categories = useAsync(fetchCategories, []);
+  const hot = useAsync(
+    () => fetchUnits({ limit: 6, aging_awal: 61 }).then((r) => r.items.map(toCardUnit)),
     [],
   );
-  const promos = useAsync(() => fetchHotDeals(), []);
+  const rec = useAsync(
+    () => fetchUnits({ limit: 6 }).then((r) => r.items.map(toCardUnit)),
+    [],
+  );
 
   return (
     <AppShell>
-      {/* SEARCH HEADER */}
-      <div className="hidden items-center gap-2.5 border-b border-line-2 bg-surface-2 px-[18px] pb-3 pt-3.5">
-        <Link
-          href="/katalog"
-          className="hidden flex-1 items-center gap-2 rounded-full border border-line bg-surface px-4 py-[11px] no-underline"
+      <main className="pb-[180px]">
+        {/* SEARCH HEADER */}
+        <header
+          className="rounded-[40px] rounded-b-[26px] px-[18px] pb-[18px] pt-5 text-surface"
+          style={{ background: "linear-gradient(155deg,#0E1B1E,#1B3438)" }}
         >
-          <Search className="text-muted" />
-          <span className="text-[14px] text-placeholder">Cari di Mobix . . .</span>
-        </Link>
-        <button
-          aria-label="Mode gelap"
-          className="hidden h-9 w-9 items-center justify-center text-ink"
-        >
-          <Moon />
-        </button>
-        <Link
-          href="/katalog"
-          className="hidden flex-shrink-0 whitespace-nowrap rounded-full bg-teal-soft px-[18px] py-[11px] text-[14px] font-semibold text-surface no-underline"
-        >
-          Jual Mobil
-        </Link>
-      </div>
-
-      {/* CONTENT */}
-      <main className="flex flex-col gap-3.5 p-3.5 pb-[180px]">
-        {/* HERO */}
-        <section className="rounded-[22px] border border-line bg-surface p-[18px]">
-          <div className="mb-3.5 flex items-start justify-between gap-3.5">
-            <div className="flex-1">
-              <div className="mb-1 text-[12px] font-medium text-muted">
-                Program Keagenan
-              </div>
-              <h1 className="m-0 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2] text-ink">
-                Jadi Agen Mobix,{" "}
-                <span className="font-serif font-medium italic text-teal-deep">
-                  komisi puluhan juta
-                </span>{" "}
-                tiap bulan.
-              </h1>
-            </div>
-            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-[18px] bg-gradient-to-br from-teal-tint to-teal-tint-border">
-              <img src="/mobix-logo.png" alt="Mobix" className="block h-auto w-[46px]" />
-            </div>
+          <div className="text-[20px] font-extrabold -tracking-[0.02em]">
+            mobi<span className="text-teal">x</span>
           </div>
-          <p className="m-0 mb-4 text-[13px] leading-[1.55] text-muted">
-            Tanpa modal stok. Akses katalog unit yang siap jual, share ke jaringan
-            kamu, dibantu AI Mobix dari foto sampai follow-up ke calon pembeli.
+          <h1 className="m-0 mb-1 mt-3.5 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2]">
+            Mau mobil{" "}
+            <span className="font-serif text-[22px] font-semibold italic text-teal">
+              apa
+            </span>{" "}
+            hari ini?
+          </h1>
+          <p className="m-0 mb-3.5 text-[12px] text-white/65">
+            2.400+ unit ready · inspeksi 175 titik · garansi mesin
           </p>
-          <div className="mt-3 flex items-center gap-2.5">
-            <div className="flex">
-              <span className="inline-block h-[22px] w-[22px] rounded-full border-2 border-surface bg-gradient-to-br from-teal to-teal-deep" />
-              <span className="-ml-[7px] inline-block h-[22px] w-[22px] rounded-full border-2 border-surface bg-gradient-to-br from-[#F5B764] to-[#E08A2C]" />
-              <span className="-ml-[7px] inline-block h-[22px] w-[22px] rounded-full border-2 border-surface bg-gradient-to-br from-[#7B6CF6] to-[#4F3EE0]" />
-            </div>
-            <span className="text-[12px] text-muted">
-              Sudah dipakai 1.240+ agen di seluruh Indonesia
+          <Link
+            href="/katalog?focus=1"
+            className="flex items-center gap-2.5 rounded-2xl bg-surface px-3.5 py-[13px] text-[13.5px] font-medium text-placeholder no-underline shadow-[0_8px_24px_-10px_rgba(14,27,30,0.3)]"
+          >
+            <Search size={16} strokeWidth={2} className="flex-shrink-0 text-teal-deep" />
+            <span>
+              Cari <b className="font-semibold text-ink">Avanza</b>, Brio, Xpander…
             </span>
+          </Link>
+          <div className="scroll-x mt-3 flex gap-2 overflow-x-auto pb-0.5">
+            {BUDGET_CHIPS.map((c) => (
+              <Link
+                key={c.label}
+                href={c.href}
+                className="flex-shrink-0 whitespace-nowrap rounded-full border border-white/[0.22] bg-white/10 px-3.5 py-[7px] text-[11.5px] font-semibold text-surface no-underline"
+              >
+                {c.label}
+              </Link>
+            ))}
           </div>
-        </section>
+        </header>
 
-        {/* QUICK STATS */}
-        <section className="grid grid-cols-3 gap-2.5">
-          {STATS.map((s) => (
-            <div
-              key={s.label}
-              className="rounded-[18px] border border-line bg-surface px-3 py-3.5 text-center"
-            >
-              <div className="mb-1 text-[11px] text-muted">{s.label}</div>
-              <div className="-tracking-[0.01em] text-[16px] font-extrabold text-ink">
-                {s.value}
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {/* KATALOG LIVE */}
-        <section className="rounded-[22px] border border-line bg-surface pb-4 pt-[18px]">
-          <div className="flex items-end justify-between gap-2.5 px-[18px] pb-3">
-            <div>
-              <h2 className="m-0 -tracking-[0.01em] text-[18px] font-extrabold text-ink">
-                Yang siap kamu share hari ini
-              </h2>
-              <p className="m-0 mt-1 text-[12px] text-muted">
-                Diperbarui beberapa saat lalu dari cabang.
-              </p>
-            </div>
+        {/* FILTER TIPE BODI */}
+        <div className="px-[18px] pt-4">
+          <div className="scroll-x flex gap-2 overflow-x-auto pb-0.5">
             <Link
               href="/katalog"
-              className="whitespace-nowrap text-[13px] font-bold text-teal-deep no-underline"
+              className="flex-shrink-0 whitespace-nowrap rounded-full border border-teal-tint-border bg-teal-tint px-[15px] py-[9px] text-[12px] font-bold text-teal-deep no-underline"
+            >
+              Semua
+            </Link>
+            {(categories.data ?? []).map((c) => (
+              <Link
+                key={c}
+                href={`/katalog?kategori=${encodeURIComponent(c)}`}
+                className="flex-shrink-0 whitespace-nowrap rounded-full border border-line bg-surface px-[15px] py-[9px] text-[12px] font-bold text-mid no-underline"
+              >
+                {prettyCategory(c)}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* CARI PER MEREK */}
+        <section className="px-[18px] pt-[22px]">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="m-0 -tracking-[0.01em] text-[15px] font-extrabold text-ink">
+              Cari per merek
+            </h2>
+            <Link
+              href="/katalog"
+              className="whitespace-nowrap text-[11.5px] font-bold text-teal-deep no-underline"
+            >
+              Semua merek
+            </Link>
+          </div>
+          <div className="mt-4 grid grid-cols-4 gap-2">
+            {BRANDS.map((b) => (
+              <Link
+                key={b.label}
+                href={b.label === "Lainnya" ? "/katalog" : `/katalog?q=${encodeURIComponent(b.label)}`}
+                className="flex flex-col items-center gap-1.5 rounded-[18px] border border-line bg-surface px-1 pb-2.5 pt-3 no-underline"
+              >
+                <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-line bg-field text-[14px] font-extrabold text-mid">
+                  {b.mono}
+                </span>
+                <span className="text-[10.5px] font-semibold text-muted">{b.label}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* HOT DEALS */}
+        <section className="pt-[22px]">
+          <div className="flex items-baseline justify-between gap-2 px-[18px]">
+            <h2 className="m-0 -tracking-[0.01em] text-[15px] font-extrabold text-ink">
+              🔥 Hot Deals minggu ini
+            </h2>
+            <Link
+              href="/hot-deals"
+              className="whitespace-nowrap text-[11.5px] font-bold text-teal-deep no-underline"
             >
               Lihat semua
             </Link>
           </div>
-          <div className="scroll-x flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18px] pb-1.5 pt-1">
-            {featured.loading &&
-              Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
-            {!featured.loading &&
-              (featured.data ?? []).map((u) => <UnitCard key={u.id} unit={u} />)}
-            {!featured.loading && featured.error && (
+          <div className="scroll-x mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18px] pb-1">
+            {hot.loading &&
+              Array.from({ length: 2 }).map((_, i) => <HotDealSkeleton key={i} />)}
+            {!hot.loading &&
+              !hot.error &&
+              (hot.data ?? []).map((u) => <HotDealCard key={u.id} unit={u} />)}
+            {!hot.loading && hot.error && (
               <div className="flex-1 py-6 text-center text-[12px] text-muted">
-                Gagal memuat unit. Coba lagi nanti.
+                Gagal memuat hot deals.
               </div>
             )}
-            {!featured.loading &&
-              !featured.error &&
-              (featured.data ?? []).length === 0 && (
-                <div className="flex-1 py-6 text-center text-[12px] text-muted">
-                  Belum ada unit ready.
-                </div>
-              )}
+            {!hot.loading && !hot.error && (hot.data ?? []).length === 0 && (
+              <div className="flex-1 py-6 text-center text-[12px] text-muted">
+                Belum ada hot deals minggu ini.
+              </div>
+            )}
           </div>
         </section>
 
-        {/* CARA KERJA */}
-        <section className="rounded-[22px] border border-line bg-surface p-[18px]">
-          <h2 className="m-0 mb-1 -tracking-[0.01em] text-[18px] font-extrabold text-ink">
-            Cara kerja program agen
-          </h2>
-          <p className="m-0 mb-3.5 text-[13px] leading-[1.5] text-muted">
-            Empat tahap yang sama untuk setiap unit, dari pendaftaran sampai komisi
-            diterima.
+        {/* REKOMENDASI UNTUKMU */}
+        <section className="px-[18px] pt-[22px]">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="m-0 -tracking-[0.01em] text-[15px] font-extrabold text-ink">
+              Rekomendasi untukmu
+            </h2>
+            <Link
+              href="/katalog"
+              className="whitespace-nowrap text-[11.5px] font-bold text-teal-deep no-underline"
+            >
+              Filter
+            </Link>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2.5">
+            {rec.loading &&
+              Array.from({ length: 4 }).map((_, i) => <RecSkeleton key={i} />)}
+            {!rec.loading &&
+              !rec.error &&
+              (rec.data ?? []).map((u) => <RecCard key={u.id} unit={u} />)}
+          </div>
+          {!rec.loading && rec.error && (
+            <div className="py-6 text-center text-[12px] text-muted">
+              Gagal memuat rekomendasi.
+            </div>
+          )}
+          {!rec.loading && !rec.error && (rec.data ?? []).length === 0 && (
+            <div className="py-6 text-center text-[12px] text-muted">
+              Belum ada unit rekomendasi.
+            </div>
+          )}
+        </section>
+
+        {/* BANNER KEAGENAN */}
+        <section
+          className="mx-[18px] mt-[22px] rounded-[22px] p-[18px] text-surface"
+          style={{ background: "linear-gradient(150deg,#0E1B1E,#1B3438)" }}
+        >
+          <div className="text-[15px] font-extrabold leading-[1.3]">
+            Jual unit Mobix, dapat{" "}
+            <span className="font-serif font-semibold italic text-teal">
+              komisi puluhan juta
+            </span>
+          </div>
+          <p className="m-0 mt-2 text-[12px] leading-[1.5] text-white/65">
+            Share katalog ke jaringanmu, tim Mobix yang urus hitungan, survei, sampai
+            serah terima. 1.240+ agen sudah gabung.
           </p>
-          <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
-            {STEPS.map((step) => (
-              <li key={step.title} className="flex items-start gap-3.5">
-                <div
-                  className={`flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-xl ${
-                    step.tint ? "bg-teal-tint text-teal-deep" : "bg-field text-ink"
-                  }`}
-                >
-                  {step.icon}
-                </div>
-                <div className="flex-1">
-                  <div className="text-[14px] font-bold text-ink">{step.title}</div>
-                  <div
-                    className={`mt-0.5 text-[12px] leading-[1.5] ${
-                      step.tint ? "font-semibold text-teal-deep" : "text-muted"
-                    }`}
-                  >
-                    {step.caption}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        {/* AI MOBIX CARD */}
-        <section className="relative overflow-hidden rounded-[22px] bg-gradient-to-b from-ink to-ink-2 p-5 text-surface">
-          <div className="absolute -right-8 -top-12 h-[200px] w-[200px] bg-[radial-gradient(circle,#1ECFCB_0%,transparent_70%)] opacity-[0.18]" />
-          <div className="relative">
-            <div className="mb-3 flex items-center gap-2.5">
-              <div className="flex h-[38px] w-[38px] items-center justify-center rounded-xl bg-teal text-[16px] font-extrabold text-ink">
-                M
-              </div>
-              <div>
-                <div className="text-[14px] font-bold">AI Mobix</div>
-                <div className="text-[11px] text-[#A4D7D7]">
-                  Asisten otomatis untuk agen
-                </div>
-              </div>
-            </div>
-            <p className="m-0 mb-4 text-[13px] leading-[1.55] text-[#C7DEE0]">
-              Minta foto sisi kanan, video keliling unit, atau langsung sambungkan
-              calon pembeli ke PIC cabang yang menyimpan mobilnya. Semuanya lewat
-              satu chat.
-            </p>
-            <div className="flex flex-col gap-2">
-              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-[12px] text-[#C7DEE0]">
-                "Tolong fotoin Avanza A-10428 dari sisi kanan & dashboard ya"
-              </div>
-              <div className="rounded-xl bg-teal px-3 py-2.5 text-[12px] font-semibold text-ink">
-                Siap. Diteruskan ke tim cabang Pondok Bambu — estimasi 20 menit.
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* TESTIMONI */}
-        <section className="rounded-[22px] border border-line bg-surface pb-4 pt-[18px]">
-          <div className="px-[18px] pb-3">
-            <h2 className="m-0 -tracking-[0.01em] text-[18px] font-extrabold text-ink">
-              Cerita agen yang sudah jalan
-            </h2>
-            <p className="m-0 mt-1 text-[12px] text-muted">
-              Dari ibu rumah tangga sampai eks sales dealer.
-            </p>
-          </div>
-          <div className="scroll-x flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-[18px] pb-1.5">
-            {TESTIMONIALS.map((t) => (
-              <article
-                key={t.name}
-                className="flex-[0_0_86%] snap-start rounded-[18px] border border-line bg-surface-3 p-3.5"
-              >
-                <div className="mb-2.5 flex items-center gap-2.5">
-                  <div
-                    className="flex h-[38px] w-[38px] items-center justify-center rounded-full text-[13px] font-extrabold"
-                    style={{ background: t.gradient, color: t.textOnGradient }}
-                  >
-                    {t.initials}
-                  </div>
-                  <div>
-                    <div className="text-[13px] font-bold text-ink">{t.name}</div>
-                    <div className="text-[11px] text-muted">{t.role}</div>
-                  </div>
-                </div>
-                <p className="m-0 text-[13px] leading-[1.5] text-mid">"{t.quote}"</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        {/* PENAWARAN / PROMO */}
-        <section className="rounded-[22px] border border-line bg-surface p-[18px]">
-          <div className="mb-3.5 flex items-center justify-between gap-2.5">
-            <h2 className="m-0 -tracking-[0.01em] text-[18px] font-extrabold text-ink">
-              Penawaran atau promo lainnya
-            </h2>
-            {(promos.data?.length ?? 0) > 3 && (
-              <Link
-                href="/promo"
-                className="whitespace-nowrap text-[13px] font-bold text-teal-deep no-underline"
-              >
-                Lihat semua
-              </Link>
-            )}
-          </div>
-          <div className="flex flex-col gap-3.5">
-            {promos.loading &&
-              Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3.5">
-                  <Skeleton className="h-20 w-[104px] flex-shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-3.5 w-3/4" />
-                    <Skeleton className="h-2.5 w-full" />
-                  </div>
-                </div>
-              ))}
-            {!promos.loading && promos.error && (
-              <div className="py-4 text-center text-[12px] text-muted">
-                Gagal memuat promo.
-              </div>
-            )}
-            {!promos.loading &&
-              !promos.error &&
-              (promos.data ?? []).slice(0, 3).map((item) => (
-                <PromoRow key={item.slug} item={item} />
-              ))}
-          </div>
+          <Link
+            href="/daftar"
+            className="mt-3 inline-block rounded-xl bg-teal px-4 py-2.5 text-[12.5px] font-extrabold text-ink no-underline"
+          >
+            Gabung jadi agen →
+          </Link>
         </section>
 
         {/* FOOTER */}
-        <footer className="px-3.5 pb-1 pt-[18px] text-center">
-          <p className="m-0 mb-3.5 text-[12px] leading-[1.5] text-muted">
-            Powered by Digital Inventory Management System - DSS Motor
-          </p>
-          <div className="mb-[18px] flex flex-col items-center gap-2.5">
-            <a href="#" className="text-[14px] font-semibold text-ink no-underline">
-              Berita
-            </a>
-            <a href="#" className="text-[14px] font-semibold text-ink no-underline">
-              Customer Care
-            </a>
-          </div>
-          <div className="mt-6 flex items-center justify-center gap-[18px] text-muted">
-            <a href="#" aria-label="Instagram" className="text-muted">
-              <Instagram />
-            </a>
-            <a href="#" aria-label="Facebook" className="text-muted">
-              <Facebook />
-            </a>
-            <a href="#" aria-label="YouTube" className="text-muted">
-              <YouTube />
-            </a>
-            <a href="#" aria-label="TikTok" className="text-muted">
-              <TikTok />
-            </a>
-          </div>
+        <footer className="px-[18px] pb-1 pt-[26px] text-center text-[11px] text-muted">
+          © {new Date().getFullYear()} agenmobix.id ·{" "}
+          <a href="#" className="font-semibold text-teal-deep no-underline">
+            Berita
+          </a>{" "}
+          ·{" "}
+          <a href="#" className="font-semibold text-teal-deep no-underline">
+            Customer Care
+          </a>
         </footer>
-
       </main>
 
       <div className="fixed bottom-[120px] left-1/2 z-20 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[1fr_auto_1fr] items-center rounded-3xl border border-line bg-surface px-4 py-3 shadow-nav">

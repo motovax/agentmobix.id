@@ -590,6 +590,16 @@ export function titleCase(s: string): string {
     .trim();
 }
 
+const TRANSMISI_LABELS: Record<string, string> = {
+  MANUAL: "Manual",
+  AUTOMATIC: "Matic",
+};
+
+/** Display label for a raw transmisi code, e.g. "AUTOMATIC" -> "Matic". */
+export function prettyTransmisi(t: string): string {
+  return TRANSMISI_LABELS[t?.toUpperCase()] ?? titleCase(t || "");
+}
+
 /** Minimal view model consumed by the card components. */
 export interface CardUnit {
   id: string;
@@ -605,6 +615,7 @@ export interface CardUnit {
   komisi: number;
   km: number;
   year: number;
+  transmisi: string;
   badge: UnitBadge;
   thumbnail: string | undefined;
   komisiLabel: string;
@@ -625,6 +636,7 @@ export function toCardUnit(item: ProductListItem): CardUnit {
     komisi: estimateKomisi(item.harga),
     km: item.odometer,
     year: item.year,
+    transmisi: prettyTransmisi(item.transmisi),
     badge: deriveBadge(item),
     thumbnail: mobixImage(item.thumbnail),
     komisiLabel: (item.aging ?? 0) > 60 ? "+Rp 2 juta" : "Mulai dari 2jt",
