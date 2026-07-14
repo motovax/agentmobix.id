@@ -35,6 +35,7 @@ export interface ProductListItem {
   transmisi: string;
   jarakTempuh: string; // already formatted, e.g. "56746 KM"
   bahanBakar: string;
+  thumbnail_depan?: string | null; // relative "/unit-file-serve?path=..."
   thumbnail: string; // relative "/unit-file-serve?path=..."
   plate_no: string;
   type: string;
@@ -135,6 +136,27 @@ export interface CaptionSuggestRequest {
   style_hint?: string;
 }
 
+export interface AIBackgroundRequest {
+  source: string;
+  slug?: string;
+  nama?: string;
+  merek?: string;
+  warna?: string;
+  tahun?: number;
+  angle_hint?: string;
+  force?: boolean;
+}
+
+export interface AIBackgroundResponse {
+  job_id: string;
+  source_key: string;
+  status: "queued" | "processing" | "done" | "failed";
+  progress: number;
+  image_url?: string;
+  cached: boolean;
+  message?: string;
+}
+
 export interface ListRequest {
   merek?: string[];
   judul?: string[];
@@ -169,14 +191,10 @@ function normalizePlateValue(q: string): string {
   return q.replace(/[^A-Z0-9]/gi, "").toUpperCase();
 }
 
-function plateAreaPrefix(q: string): string {
-  const area = normalizePlateValue(q).match(/^[A-Z]{1,2}/)?.[0] ?? "";
-  return area ? `${area}%` : q;
-}
-
 function plateCandidateQuery(q: string): string {
   const normalized = normalizePlateValue(q);
-  return normalized.length < 4 ? normalizePlateQuery(normalized) : plateAreaPrefix(normalized);
+  const stem = normalized.match(/^[A-Z]{1,2}\d/)?.[0] ?? "";
+  return stem ? `${stem}%` : normalizePlateQuery(normalized);
 }
 
 function levenshteinDistance(a: string, b: string): number {
@@ -305,9 +323,27 @@ export interface CabangDetail {
   stok_ready: number;
 }
 
+function isNullableScanError(error: unknown) {
+  return error instanceof Error && /cannot scan NULL|can't scan into dest/i.test(error.message);
+}
+
 /** Live filter values (GET endpoints, see /docs). */
 export async function fetchCategories(): Promise<string[]> {
-  return (await get<string[]>("/daftar-kategori")).data ?? [];
+  const categories = (await get<string[]>("/daftar-kategori")).data ?? [];
+  const checks = await Promise.allSettled(
+    categories.map((category) =>
+      post<ProductListItem[]>("/daftar-produk", buildListBody({
+        page: 1,
+        limit: 1,
+        kategori: [category],
+      })),
+    ),
+  );
+
+  return categories.filter((_, index) => {
+    const check = checks[index];
+    return check.status === "fulfilled" || !isNullableScanError(check.reason);
+  });
 }
 export async function fetchBrands(): Promise<string[]> {
   return (await get<string[]>("/daftar-merek")).data ?? [];
@@ -350,10 +386,6 @@ function buildListBody(req: ListRequest) {
     limit: 12,
     ...req,
   };
-}
-
-function isNullableScanError(error: unknown) {
-  return error instanceof Error && /cannot scan NULL|can't scan into dest/i.test(error.message);
 }
 
 async function fetchUnitsByCategoryFallback(req: ListRequest): Promise<ListResult> {
@@ -559,6 +591,22 @@ export async function suggestShareCaption(
   return caption;
 }
 
+export async function generateAIBackground(
+  request: AIBackgroundRequest,
+): Promise<AIBackgroundResponse> {
+  const env = await post<AIBackgroundResponse>("/ai-background", request);
+  return env.data;
+}
+
+export async function fetchAIBackgroundStatus(
+  jobId: string,
+): Promise<AIBackgroundResponse> {
+  const env = await get<AIBackgroundResponse>(
+    `/ai-background/status?job_id=${encodeURIComponent(jobId)}`,
+  );
+  return env.data;
+}
+
 /* ---- agent-program derivations (not present in the catalog API) ---- */
 
 /**
@@ -638,7 +686,7 @@ export function toCardUnit(item: ProductListItem): CardUnit {
     year: item.year,
     transmisi: prettyTransmisi(item.transmisi),
     badge: deriveBadge(item),
-    thumbnail: mobixImage(item.thumbnail),
+    thumbnail: mobixImage(item.thumbnail_depan?.trim() || item.thumbnail),
     komisiLabel: (item.aging ?? 0) > 60 ? "+Rp 2 juta" : "Mulai dari 2jt",
   };
 }

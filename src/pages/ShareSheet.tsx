@@ -13,6 +13,7 @@ import {
   Check,
   Sparkles,
   Play,
+  Info,
 } from "../components/icons";
 import {
   fetchUnitDetail,
@@ -23,10 +24,13 @@ import {
   mobixMedia,
   mobixMediaFetchable,
   suggestShareCaption,
+  generateAIBackground,
+  fetchAIBackgroundStatus,
   titleCase,
   type GalleryItem,
   type ProductDetail,
   type VideoItem,
+  type AIBackgroundResponse,
 } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
 import { formatJt, formatRupiah } from "../lib/format";
@@ -43,6 +47,8 @@ type PendingShareStep = {
   label: string;
   includeCaption?: boolean;
 };
+
+type AiBackgroundStatus = "idle" | "generating" | "done" | "failed";
 
 /* ---- canvas overlay composition ---- */
 
@@ -330,6 +336,12 @@ export function ShareSheet() {
   const [shareFiles, setShareFiles] = useState<File[]>([]);
   const [shareComposing, setShareComposing] = useState(false);
   const [shareFilesSignature, setShareFilesSignature] = useState("");
+  const [aiBackgroundStatus, setAiBackgroundStatus] = useState<AiBackgroundStatus>("idle");
+  const [aiBackgroundProgress, setAiBackgroundProgress] = useState(0);
+  const [aiBackgroundFiles, setAiBackgroundFiles] = useState<Record<string, File>>({});
+  const [aiBackgroundUrls, setAiBackgroundUrls] = useState<Record<string, string>>({});
+  const [aiPreviewMode, setAiPreviewMode] = useState<"ai" | "original">("ai");
+  const [aiBackgroundError, setAiBackgroundError] = useState("");
 
   const blobCache = useRef<Map<string, Blob>>(new Map());
   const captionSuggestionIndex = useRef(0);
@@ -354,6 +366,9 @@ export function ShareSheet() {
   const selectedMediaItems = selectedIdxes
     .map((i) => mediaItems[i])
     .filter((media): media is ShareMedia => Boolean(media));
+  const selectedImageMedia = selectedMediaItems.filter(
+    (media): media is Extract<ShareMedia, { kind: "image" }> => media.kind === "image",
+  );
   const selectedImageCount = selectedMediaItems.filter((media) => media.kind === "image").length;
   const selectedVideoCount = selectedMediaItems.filter((media) => media.kind === "video").length;
   const selectedMediaLabel =
@@ -408,6 +423,68 @@ export function ShareSheet() {
         )}, bisa cek langsung. Chat saya ya`
     : "";
 
+  function replaceAiBackgroundFiles(entries: Array<[string, File, string]>) {
+    const files: Record<string, File> = {};
+    const urls: Record<string, string> = {};
+    entries.forEach(([id, file, url]) => {
+      files[id] = file;
+      urls[id] = url;
+    });
+    setAiBackgroundFiles(files);
+    setAiBackgroundUrls(urls);
+  }
+
+  function mergeAiBackgroundFiles(entries: Array<[string, File, string]>) {
+    setAiBackgroundFiles((prev) => {
+      const next = { ...prev };
+      entries.forEach(([id, file]) => {
+        next[id] = file;
+      });
+      return next;
+    });
+    setAiBackgroundUrls((prev) => {
+      const next = { ...prev };
+      entries.forEach(([id, , url]) => {
+        next[id] = url;
+      });
+      return next;
+    });
+  }
+
+  async function buildImageFilesForShare(
+    imageMedia: Array<Extract<ShareMedia, { kind: "image" }>>,
+  ) {
+    if (
+      aiBackgroundStatus === "done" &&
+      aiPreviewMode === "ai" &&
+      imageMedia.some((media) => aiBackgroundFiles[media.id])
+    ) {
+      const files = await Promise.all(
+        imageMedia.map(async (media) => {
+          const aiFile = aiBackgroundFiles[media.id];
+          if (aiFile) return aiFile;
+          const fallback = await buildShareImages(
+            [media.item],
+            sharePrice,
+            shareTdp,
+            false,
+            blobCache.current,
+          );
+          return fallback[0] ?? null;
+        }),
+      );
+      return files.filter(Boolean) as File[];
+    }
+
+    return buildShareImages(
+      imageMedia.map((media) => media.item),
+      sharePrice,
+      shareTdp,
+      false,
+      blobCache.current,
+    );
+  }
+
   // init when unit loads
   useEffect(() => {
     if (!unit) return;
@@ -415,6 +492,11 @@ export function ShareSheet() {
     setPreviewIdx(0);
     setCaptionText(autoCaption);
     setPendingShareStep(null);
+    setAiBackgroundStatus("idle");
+    setAiBackgroundProgress(0);
+    setAiPreviewMode("ai");
+    setAiBackgroundError("");
+    replaceAiBackgroundFiles([]);
   }, [unit?.id, autoCaption]);
 
   // fetch raw blobs (cached) + compose download files whenever selection changes
@@ -426,22 +508,15 @@ export function ShareSheet() {
     const selectedMedia = selectedIdxes
       .map((i) => mediaItems[i])
       .filter(Boolean);
-    const selectedGallery = selectedMedia
-      .filter((media): media is Extract<ShareMedia, { kind: "image" }> => media.kind === "image")
-      .map((media) => media.item);
+    const selectedImages = selectedMedia
+      .filter((media): media is Extract<ShareMedia, { kind: "image" }> => media.kind === "image");
     const selectedVideos = selectedMedia
       .filter((media): media is Extract<ShareMedia, { kind: "video" }> => media.kind === "video")
       .map((media) => media.item);
 
     async function run() {
-      const imageFiles = selectedGallery.length
-        ? await buildShareImages(
-        selectedGallery,
-        sharePrice,
-        shareTdp,
-        false,
-            blobCache.current,
-          )
+      const imageFiles = selectedImages.length
+        ? await buildImageFilesForShare(selectedImages)
         : [];
       const videoFiles = selectedVideos.length
         ? await buildShareVideos(selectedVideos, blobCache.current)
@@ -459,7 +534,15 @@ export function ShareSheet() {
     return () => {
       alive = false;
     };
-  }, [unit, selectedIdxes.join(","), sharePrice, shareTdp]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    unit,
+    selectedIdxes.join(","),
+    sharePrice,
+    shareTdp,
+    aiBackgroundStatus,
+    aiPreviewMode,
+    Object.keys(aiBackgroundFiles).join(","),
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function prepareShareFiles() {
     if (!unit || !mediaItems.length) return [];
@@ -467,13 +550,12 @@ export function ShareSheet() {
     const selectedMedia = selectedIdxes
       .map((i) => mediaItems[i])
       .filter(Boolean);
-    const selectedGallery = selectedMedia
-      .filter((media): media is Extract<ShareMedia, { kind: "image" }> => media.kind === "image")
-      .map((media) => media.item);
+    const selectedImages = selectedMedia
+      .filter((media): media is Extract<ShareMedia, { kind: "image" }> => media.kind === "image");
     const selectedVideos = selectedMedia
       .filter((media): media is Extract<ShareMedia, { kind: "video" }> => media.kind === "video")
       .map((media) => media.item);
-    const signature = `${selectedIdxes.join(",")}:${sharePrice}:${shareTdp}`;
+    const signature = `${selectedIdxes.join(",")}:${sharePrice}:${shareTdp}:${aiBackgroundStatus}:${aiPreviewMode}:${Object.keys(aiBackgroundFiles).sort().join(",")}`;
 
     if (shareFiles.length > 0 && shareFilesSignature === signature) {
       return shareFiles;
@@ -482,14 +564,8 @@ export function ShareSheet() {
     setShareComposing(true);
 
     try {
-      const imageFiles = selectedGallery.length
-        ? await buildShareImages(
-            selectedGallery,
-            sharePrice,
-            shareTdp,
-            false,
-            blobCache.current,
-          )
+      const imageFiles = selectedImages.length
+        ? await buildImageFilesForShare(selectedImages)
         : [];
       const videoFiles = selectedVideos.length
         ? await buildShareVideos(selectedVideos, blobCache.current)
@@ -539,6 +615,93 @@ export function ShareSheet() {
   async function copy(what: "caption" | "link", text: string) {
     if (await copyToClipboard(text)) {
       showCopiedState(what);
+    }
+  }
+
+  async function waitForAIBackgroundJob(
+    initial: AIBackgroundResponse,
+    onProgress: (progress: number) => void,
+  ) {
+    let current = initial;
+    onProgress(current.progress || (current.status === "done" ? 100 : 10));
+
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      if (current.status === "done" || current.status === "failed") {
+        return current;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 1500));
+      current = await fetchAIBackgroundStatus(current.job_id);
+      onProgress(current.progress || 20);
+    }
+
+    throw new Error("Generate background terlalu lama. Coba lagi sebentar.");
+  }
+
+  async function handleGenerateAiBackground(force = false) {
+    if (!unit || aiBackgroundStatus === "generating" || selectedImageMedia.length === 0) return;
+
+    const activeIsSelectedImage = activeMedia?.kind === "image" && selectedImageMedia.some((media) => media.id === activeMedia.id);
+    if (!activeIsSelectedImage) {
+      const firstSelectedImageIdx = mediaItems.findIndex((media) => media.id === selectedImageMedia[0].id);
+      if (firstSelectedImageIdx >= 0) {
+        setPreviewIdx(firstSelectedImageIdx);
+      }
+    }
+
+    setAiBackgroundStatus("generating");
+    setAiBackgroundError("");
+    setAiBackgroundProgress(6);
+    setAiPreviewMode("ai");
+
+    try {
+      const progressByMedia: Record<string, number> = {};
+      const updateAggregateProgress = (id: string, progress: number) => {
+        progressByMedia[id] = progress;
+        const values = selectedImageMedia.map((media) => progressByMedia[media.id] ?? 6);
+        const avg = Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+        setAiBackgroundProgress(Math.min(99, avg));
+      };
+
+      const entries = await Promise.all(
+        selectedImageMedia.map(async (media, index) => {
+          const started = await generateAIBackground({
+            source: media.item.url,
+            slug: unit.slug,
+            nama: unit.nama,
+            merek: unit.brand,
+            warna: unit.color,
+            tahun: unit.year,
+            force,
+          });
+          const result = await waitForAIBackgroundJob(started, (progress) =>
+            updateAggregateProgress(media.id, progress),
+          );
+          if (result.status !== "done" || !result.image_url) {
+            throw new Error(result.message || "AI background gagal dibuat");
+          }
+
+          const blob = await fetchRawMediaBlob(result.image_url, blobCache.current);
+          if (!blob) return null;
+          const file = new File([blob], `unit-ai-background-${index + 1}.jpg`, {
+            type: blob.type || "image/jpeg",
+          });
+          return [media.id, file, mobixMedia(result.image_url) ?? result.image_url] as [string, File, string];
+        }),
+      );
+      const validEntries = entries.filter(Boolean) as Array<[string, File, string]>;
+
+      mergeAiBackgroundFiles(validEntries);
+      setAiBackgroundProgress(100);
+      setAiBackgroundStatus(validEntries.length > 0 ? "done" : "failed");
+      if (validEntries.length === 0) {
+        setAiBackgroundError("Tidak ada foto AI yang berhasil dibuat.");
+      }
+    } catch (error) {
+      setAiBackgroundProgress(0);
+      setAiBackgroundStatus("failed");
+      setAiBackgroundError(
+        error instanceof Error ? error.message : "Gagal membuat AI background.",
+      );
     }
   }
 
@@ -744,13 +907,31 @@ export function ShareSheet() {
   }
 
   const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
+  const aiActiveUrl = activeMedia?.kind === "image" && aiPreviewMode === "ai"
+    ? aiBackgroundUrls[activeMedia.id]
+    : undefined;
   const activeUrl = activeMedia?.kind === "video"
     ? mobixMedia(activeMedia.url)
-    : mobixImage(activeMedia?.url, MOBIX_SHARE_WIDTH);
+    : aiActiveUrl ?? mobixImage(activeMedia?.url, MOBIX_SHARE_WIDTH);
   const activePlaceholder = activeMedia?.kind === "image"
     ? mobixImage(activeMedia.url, MOBIX_SHARE_WIDTH)
     : undefined;
   const priceDelta = unit && sharePrice ? sharePrice - unit.harga : 0;
+  const canGenerateAiBackground =
+    Boolean(unit) && selectedImageMedia.length > 0 && aiBackgroundStatus !== "generating";
+  const aiBackgroundActiveUrl = activeMedia?.kind === "image"
+    ? aiBackgroundUrls[activeMedia.id]
+    : undefined;
+  const activeHasAiBackground = Boolean(aiBackgroundActiveUrl);
+  const selectedAiBackgroundCount = selectedImageMedia.filter((media) => aiBackgroundUrls[media.id]).length;
+  const selectedAiBackgroundComplete =
+    selectedImageMedia.length > 0 && selectedAiBackgroundCount === selectedImageMedia.length;
+  const aiBackgroundDone = selectedAiBackgroundCount > 0 && aiBackgroundStatus !== "generating";
+  const aiBackgroundPreviewMedia =
+    activeMedia?.kind === "image" && selectedImageMedia.some((media) => media.id === activeMedia.id)
+      ? activeMedia
+      : selectedImageMedia[0];
+  const showAiOriginalToggle = activeMedia?.kind === "image" && activeHasAiBackground;
 
   return (
     <AppShell bg="bg-ink">
@@ -899,6 +1080,119 @@ export function ShareSheet() {
             )}
           </div>
         )}
+
+        {/* AI background */}
+        <div className="mb-[18px] rounded-[14px] border border-dashed border-[#8D7DFF] bg-surface px-3.5 py-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#D9D4FF] bg-[#F5F2FF] text-[#6B57E8]">
+              <Sparkles size={19} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <div className="text-[13px] font-bold text-ink">AI Background</div>
+                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                  aiBackgroundDone
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-[#F0ECFF] text-[#6B57E8]"
+                }`}>
+                  {aiBackgroundDone ? "Selesai" : "Baru"}
+                </span>
+              </div>
+              <div className="mt-1 text-[12px] leading-[1.45] text-mid">
+                Hapus background dan buat background profesional otomatis sesuai angle mobil.
+              </div>
+            </div>
+            {aiBackgroundDone ? (
+              <Check size={18} className="mt-1 shrink-0 text-emerald-600" />
+            ) : (
+              <Info size={18} className="mt-1 shrink-0 text-muted" />
+            )}
+          </div>
+
+          {aiBackgroundStatus === "generating" && (
+            <div className="mt-3 overflow-hidden rounded-[12px] bg-ink">
+              <div className="relative aspect-video">
+                {aiBackgroundPreviewMedia && (
+                  <Photo
+                    className="h-full w-full opacity-45"
+                    src={mobixImage(aiBackgroundPreviewMedia.url, MOBIX_SHARE_WIDTH)}
+                    alt=""
+                  />
+                )}
+                <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center text-surface">
+                  <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/55 bg-white/10">
+                    <Sparkles size={24} />
+                  </div>
+                  <div className="text-[13px] font-bold">Sedang membuat background...</div>
+                  <div className="mt-0.5 text-[12px] text-white/80">Menyesuaikan angle mobil</div>
+                  <div className="mt-3 flex w-full max-w-[250px] items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/25">
+                      <div
+                        className="h-full rounded-full bg-teal-deep transition-all"
+                        style={{ width: `${Math.max(8, aiBackgroundProgress)}%` }}
+                      />
+                    </div>
+                    <span className="w-9 text-right text-[12px] font-bold">
+                      {aiBackgroundProgress}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {aiBackgroundStatus === "failed" && aiBackgroundError && (
+            <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
+              {aiBackgroundError}
+            </div>
+          )}
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {aiBackgroundDone && (
+              <button
+                type="button"
+                onClick={() => setAiPreviewMode("original")}
+                className="min-h-10 flex-1 rounded-lg border border-line bg-surface px-3 text-[12px] font-bold text-ink"
+              >
+                Lihat Original
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => void handleGenerateAiBackground(selectedAiBackgroundComplete)}
+              disabled={!canGenerateAiBackground}
+              className="min-h-10 flex-1 rounded-lg bg-teal-deep px-3 text-[12px] font-bold text-surface disabled:opacity-50"
+            >
+              {selectedAiBackgroundComplete ? "Generate Ulang" : "Generate Background"}
+            </button>
+          </div>
+
+          {showAiOriginalToggle && (
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span className="text-[12px] font-bold text-mid">Tampilkan:</span>
+              <div className="grid w-[170px] grid-cols-2 rounded-lg border border-line bg-surface p-0.5 text-[12px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setAiPreviewMode("ai")}
+                  className={`rounded-md px-3 py-2 ${
+                    aiPreviewMode === "ai" ? "bg-teal-deep text-surface" : "text-mid"
+                  }`}
+                >
+                  AI
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAiPreviewMode("original")}
+                  className={`rounded-md px-3 py-2 ${
+                    aiPreviewMode === "original" ? "bg-teal-deep text-surface" : "text-mid"
+                  }`}
+                >
+                  Original
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* caption – editable */}
         <div className="mb-[18px] rounded-[14px] border border-line bg-surface px-3.5 py-3">
