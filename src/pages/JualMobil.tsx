@@ -28,6 +28,11 @@ const INITIAL_FORM: SellCarFormData = {
 const PLATES = ["B - DKI Jakarta", "D - Bandung", "F - Bogor", "L - Surabaya", "AB - Yogyakarta", "Lainnya"];
 const COLORS = ["Hitam", "Putih", "Abu-abu", "Silver", "Merah", "Biru", "Cokelat", "Lainnya"];
 
+function formatThousands(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  return digits ? new Intl.NumberFormat("id-ID").format(Number(digits)) : "";
+}
+
 function Field({
   label,
   required = false,
@@ -193,10 +198,10 @@ export function JualMobil() {
 
             <Field label="Jarak Tempuh (KM)" hint="Contoh: 50.000">
               <input
-                type="number"
-                min="0"
-                value={form.mileage}
-                onChange={(event) => update("mileage", event.target.value)}
+                type="text"
+                inputMode="numeric"
+                value={formatThousands(form.mileage)}
+                onChange={(event) => update("mileage", event.target.value.replace(/\D/g, ""))}
                 placeholder="Contoh: 50.000"
                 className="h-11 w-full rounded-[12px] border border-line bg-surface px-3.5 text-[13px] text-ink outline-none transition placeholder:text-placeholder focus:border-teal-deep"
               />
@@ -208,11 +213,13 @@ export function JualMobil() {
               </SelectField>
             </Field>
 
-            <Field label="Masa Berlaku STNK">
+            <Field label="Masa Berlaku STNK" hint="Pilih bulan dan tahun masa berlaku STNK.">
               <input
                 type="month"
+                lang="id-ID"
                 value={form.stnk}
                 onChange={(event) => update("stnk", event.target.value)}
+                aria-label="Pilih bulan dan tahun masa berlaku STNK"
                 className="h-11 w-full rounded-[12px] border border-line bg-surface px-3.5 text-[13px] text-ink outline-none transition focus:border-teal-deep"
               />
             </Field>
