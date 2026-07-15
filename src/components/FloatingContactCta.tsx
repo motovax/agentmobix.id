@@ -92,7 +92,7 @@ export function ContactActionMenu({
 export function FloatingContactCta({
   adminMessage = DEFAULT_ADMIN_MESSAGE,
   calculationMessage = DEFAULT_CALCULATION_MESSAGE,
-  bottomClassName = "bottom-[calc(12px+env(safe-area-inset-bottom))]",
+  bottomClassName = "bottom-[calc(28px+env(safe-area-inset-bottom))]",
 }: {
   adminMessage?: string;
   calculationMessage?: string;

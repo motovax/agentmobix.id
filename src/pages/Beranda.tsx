@@ -457,7 +457,7 @@ export function Beranda() {
         </footer>
       </main>
 
-      <FloatingContactCta bottomClassName="bottom-[calc(96px+env(safe-area-inset-bottom))]" />
+      <FloatingContactCta bottomClassName="bottom-[calc(112px+env(safe-area-inset-bottom))]" />
       <BottomNav active="beranda" />
     </AppShell>
   );
