@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { AppBar } from "../components/AppBar";
@@ -27,6 +27,20 @@ const INITIAL_FORM: SellCarFormData = {
 
 const PLATES = ["B - DKI Jakarta", "D - Bandung", "F - Bogor", "L - Surabaya", "AB - Yogyakarta", "Lainnya"];
 const COLORS = ["Hitam", "Putih", "Abu-abu", "Silver", "Merah", "Biru", "Cokelat", "Lainnya"];
+const MONTHS = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
 
 function formatThousands(value: string): string {
   const digits = value.replace(/\D/g, "");
@@ -80,6 +94,102 @@ function SelectField({
         {children}
       </select>
       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted" />
+    </div>
+  );
+}
+
+function MonthYearPicker({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  const initialYear = Number(value.slice(0, 4)) || new Date().getFullYear();
+  const [open, setOpen] = useState(false);
+  const [viewYear, setViewYear] = useState(initialYear);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [open]);
+
+  function selectMonth(month: number) {
+    onChange(`${viewYear}-${String(month + 1).padStart(2, "0")}`);
+    setOpen(false);
+  }
+
+  const selectedYear = Number(value.slice(0, 4));
+  const selectedMonth = Number(value.slice(5, 7)) - 1;
+  const label = value
+    ? `${MONTHS[selectedMonth] ?? ""} ${selectedYear}`
+    : placeholder;
+
+  return (
+    <div ref={pickerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => {
+          setViewYear(Number(value.slice(0, 4)) || new Date().getFullYear());
+          setOpen((current) => !current);
+        }}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className={`flex h-11 w-full items-center justify-between rounded-[12px] border bg-surface px-3.5 text-left text-[13px] outline-none transition focus:border-teal-deep ${
+          value ? "border-line text-ink" : "border-line text-placeholder"
+        }`}
+      >
+        <span>{label}</span>
+        <ChevronDown className={`text-muted transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div role="dialog" aria-label="Pilih bulan dan tahun" className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 rounded-[16px] border border-line bg-surface p-3 shadow-[0_12px_30px_-14px_rgba(14,27,30,0.4)]">
+          <div className="mb-2 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setViewYear((year) => year - 1)}
+              aria-label="Tahun sebelumnya"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[22px] leading-none text-ink transition hover:bg-field"
+            >
+              ‹
+            </button>
+            <div className="text-[14px] font-extrabold text-ink">{viewYear}</div>
+            <button
+              type="button"
+              onClick={() => setViewYear((year) => year + 1)}
+              aria-label="Tahun berikutnya"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[22px] leading-none text-ink transition hover:bg-field"
+            >
+              ›
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {MONTHS.map((month, index) => {
+              const active = selectedYear === viewYear && selectedMonth === index;
+              return (
+                <button
+                  key={month}
+                  type="button"
+                  onClick={() => selectMonth(index)}
+                  className={`rounded-[10px] px-1.5 py-2 text-[11px] font-semibold transition ${
+                    active ? "bg-teal-deep text-white" : "text-mid hover:bg-teal-tint"
+                  }`}
+                >
+                  {month.slice(0, 3)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -214,13 +324,10 @@ export function JualMobil() {
             </Field>
 
             <Field label="Masa Berlaku STNK" hint="Pilih bulan dan tahun masa berlaku STNK.">
-              <input
-                type="month"
-                lang="id-ID"
+              <MonthYearPicker
                 value={form.stnk}
-                onChange={(event) => update("stnk", event.target.value)}
-                aria-label="Pilih bulan dan tahun masa berlaku STNK"
-                className="h-11 w-full rounded-[12px] border border-line bg-surface px-3.5 text-[13px] text-ink outline-none transition focus:border-teal-deep"
+                onChange={(value) => update("stnk", value)}
+                placeholder="Pilih bulan dan tahun"
               />
             </Field>
 
