@@ -305,14 +305,14 @@ export function Beranda() {
               Semua merek
             </Link>
           </div>
-          <div className="mt-4 grid grid-cols-4 gap-2">
+          <div className="scroll-x -mx-[18px] mt-3 flex gap-2 overflow-x-auto px-[18px] pb-0.5">
             {BRANDS.map((b) => (
               <Link
                 key={b.label}
                 href={b.label === "Lainnya" ? "/katalog" : `/katalog?q=${encodeURIComponent(b.label)}`}
-                className="flex flex-col items-center gap-1.5 rounded-[18px] border border-line bg-surface px-1 pb-2.5 pt-3 no-underline"
+                className="flex w-[74px] flex-shrink-0 flex-col items-center gap-1 rounded-[14px] border border-line bg-surface px-1 pb-2 pt-2 no-underline"
               >
-                <span className="flex h-[34px] w-[34px] items-center justify-center overflow-hidden rounded-full border border-line bg-surface">
+                <span className="flex h-[28px] w-[28px] items-center justify-center overflow-hidden rounded-full border border-line bg-surface">
                   {b.logo ? (
                     <img
                       src={b.logo}
@@ -321,10 +321,12 @@ export function Beranda() {
                       className="h-full w-full object-contain p-1"
                     />
                   ) : (
-                    <span className="text-[14px] font-extrabold text-mid">+</span>
+                    <span className="text-[13px] font-extrabold text-mid">+</span>
                   )}
                 </span>
-                <span className="text-[10.5px] font-semibold text-muted">{b.label}</span>
+                <span className="w-full truncate text-center text-[10px] font-semibold text-muted">
+                  {b.label}
+                </span>
               </Link>
             ))}
           </div>
