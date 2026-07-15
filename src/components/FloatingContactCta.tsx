@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Calculator, Chat } from "./icons";
 
 const ADMIN_PHONE = "6285701959826";
@@ -21,32 +22,71 @@ export function FloatingContactCta({
   calculationMessage?: string;
   bottomClassName?: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function onPointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   return (
     <div
+      ref={rootRef}
       className={[
-        "fixed left-1/2 z-40 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[1fr_auto_1fr] items-center rounded-3xl border border-line bg-surface px-4 py-3 shadow-nav",
+        "fixed right-[18px] z-40 flex flex-col items-end gap-2",
         bottomClassName,
       ].join(" ")}
     >
-      <a
-        href={waHref(adminMessage)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center justify-center gap-2 px-2 py-1.5 text-[14px] font-bold text-teal-deep no-underline"
+      {open && (
+        <div className="w-[192px] overflow-hidden rounded-2xl border border-line bg-surface p-1.5 shadow-nav">
+          <a
+            href={waHref(adminMessage)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-bold text-teal-deep no-underline"
+          >
+            <Chat size={18} />
+            Tanya Admin
+          </a>
+          <a
+            href={waHref(calculationMessage)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-bold text-teal-deep no-underline"
+          >
+            <Calculator size={18} />
+            Minta Hitungan
+          </a>
+        </div>
+      )}
+      <button
+        type="button"
+        aria-label="Buka pilihan kontak"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="flex h-14 w-14 items-center justify-center rounded-full border border-teal-tint-border bg-teal text-ink shadow-nav"
       >
-        <Chat size={22} />
-        Tanya Admin
-      </a>
-      <div className="h-9 w-px bg-line" />
-      <a
-        href={waHref(calculationMessage)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center justify-center gap-2 px-2 py-1.5 text-[14px] font-bold text-teal-deep no-underline"
-      >
-        <Calculator size={22} />
-        Minta Hitungan
-      </a>
+        <Chat size={24} />
+      </button>
     </div>
   );
 }
