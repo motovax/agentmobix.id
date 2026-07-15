@@ -117,6 +117,7 @@ export function Beranda() {
   const [recTotalPages, setRecTotalPages] = useState<number | null>(null);
   const [recLoading, setRecLoading] = useState(false);
   const [recError, setRecError] = useState(false);
+  const recLoadMoreRef = useRef<HTMLDivElement | null>(null);
   const recLoadingRef = useRef(false);
   const recRequestRef = useRef(0);
 
@@ -199,6 +200,23 @@ export function Beranda() {
   useEffect(() => {
     loadRecommendations({ page: 1, replace: true });
   }, [activeCategory]);
+
+  useEffect(() => {
+    const target = recLoadMoreRef.current;
+    if (!target || recError || recLoading || !hasMoreRecommendations) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadRecommendations();
+        }
+      },
+      { rootMargin: "320px 0px" },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMoreRecommendations, loadRecommendations, recError, recLoading]);
 
   return (
     <AppShell>
@@ -372,12 +390,12 @@ export function Beranda() {
               </button>
             ))}
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2.5">
             {recItems.map((u) => (
               <RecCard key={u.id} unit={u} />
             ))}
             {recLoading &&
-              Array.from({ length: recItems.length ? 3 : 6 }).map((_, i) => (
+              Array.from({ length: recItems.length ? 2 : 6 }).map((_, i) => (
                 <RecSkeleton key={`rec-skeleton-${i}`} />
               ))}
           </div>
@@ -400,15 +418,7 @@ export function Beranda() {
               Belum ada unit katalog.
             </div>
           )}
-          {!recLoading && !recError && recItems.length > 0 && hasMoreRecommendations && (
-            <button
-              type="button"
-              onClick={() => loadRecommendations()}
-              className="mt-3 w-full rounded-xl border border-teal-tint-border bg-teal-tint px-3 py-3 text-[12.5px] font-extrabold text-teal-deep"
-            >
-              Muat lebih banyak
-            </button>
-          )}
+          <div ref={recLoadMoreRef} className="h-1" aria-hidden="true" />
         </section>
 
         {/* BANNER KEAGENAN */}
