@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { BottomNav } from "../components/BottomNav";
-import { Search, Chat, Calculator } from "../components/icons";
+import { FloatingContactCta } from "../components/FloatingContactCta";
+import { Search } from "../components/icons";
 import { Photo, Skeleton } from "../components/ui";
 import {
   fetchUnits,
@@ -17,8 +18,8 @@ import { useAsync } from "../lib/useAsync";
 
 const BUDGET_CHIPS = [
   { label: "< Rp100jt", href: "/katalog?harga_max=100000000" },
-  { label: "Rp100–150jt", href: "/katalog?harga_min=100000000&harga_max=150000000" },
-  { label: "Rp150–200jt", href: "/katalog?harga_min=150000000&harga_max=200000000" },
+  { label: "Rp100?150jt", href: "/katalog?harga_min=100000000&harga_max=150000000" },
+  { label: "Rp150?200jt", href: "/katalog?harga_min=150000000&harga_max=200000000" },
   { label: "> Rp200jt", href: "/katalog?harga_min=200000000" },
   { label: "Matic", href: "/katalog?transmisi=AUTOMATIC" },
 ];
@@ -33,46 +34,6 @@ const BRANDS = [
   { label: "Hyundai", logo: "/brands/hyundai.png" },
   { label: "Lainnya", logo: null },
 ];
-
-function HotDealCard({ unit }: { unit: CardUnit }) {
-  return (
-    <Link
-      href={`/unit/${unit.slug}`}
-      className="block w-[236px] flex-shrink-0 snap-start overflow-hidden rounded-[18px] border border-line bg-surface text-inherit no-underline"
-    >
-      <Photo className="h-32" src={unit.thumbnail} alt={unit.title}>
-        <span className="absolute right-2 top-2 rounded-full bg-ink/75 px-2 py-1 text-[10px] font-bold text-surface">
-          {unit.year}
-        </span>
-      </Photo>
-      <div className="px-3 pb-3 pt-2.5">
-        <div className="mb-1 line-clamp-2 text-[13px] font-bold leading-[1.25] text-ink">
-          {unit.title}
-        </div>
-        <div className="-tracking-[0.01em] text-[15px] font-extrabold text-teal-deep">
-          Rp {formatJt(unit.price)}
-        </div>
-        <div className="mt-0.5 text-[10.5px] text-muted">
-          TDP {formatJt(unit.tdp)} · cicilan {formatJt(unit.cicilan)}/bln
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          <span className="rounded-lg bg-field px-1.5 py-1 text-[10px] font-semibold text-muted">
-            {formatKm(unit.km)}
-          </span>
-          <span className="rounded-lg bg-field px-1.5 py-1 text-[10px] font-semibold text-muted">
-            {unit.transmisi}
-          </span>
-          <span className="rounded-lg bg-field px-1.5 py-1 text-[10px] font-semibold text-muted">
-            {unit.branch}
-          </span>
-        </div>
-        <div className="mt-2.5 inline-block rounded-[10px] border border-teal-tint-border bg-teal-tint px-2.5 py-1 text-[10.5px] font-extrabold text-teal-deep">
-          Komisi {unit.komisiLabel}
-        </div>
-      </div>
-    </Link>
-  );
-}
 
 function RecCard({ unit }: { unit: CardUnit }) {
   return (
@@ -106,18 +67,6 @@ function RecCard({ unit }: { unit: CardUnit }) {
         </div>
       </div>
     </Link>
-  );
-}
-
-function HotDealSkeleton() {
-  return (
-    <div className="w-[236px] flex-shrink-0 overflow-hidden rounded-[18px] border border-line bg-surface">
-      <Skeleton className="h-32 rounded-none" />
-      <div className="space-y-2 p-3">
-        <Skeleton className="h-3 w-32" />
-        <Skeleton className="h-4 w-24" />
-      </div>
-    </div>
   );
 }
 
@@ -181,10 +130,6 @@ export function Beranda() {
   }, [debouncedQ]);
 
   const categories = useAsync(fetchCategories, []);
-  const hot = useAsync(
-    () => fetchUnits({ limit: 6, aging_awal: 61 }).then((r) => r.items.map(toCardUnit)),
-    [],
-  );
   const rec = useAsync(
     () => fetchUnits({ limit: 6 }).then((r) => r.items.map(toCardUnit)),
     [],
@@ -192,7 +137,7 @@ export function Beranda() {
 
   return (
     <AppShell>
-      <main className="pb-[calc(110px+env(safe-area-inset-bottom))]">
+      <main className="pb-[calc(176px+env(safe-area-inset-bottom))]">
         {/* SEARCH HEADER */}
         <header
           className="rounded-b-[26px] px-[18px] pb-[18px] pt-5 text-surface"
@@ -209,7 +154,7 @@ export function Beranda() {
             hari ini
           </h1>
           <p className="m-0 mb-3.5 text-[12px] text-white/65">
-            2.400+ unit ready · inspeksi 175 titik · garansi mesin
+            2.400+ unit ready ? inspeksi 175 titik ? garansi mesin
           </p>
           <form
             onSubmit={(e) => {
@@ -222,7 +167,7 @@ export function Beranda() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Cari Avanza, Brio, Xpander…"
+              placeholder="Cari Avanza, Brio, Xpander?"
               enterKeyHint="search"
               className="min-w-0 flex-1 bg-transparent text-[13.5px] font-medium text-ink outline-none placeholder:text-placeholder"
             />
@@ -230,7 +175,7 @@ export function Beranda() {
           {debouncedQ && (
             <div className="mt-2 overflow-hidden rounded-2xl bg-surface shadow-[0_8px_24px_-10px_rgba(14,27,30,0.3)]">
               {searchLoading && (
-                <div className="px-3.5 py-3 text-[12px] text-muted">Mencari…</div>
+                <div className="px-3.5 py-3 text-[12px] text-muted">Mencari?</div>
               )}
               {!searchLoading &&
                 (searchResults ?? []).map((u) => (
@@ -249,7 +194,7 @@ export function Beranda() {
                         {u.title}
                       </div>
                       <div className="text-[11px] text-muted">
-                        Rp {formatJt(u.price)} · {u.year} · {u.branch}
+                        Rp {formatJt(u.price)} ? {u.year} ? {u.branch}
                       </div>
                     </div>
                   </Link>
@@ -264,12 +209,12 @@ export function Beranda() {
                   href={`/katalog?q=${encodeURIComponent(debouncedQ)}`}
                   className="block border-t border-line px-3.5 py-2.5 text-center text-[12px] font-bold text-teal-deep no-underline"
                 >
-                  Lihat semua hasil di katalog →
+                  Lihat semua hasil di katalog ?
                 </Link>
               )}
             </div>
           )}
-          <div className="scroll-x mt-3 flex gap-2 overflow-x-auto pb-0.5">
+          <div className="scroll-x -mx-[18px] mt-3 flex gap-2 overflow-x-auto px-[18px] pb-0.5">
             {BUDGET_CHIPS.map((c) => (
               <Link
                 key={c.label}
@@ -284,7 +229,7 @@ export function Beranda() {
 
         {/* FILTER TIPE BODI */}
         <div className="px-[18px] pt-4">
-          <div className="scroll-x flex gap-2 overflow-x-auto pb-0.5">
+          <div className="scroll-x -mx-[18px] flex gap-2 overflow-x-auto px-[18px] pb-0.5">
             <Link
               href="/katalog"
               className="flex-shrink-0 whitespace-nowrap rounded-full border border-teal-tint-border bg-teal-tint px-[15px] py-[9px] text-[12px] font-bold text-teal-deep no-underline"
@@ -341,61 +286,6 @@ export function Beranda() {
           </div>
         </section>
 
-        {/* CTA ADMIN */}
-        <div className="mx-[18px] mt-[22px] grid grid-cols-[1fr_auto_1fr] items-center rounded-3xl border border-line bg-surface px-4 py-3 shadow-nav">
-          <a
-            href={`https://wa.me/6285701959826?text=${encodeURIComponent("Halo Admin, mau tanya-tanya soal program agen Mobix dulu boleh? 🙏")}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 px-2 py-1.5 text-[14px] font-bold text-teal-deep no-underline"
-          >
-            <Chat size={22} />
-            Tanya Admin
-          </a>
-          <div className="h-9 w-px bg-line" />
-          <a
-            href={`https://wa.me/6285701959826?text=${encodeURIComponent("saya mau minta hitungan leasing\n1. Dp minim\n2. Cicilan ringan\n3. Cair All in")}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 px-2 py-1.5 text-[14px] font-bold text-teal-deep no-underline"
-          >
-            <Calculator size={22} />
-            Minta Hitungan
-          </a>
-        </div>
-
-        {/* HOT DEALS */}
-        <section className="pt-[22px]">
-          <div className="flex items-baseline justify-between gap-2 px-[18px]">
-            <h2 className="m-0 -tracking-[0.01em] text-[15px] font-extrabold text-ink">
-              🔥 Hot Deals minggu ini
-            </h2>
-            <Link
-              href="/hot-deals"
-              className="whitespace-nowrap text-[11.5px] font-bold text-teal-deep no-underline"
-            >
-              Lihat semua
-            </Link>
-          </div>
-          <div className="scroll-x mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18px] pb-1">
-            {hot.loading &&
-              Array.from({ length: 2 }).map((_, i) => <HotDealSkeleton key={i} />)}
-            {!hot.loading &&
-              !hot.error &&
-              (hot.data ?? []).map((u) => <HotDealCard key={u.id} unit={u} />)}
-            {!hot.loading && hot.error && (
-              <div className="flex-1 py-6 text-center text-[12px] text-muted">
-                Gagal memuat hot deals.
-              </div>
-            )}
-            {!hot.loading && !hot.error && (hot.data ?? []).length === 0 && (
-              <div className="flex-1 py-6 text-center text-[12px] text-muted">
-                Belum ada hot deals minggu ini.
-              </div>
-            )}
-          </div>
-        </section>
-
         {/* REKOMENDASI UNTUKMU */}
         <section className="px-[18px] pt-[22px]">
           <div className="flex items-baseline justify-between gap-2">
@@ -447,23 +337,24 @@ export function Beranda() {
             href="/daftar"
             className="mt-3 inline-block rounded-xl bg-teal px-4 py-2.5 text-[12.5px] font-extrabold text-ink no-underline"
           >
-            Gabung jadi agen →
+            Gabung jadi agen ?
           </Link>
         </section>
 
         {/* FOOTER */}
         <footer className="px-[18px] pb-1 pt-[26px] text-center text-[11px] text-muted">
-          © {new Date().getFullYear()} agenmobix.id ·{" "}
+          ? {new Date().getFullYear()} agenmobix.id ?{" "}
           <a href="#" className="font-semibold text-teal-deep no-underline">
             Berita
           </a>{" "}
-          ·{" "}
+          ?{" "}
           <a href="#" className="font-semibold text-teal-deep no-underline">
             Customer Care
           </a>
         </footer>
       </main>
 
+      <FloatingContactCta bottomClassName="bottom-[calc(88px+env(safe-area-inset-bottom))]" />
       <BottomNav active="beranda" />
     </AppShell>
   );

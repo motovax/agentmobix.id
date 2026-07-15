@@ -5,9 +5,10 @@ import "@splidejs/react-splide/css/core";
 import { Link, useParams } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
+import { FloatingContactCta } from "../components/FloatingContactCta";
 import { Photo, Skeleton } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
-import { ChevronLeft, ShareArrow, Chat, Check, Close, Play } from "../components/icons";
+import { ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
 import {
   fetchUnitDetail,
   mobixImage,
@@ -296,6 +297,12 @@ export function UnitDetail() {
         tdp: String(Math.round(shareTdp)),
       }).toString()}`
     : null;
+  const unitAdminMessage = unit
+    ? `Halo AI Mobix! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
+    : undefined;
+  const unitCalculationMessage = unit
+    ? `Halo Admin, saya mau minta hitungan leasing untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}.\n1. DP minim\n2. Cicilan ringan\n3. Cair All in`
+    : undefined;
   function formatDpValue(value: number) {
     return currencyFormatter.format(Math.max(0, Math.round(value || 0)));
   }
@@ -1689,19 +1696,6 @@ export function UnitDetail() {
           </div>
         )}
 
-        {/* TANYA AI MOBIX */}
-        <div className="px-[18px] pb-4">
-          <a
-            href={`https://wa.me/6285701959826?text=${encodeURIComponent(`Halo AI Mobix! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3.5 text-[14px] font-bold text-white no-underline shadow-[0_6px_24px_rgba(37,211,102,0.35)]"
-          >
-            <Chat size={18} className="text-white" />
-            Tanya ke AI Mobix
-          </a>
-        </div>
-
         {/* UNIT SEJENIS */}
         {similar.length > 0 && (
           <div className="px-[18px] pb-4">
@@ -1716,8 +1710,14 @@ export function UnitDetail() {
           </div>
         )}
 
-        <div className="h-[96px]" />
+        <div className="h-[172px]" />
       </main>
+
+      <FloatingContactCta
+        adminMessage={unitAdminMessage}
+        calculationMessage={unitCalculationMessage}
+        bottomClassName="bottom-[calc(88px+env(safe-area-inset-bottom))]"
+      />
 
       {/* STICKY ACTIONS */}
       <div className="fixed bottom-9 left-1/2 z-30 flex w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">

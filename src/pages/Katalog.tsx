@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
+import { FloatingContactCta } from "../components/FloatingContactCta";
 import { UnitRow } from "../components/UnitRow";
 import { SkeletonRow } from "../components/ui";
 import { ChevronLeft, Close, Search, Sliders } from "../components/icons";
@@ -436,8 +437,10 @@ export function Katalog() {
           </>
         )}
 
-        <div className="h-5" />
+        <div className="h-[96px]" />
       </main>
+
+      <FloatingContactCta />
 
       {sheetOpen && (
         <FilterSheet
