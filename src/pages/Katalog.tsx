@@ -3,11 +3,13 @@ import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { UnitRow } from "../components/UnitRow";
 import { SkeletonRow } from "../components/ui";
-import { ChevronLeft, Search, Sliders } from "../components/icons";
+import { ChevronLeft, Close, Search, Sliders } from "../components/icons";
 import {
   fetchUnits,
   fetchCategories,
+  fetchCabang,
   prettyCategory,
+  titleCase,
   toCardUnit,
   classifyQuery,
   type CardUnit,
@@ -15,6 +17,181 @@ import {
 import { useAsync } from "../lib/useAsync";
 
 const LIMIT = 12;
+
+const PRICE_RANGES = [
+  { label: "< Rp100jt", min: undefined, max: 100_000_000 },
+  { label: "Rp100–150jt", min: 100_000_000, max: 150_000_000 },
+  { label: "Rp150–200jt", min: 150_000_000, max: 200_000_000 },
+  { label: "Rp200–300jt", min: 200_000_000, max: 300_000_000 },
+  { label: "> Rp300jt", min: 300_000_000, max: undefined },
+] as const;
+
+const TRANSMISI_OPTIONS = [
+  { label: "Manual", value: "MANUAL" },
+  { label: "Matic", value: "AUTOMATIC" },
+] as const;
+
+interface Filters {
+  priceMin?: number;
+  priceMax?: number;
+  transmisi?: string;
+  lokasi?: string;
+}
+
+function countActiveFilters(f: Filters): number {
+  return (
+    (f.priceMin !== undefined || f.priceMax !== undefined ? 1 : 0) +
+    (f.transmisi ? 1 : 0) +
+    (f.lokasi ? 1 : 0)
+  );
+}
+
+function FilterChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`whitespace-nowrap rounded-full px-3.5 py-2.5 text-[13px] font-semibold ${
+        active
+          ? "border border-teal-tint-border bg-teal-tint text-teal-deep"
+          : "border border-line bg-surface text-mid"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function FilterSheet({
+  initial,
+  branches,
+  onApply,
+  onClose,
+}: {
+  initial: Filters;
+  branches: string[];
+  onApply: (f: Filters) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState<Filters>(initial);
+
+  // lock page scroll while the sheet is open
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  const priceActive = (r: (typeof PRICE_RANGES)[number]) =>
+    draft.priceMin === r.min && draft.priceMax === r.max;
+
+  return (
+    <div className="fixed inset-0 z-[10000]">
+      <div
+        className="absolute inset-0 bg-ink/40"
+        onClick={onClose}
+        aria-hidden
+      />
+      <div className="absolute bottom-0 left-1/2 flex max-h-[82dvh] w-full max-w-[412px] -translate-x-1/2 flex-col rounded-t-[26px] bg-surface">
+        <div className="flex items-center justify-between px-5 pb-1 pt-3">
+          <div className="mx-auto h-1 w-10 rounded-full bg-line" aria-hidden />
+        </div>
+        <div className="flex items-center justify-between px-5 pb-3">
+          <h3 className="m-0 text-[17px] font-extrabold text-ink">Filter</h3>
+          <button
+            onClick={onClose}
+            aria-label="Tutup"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-ink"
+          >
+            <Close />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5">
+          <div className="mb-2 text-[13px] font-bold text-ink">Rentang harga</div>
+          <div className="flex flex-wrap gap-2">
+            {PRICE_RANGES.map((r) => (
+              <FilterChip
+                key={r.label}
+                label={r.label}
+                active={priceActive(r)}
+                onClick={() =>
+                  setDraft((d) =>
+                    priceActive(r)
+                      ? { ...d, priceMin: undefined, priceMax: undefined }
+                      : { ...d, priceMin: r.min, priceMax: r.max },
+                  )
+                }
+              />
+            ))}
+          </div>
+
+          <div className="mb-2 mt-5 text-[13px] font-bold text-ink">Transmisi</div>
+          <div className="flex flex-wrap gap-2">
+            {TRANSMISI_OPTIONS.map((t) => (
+              <FilterChip
+                key={t.value}
+                label={t.label}
+                active={draft.transmisi === t.value}
+                onClick={() =>
+                  setDraft((d) => ({
+                    ...d,
+                    transmisi: d.transmisi === t.value ? undefined : t.value,
+                  }))
+                }
+              />
+            ))}
+          </div>
+
+          {branches.length > 0 && (
+            <>
+              <div className="mb-2 mt-5 text-[13px] font-bold text-ink">Cabang</div>
+              <div className="flex flex-wrap gap-2 pb-2">
+                {branches.map((b) => (
+                  <FilterChip
+                    key={b}
+                    label={titleCase(b)}
+                    active={draft.lokasi === b}
+                    onClick={() =>
+                      setDraft((d) => ({
+                        ...d,
+                        lokasi: d.lokasi === b ? undefined : b,
+                      }))
+                    }
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="flex gap-2.5 border-t border-line px-5 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3.5">
+          <button
+            onClick={() => setDraft({})}
+            className="flex-1 rounded-2xl border border-line bg-surface py-3.5 text-[14px] font-bold text-ink"
+          >
+            Reset
+          </button>
+          <button
+            onClick={() => onApply(draft)}
+            className="flex-[2] rounded-2xl bg-ink py-3.5 text-[14px] font-bold text-surface"
+          >
+            Terapkan
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function catalogErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "";
@@ -40,21 +217,23 @@ export function Katalog() {
   const [debounced, setDebounced] = useState(
     () => new URLSearchParams(initialSearch).get("q") ?? "",
   );
-  const [priceMin] = useState(() => {
-    const n = Number(new URLSearchParams(initialSearch).get("harga_min"));
-    return n > 0 ? n : undefined;
+  const [filters, setFilters] = useState<Filters>(() => {
+    const p = new URLSearchParams(initialSearch);
+    const min = Number(p.get("harga_min"));
+    const max = Number(p.get("harga_max"));
+    return {
+      priceMin: min > 0 ? min : undefined,
+      priceMax: max > 0 ? max : undefined,
+      transmisi: p.get("transmisi") || undefined,
+      lokasi: p.get("lokasi") || undefined,
+    };
   });
-  const [priceMax] = useState(() => {
-    const n = Number(new URLSearchParams(initialSearch).get("harga_max"));
-    return n > 0 ? n : undefined;
-  });
-  const [transmisiFilter] = useState(
-    () => new URLSearchParams(initialSearch).get("transmisi") || undefined,
-  );
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [autoFocus] = useState(
     () => new URLSearchParams(initialSearch).get("focus") === "1",
   );
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const cabang = useAsync(fetchCabang, []);
 
   useEffect(() => {
     if (autoFocus) searchInputRef.current?.focus();
@@ -89,9 +268,10 @@ export function Katalog() {
     } : {};
     return {
       ...fromQuery,
-      transmisi: fromQuery.transmisi ?? (transmisiFilter ? [transmisiFilter] : undefined),
-      harga_awal: priceMin,
-      harga_akhir: priceMax,
+      transmisi: fromQuery.transmisi ?? (filters.transmisi ? [filters.transmisi] : undefined),
+      lokasi: filters.lokasi ? [filters.lokasi] : undefined,
+      harga_awal: filters.priceMin,
+      harga_akhir: filters.priceMax,
     };
   }
 
@@ -126,7 +306,7 @@ export function Katalog() {
     return () => {
       alive = false;
     };
-  }, [debounced, kategori]);
+  }, [debounced, kategori, filters]);
 
   function loadMore() {
     if (loadingMore || page >= totalPages) return;
@@ -172,7 +352,18 @@ export function Katalog() {
               placeholder="Cari merek, tipe, atau nopol…"
               className="min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-placeholder"
             />
-            <Sliders className="text-muted" />
+            <button
+              onClick={() => setSheetOpen(true)}
+              aria-label="Buka filter"
+              className="relative -m-2 flex-shrink-0 p-2"
+            >
+              <Sliders className={countActiveFilters(filters) > 0 ? "text-teal-deep" : "text-muted"} />
+              {countActiveFilters(filters) > 0 && (
+                <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-teal-deep px-1 text-[9px] font-bold text-surface">
+                  {countActiveFilters(filters)}
+                </span>
+              )}
+            </button>
           </div>
         </div>
         <div className="scroll-x flex gap-1.5 overflow-x-auto">
@@ -247,6 +438,18 @@ export function Katalog() {
 
         <div className="h-5" />
       </main>
+
+      {sheetOpen && (
+        <FilterSheet
+          initial={filters}
+          branches={(cabang.data ?? []).map((c) => c.nama)}
+          onApply={(f) => {
+            setFilters(f);
+            setSheetOpen(false);
+          }}
+          onClose={() => setSheetOpen(false)}
+        />
+      )}
     </AppShell>
   );
 }
