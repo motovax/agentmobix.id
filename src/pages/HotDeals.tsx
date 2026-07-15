@@ -1,5 +1,7 @@
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
+import { BottomNav } from "../components/BottomNav";
+import { FloatingContactCta } from "../components/FloatingContactCta";
 import { SkeletonRow } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
 import { fetchUnits, toCardUnit, type CardUnit } from "../lib/mobix";
@@ -42,8 +44,12 @@ export function HotDeals() {
           !error &&
           (data ?? []).map((u: CardUnit) => <UnitRow key={u.id} unit={u} />)}
 
-        <div className="h-5" />
+        {/* Reserve room for the floating CTA and bottom navigation. */}
+        <div className="h-[160px]" />
       </main>
+
+      <FloatingContactCta bottomClassName="bottom-[calc(112px+env(safe-area-inset-bottom))]" />
+      <BottomNav active="hot" />
     </AppShell>
   );
 }

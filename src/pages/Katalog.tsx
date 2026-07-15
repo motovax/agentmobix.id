@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
+import { BottomNav } from "../components/BottomNav";
 import { FloatingContactCta } from "../components/FloatingContactCta";
 import { UnitRow } from "../components/UnitRow";
 import { SkeletonRow } from "../components/ui";
@@ -437,10 +438,12 @@ export function Katalog() {
           </>
         )}
 
-        <div className="h-[96px]" />
+        {/* Reserve room for the floating CTA and bottom navigation. */}
+        <div className="h-[160px]" />
       </main>
 
-      <FloatingContactCta />
+      <FloatingContactCta bottomClassName="bottom-[calc(112px+env(safe-area-inset-bottom))]" />
+      <BottomNav active="produk" />
 
       {sheetOpen && (
         <FilterSheet

@@ -4,6 +4,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
+import { BottomNav } from "../components/BottomNav";
+import { FloatingContactCta } from "../components/FloatingContactCta";
 import { MapPin } from "../components/icons";
 import { fetchCabang, type CabangDetail } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
@@ -163,8 +165,12 @@ export function Lokasi() {
             </div>
           ))}
 
-        <div className="h-5" />
+        {/* Reserve room for the floating CTA and bottom navigation. */}
+        <div className="h-[160px]" />
       </main>
+
+      <FloatingContactCta bottomClassName="bottom-[calc(112px+env(safe-area-inset-bottom))]" />
+      <BottomNav active="lokasi" />
     </AppShell>
   );
 }
