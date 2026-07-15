@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { BottomNav } from "../components/BottomNav";
 import { FloatingContactCta } from "../components/FloatingContactCta";
-import { ArrowRight, ChevronLeft, Search } from "../components/icons";
+import { Search } from "../components/icons";
 import { Photo, Skeleton } from "../components/ui";
 import {
   fetchUnits,
@@ -35,7 +35,7 @@ const BRANDS = [
   { label: "Lainnya", logo: null },
 ];
 
-const REC_BATCH_SIZE = 8;
+const REC_BATCH_SIZE = 6;
 
 function appendUniqueUnits(current: CardUnit[], next: CardUnit[]) {
   const seen = new Set(current.map((unit) => unit.id));
@@ -118,7 +118,6 @@ export function Beranda() {
   const [recError, setRecError] = useState(false);
   const recLoadingRef = useRef(false);
   const recStartedRef = useRef(false);
-  const recScrollerRef = useRef<HTMLDivElement>(null);
   const recSentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -187,28 +186,18 @@ export function Beranda() {
   }, [loadRecommendations]);
 
   useEffect(() => {
-    const root = recScrollerRef.current;
     const sentinel = recSentinelRef.current;
-    if (!root || !sentinel || !hasMoreRecommendations) return;
+    if (!sentinel || !hasMoreRecommendations) return;
 
     const obs = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) loadRecommendations();
       },
-      { root, rootMargin: "0px 220px 0px 0px" },
+      { rootMargin: "260px" },
     );
     obs.observe(sentinel);
     return () => obs.disconnect();
   }, [hasMoreRecommendations, loadRecommendations]);
-
-  const scrollRecommendations = (direction: -1 | 1) => {
-    const el = recScrollerRef.current;
-    if (!el) return;
-    el.scrollBy({
-      left: direction * Math.round(el.clientWidth * 0.82),
-      behavior: "smooth",
-    });
-  };
 
   return (
     <AppShell>
@@ -363,61 +352,29 @@ export function Beranda() {
 
         {/* REKOMENDASI UNTUKMU */}
         <section className="px-[18px] pt-[22px]">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-baseline justify-between gap-2">
             <h2 className="m-0 -tracking-[0.01em] text-[15px] font-extrabold text-ink">
               Rekomendasi untukmu
             </h2>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                aria-label="Geser rekomendasi ke kiri"
-                onClick={() => scrollRecommendations(-1)}
-                className="hidden h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-teal-deep shadow-sm sm:inline-flex"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                type="button"
-                aria-label="Geser rekomendasi ke kanan"
-                onClick={() => scrollRecommendations(1)}
-                className="hidden h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-teal-deep shadow-sm sm:inline-flex"
-              >
-                <ArrowRight size={15} />
-              </button>
-              <Link
-                href="/katalog"
-                className="whitespace-nowrap text-[11.5px] font-bold text-teal-deep no-underline"
-              >
-                Filter
-              </Link>
-            </div>
+            <Link
+              href="/katalog"
+              className="whitespace-nowrap text-[11.5px] font-bold text-teal-deep no-underline"
+            >
+              Filter
+            </Link>
           </div>
-          <div
-            ref={recScrollerRef}
-            className="scroll-x -mx-[18px] mt-3 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-[18px] pb-1"
-          >
+          <div className="mt-3 grid grid-cols-3 gap-2">
             {recItems.map((u) => (
-              <div key={u.id} className="w-[162px] flex-shrink-0 snap-start">
-                <RecCard unit={u} />
-              </div>
+              <RecCard key={u.id} unit={u} />
             ))}
             {recLoading &&
-              Array.from({ length: recItems.length ? 2 : 4 }).map((_, i) => (
-                <div
-                  key={`rec-skeleton-${i}`}
-                  className="w-[162px] flex-shrink-0 snap-start"
-                >
-                  <RecSkeleton />
-                </div>
+              Array.from({ length: recItems.length ? 3 : 6 }).map((_, i) => (
+                <RecSkeleton key={`rec-skeleton-${i}`} />
               ))}
-            {hasMoreRecommendations && (
-              <div
-                ref={recSentinelRef}
-                className="w-px flex-shrink-0 self-stretch"
-                aria-hidden="true"
-              />
-            )}
           </div>
+          {hasMoreRecommendations && (
+            <div ref={recSentinelRef} className="h-px" aria-hidden="true" />
+          )}
           {!recLoading && recError && recItems.length === 0 && (
             <div className="py-6 text-center text-[12px] text-muted">
               Gagal memuat rekomendasi.
