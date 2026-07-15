@@ -1714,7 +1714,7 @@ export function UnitDetail() {
       </main>
 
       {/* STICKY ACTIONS */}
-      <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-40 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[48px_minmax(0,1fr)_minmax(0,1.35fr)] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
+      <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-40 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[48px_48px_minmax(0,1fr)] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
         <a
           href={waHref(unitAdminMessage ?? "")}
           target="_blank"
@@ -1728,10 +1728,10 @@ export function UnitDetail() {
           href={waHref(unitCalculationMessage ?? "")}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex h-12 min-w-0 items-center justify-center gap-1.5 rounded-2xl border border-teal-tint-border bg-teal-tint px-2 text-[12px] font-extrabold leading-none text-teal-deep no-underline"
+          aria-label="Minta hitungan untuk unit ini"
+          className="flex h-12 items-center justify-center rounded-2xl border border-line bg-surface text-teal-deep no-underline"
         >
-          <Calculator size={18} className="flex-shrink-0" />
-          <span className="truncate">Hitungan</span>
+          <Calculator size={20} />
         </a>
         {shareHref ? (
           <Link
