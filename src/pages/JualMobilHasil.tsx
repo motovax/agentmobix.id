@@ -62,7 +62,7 @@ export function JualMobilHasil() {
               href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-3.5 py-2 text-[11px] font-extrabold text-white no-underline shadow-wa"
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-3.5 py-2 text-[12px] font-extrabold text-white no-underline shadow-wa"
             >
               <WhatsApp size={15} /> Hubungi Albert via WhatsApp
             </a>

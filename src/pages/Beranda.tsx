@@ -234,7 +234,7 @@ export function Beranda() {
               href="/jual-mobil"
               className="rounded-full bg-teal px-3.5 py-2 text-[11px] font-extrabold text-ink no-underline"
             >
-              Cek Harga
+              Cek Harga Unit
             </Link>
           </div>
           <h1 className="m-0 mb-1 mt-3.5 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2]">
