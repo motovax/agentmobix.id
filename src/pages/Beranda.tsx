@@ -319,7 +319,7 @@ export function Beranda() {
         </header>
 
         {/* CARI PER MEREK */}
-        <section className="px-[18px] pt-[22px]">
+        <section className="px-[18px] pt-3">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="m-0 -tracking-[0.01em] text-[15px] font-extrabold text-ink">
               Cari per merek
@@ -359,7 +359,7 @@ export function Beranda() {
         </section>
 
         {/* LIVE KATALOG */}
-        <section className="px-[18px] pt-[22px]">
+        <section className="px-[18px] pt-3">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="m-0 -tracking-[0.01em] text-[15px] font-extrabold text-ink">
               Live katalog
