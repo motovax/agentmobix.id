@@ -94,13 +94,10 @@ export function JualMobilHasil() {
             <Detail label="Plat" value={result.plate} />
           </div>
 
-          <div className="mt-7 grid grid-cols-2 gap-2.5">
-            <Link href="/jual-mobil" className="flex h-11 items-center justify-center rounded-[12px] bg-[#E6E6E6] text-[13px] font-bold text-ink no-underline">
+          <div className="mt-7">
+            <Link href="/jual-mobil" className="flex h-11 w-full items-center justify-center rounded-[12px] bg-[#E6E6E6] text-[13px] font-bold text-ink no-underline">
               Kembali
             </Link>
-            <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="flex h-11 items-center justify-center rounded-[12px] bg-teal-deep text-[13px] font-bold text-white no-underline">
-              Kirim ke Albert
-            </a>
           </div>
         </section>
       </main>
