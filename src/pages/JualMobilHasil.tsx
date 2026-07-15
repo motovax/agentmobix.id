@@ -41,8 +41,8 @@ export function JualMobilHasil() {
   if (!result) return null;
 
   const whatsappUrl = getWhatsAppUrl(result);
-  const lowerPrice = Math.max(0, result.recommendedPrice - 5_000_000);
-  const upperPrice = result.recommendedPrice + 5_000_000;
+  const lowerPrice = typeof result.priceMin === "number" ? result.priceMin : Math.max(0, result.recommendedPrice - 5_000_000);
+  const upperPrice = typeof result.priceMax === "number" ? result.priceMax : result.recommendedPrice + 5_000_000;
   return (
     <AppShell>
       <AppBar title="Hasil Prediksi" subtitle="Cek kembali data kendaraan Anda" back="/jual-mobil" />

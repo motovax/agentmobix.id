@@ -5,7 +5,7 @@ import { AppBar } from "../components/AppBar";
 import { AppShell } from "../components/AppShell";
 import { Camera, ChevronDown, Sparkles } from "../components/icons";
 import {
-  buildSellCarResult,
+  fetchSellCarQuote,
   fetchSellCarData,
   getBrands,
   getYears,
@@ -200,6 +200,7 @@ export function JualMobil() {
   const [form, setForm] = useState(INITIAL_FORM);
   const [activeTab, setActiveTab] = useState<"form" | "ai">("form");
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -226,16 +227,20 @@ export function JualMobil() {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!data) return;
-    const result = buildSellCarResult(data, form);
-    if (!result) {
-      setError("Data mobil belum memiliki harga di matrix. Silakan pilih kombinasi lain.");
-      return;
+    setError("");
+    setSubmitting(true);
+    try {
+      const result = await fetchSellCarQuote(form);
+      sessionStorage.setItem("mobix-sell-car-result", JSON.stringify(result));
+      navigate("/jual-mobil/hasil");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Gagal menghitung harga mobil.");
+    } finally {
+      setSubmitting(false);
     }
-    sessionStorage.setItem("mobix-sell-car-result", JSON.stringify(result));
-    navigate("/jual-mobil/hasil");
   }
 
   return (
@@ -363,10 +368,10 @@ export function JualMobil() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || submitting}
                 className="mt-1 flex h-12 w-full items-center justify-center rounded-[12px] bg-teal-deep text-[14px] font-extrabold text-white transition hover:bg-[#078e8b] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Prediksi Harga Mobil Anda!
+                {submitting ? "Menghitung harga..." : "Prediksi Harga Mobil Anda!"}
               </button>
             </form>
           ) : (
