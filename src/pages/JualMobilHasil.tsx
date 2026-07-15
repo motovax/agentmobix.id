@@ -55,7 +55,7 @@ export function JualMobilHasil() {
           </div>
 
           <div className="mt-5 rounded-[14px] bg-[#FFF19A] px-3.5 py-3 text-center text-[12px] font-semibold leading-[1.5] text-[#7D786B]">
-            <div>Harga ini masih berupa estimasi dan dapat mengalami perubahan.</div>
+            <div>Harga ini masih dapat mengalami perubahan.</div>
             <div>Tim kami akan menghubungi Anda setelah data yang Anda kirimkan berhasil kami terima.</div>
             <div className="mt-1.5 font-bold text-[#5E5A50]">kalo mau dapat harga tertinggi hubungi Albert</div>
             <a
