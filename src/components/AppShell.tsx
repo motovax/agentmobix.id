@@ -20,7 +20,7 @@ export function AppShell({
     <div className="flex min-h-screen justify-center bg-app-bg sm:py-6">
       <div
         className={[
-          "relative w-full max-w-[412px] overflow-hidden shadow-frame sm:rounded-frame",
+          "relative w-full overflow-hidden shadow-frame sm:max-w-[412px] sm:rounded-frame",
           bg,
           flexColumn ? "flex min-h-screen flex-col sm:min-h-0 sm:h-[872px]" : "min-h-screen sm:min-h-0",
         ].join(" ")}
