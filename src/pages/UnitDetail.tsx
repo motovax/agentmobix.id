@@ -5,10 +5,10 @@ import "@splidejs/react-splide/css/core";
 import { Link, useParams } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
-import { FloatingContactCta } from "../components/FloatingContactCta";
+import { waHref } from "../components/FloatingContactCta";
 import { Photo, Skeleton } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
-import { ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
+import { Calculator, Chat, ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
 import {
   fetchUnitDetail,
   mobixImage,
@@ -1710,32 +1710,44 @@ export function UnitDetail() {
           </div>
         )}
 
-        <div className="h-[172px]" />
+        <div className="h-[104px]" />
       </main>
 
-      <FloatingContactCta
-        adminMessage={unitAdminMessage}
-        calculationMessage={unitCalculationMessage}
-        bottomClassName="bottom-[calc(88px+env(safe-area-inset-bottom))]"
-      />
-
       {/* STICKY ACTIONS */}
-      <div className="fixed bottom-9 left-1/2 z-30 flex w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
+      <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-40 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[48px_minmax(0,1fr)_minmax(0,1.35fr)] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
+        <a
+          href={waHref(unitAdminMessage ?? "")}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Tanya admin tentang unit ini"
+          className="flex h-12 items-center justify-center rounded-2xl border border-line bg-surface text-teal-deep no-underline"
+        >
+          <Chat size={21} />
+        </a>
+        <a
+          href={waHref(unitCalculationMessage ?? "")}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex h-12 min-w-0 items-center justify-center gap-1.5 rounded-2xl border border-teal-tint-border bg-teal-tint px-2 text-[12px] font-extrabold leading-none text-teal-deep no-underline"
+        >
+          <Calculator size={18} className="flex-shrink-0" />
+          <span className="truncate">Hitungan</span>
+        </a>
         {shareHref ? (
           <Link
             href={shareHref}
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-ink px-3.5 py-3 text-[13px] font-bold text-surface no-underline"
+            className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl bg-ink px-3 text-[13px] font-bold text-surface no-underline"
           >
-            Share ke klien
+            <span className="truncate">Share ke klien</span>
             <ShareArrow size={14} />
           </Link>
         ) : (
           <button
             type="button"
             disabled
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-ink/35 px-3.5 py-3 text-[13px] font-bold text-surface"
+            className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl bg-ink/35 px-3 text-[12px] font-bold text-surface"
           >
-            Share menunggu DSF
+            <span className="truncate">Menunggu DSF</span>
             <ShareArrow size={14} />
           </button>
         )}

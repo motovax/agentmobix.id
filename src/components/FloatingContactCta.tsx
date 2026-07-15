@@ -8,7 +8,7 @@ const DEFAULT_ADMIN_MESSAGE =
 const DEFAULT_CALCULATION_MESSAGE =
   "saya mau minta hitungan leasing\n1. Dp minim\n2. Cicilan ringan\n3. Cair All in";
 
-function waHref(message: string) {
+export function waHref(message: string) {
   return `https://wa.me/${ADMIN_PHONE}?text=${encodeURIComponent(message)}`;
 }
 
