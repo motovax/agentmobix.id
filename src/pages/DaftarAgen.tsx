@@ -1,27 +1,35 @@
 import { useState, type FormEvent } from "react";
-import { useLocation } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
-import { ArrowRight, ChevronDown, Check, Camera, Info } from "../components/icons";
+import { ArrowRight, ChevronDown, Check, Info } from "../components/icons";
 
 const CITIES = ["Bekasi", "Jakarta", "Bandung", "Surabaya", "Semarang"];
 const BANKS = ["BCA", "Mandiri", "BRI", "BNI"];
 
 export function DaftarAgen() {
-  const [, navigate] = useLocation();
-  const [name, setName] = useState("Rizky Maulana");
-  const [wa, setWa] = useState("852 1100 2233");
+  const [name, setName] = useState("");
+  const [wa, setWa] = useState("");
   const [city, setCity] = useState("Bekasi");
   const [bank, setBank] = useState("BCA");
-  const [account, setAccount] = useState("8830 1122 334");
+  const [account, setAccount] = useState("");
   const [agree, setAgree] = useState(true);
-  const [submitted, setSubmitted] = useState(false);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!agree) return;
-    setSubmitted(true);
-    window.setTimeout(() => navigate("/"), 1100);
+    const message = [
+      "Halo AI Mobix! Saya mau daftar jadi Agen Mobix 🙏",
+      "",
+      `Nama lengkap: ${name.trim()}`,
+      `No. WhatsApp: +62 ${wa.trim()}`,
+      `Kota domisili: ${city}`,
+      `Rekening komisi: ${bank} ${account.trim()}`,
+    ].join("\n");
+    window.open(
+      `https://wa.me/6285701959826?text=${encodeURIComponent(message)}`,
+      "_blank",
+      "noopener",
+    );
   }
 
   const inputCls =
@@ -32,25 +40,17 @@ export function DaftarAgen() {
       <AppBar title="Daftar jadi Agen" subtitle="Gratis · sekitar 2 menit" />
 
       <form onSubmit={onSubmit} className="flex flex-col gap-3.5 px-4 pt-4">
-        {/* progress */}
-        <div className="flex items-center gap-1.5">
-          <div className="h-1 flex-1 rounded-full bg-ink" />
-          <div className="h-1 flex-1 rounded-full bg-ink" />
-          <div className="h-1 flex-1 rounded-full bg-[#D4DEDF]" />
-          <span className="ml-1 text-[11px] font-semibold text-muted">2/3</span>
-        </div>
-
-        {/* bonus card */}
+        {/* benefit card */}
         <div className="flex items-center gap-3 rounded-[18px] bg-gradient-to-b from-ink to-ink-2 p-4 text-surface">
           <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-teal text-[20px] font-extrabold text-ink">
             ★
           </div>
           <div>
-            <div className="text-[14px] font-bold">Bonus pendaftar minggu ini</div>
+            <div className="text-[14px] font-bold">Benefit agen Mobix</div>
             <div className="mt-0.5 text-[12px] leading-[1.4] text-[#A4D7D7]">
-              Starter pack{" "}
-              <span className="font-serif italic text-teal">Rp 500 ribu</span> untuk
-              iklan pertamamu.
+              Akses <span className="font-serif italic text-teal">CRM Dashboard</span>{" "}
+              dan cek <span className="font-serif italic text-teal">Sales Insight</span>{" "}
+              untuk pantau prospek &amp; penjualanmu.
             </div>
           </div>
         </div>
@@ -65,6 +65,8 @@ export function DaftarAgen() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              placeholder="Nama sesuai KTP"
+              required
               className={inputCls}
             />
           </div>
@@ -81,7 +83,9 @@ export function DaftarAgen() {
                 type="tel"
                 value={wa}
                 onChange={(e) => setWa(e.target.value)}
-                className="flex-1 bg-transparent px-3.5 py-3 text-[14px] text-ink outline-none"
+                placeholder="812 3456 7890"
+                required
+                className="flex-1 bg-transparent px-3.5 py-3 text-[14px] text-ink outline-none placeholder:text-placeholder"
               />
             </div>
           </div>
@@ -101,25 +105,6 @@ export function DaftarAgen() {
                 ))}
               </select>
               <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted" />
-            </div>
-          </div>
-
-          {/* KTP upload */}
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-mid">
-              Foto KTP
-            </label>
-            <div className="flex items-center gap-3 rounded-[14px] border-[1.5px] border-dashed border-teal-tint-border bg-[#F2FCFB] p-[18px]">
-              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-teal-tint text-teal-deep">
-                <Camera />
-              </div>
-              <div className="flex-1">
-                <div className="text-[13px] font-bold text-ink">KTP_rizky.jpg</div>
-                <div className="text-[11px] text-teal-deep">Terunggah · 1,2 MB</div>
-              </div>
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-teal text-ink">
-                <Check />
-              </div>
             </div>
           </div>
 
@@ -145,7 +130,9 @@ export function DaftarAgen() {
                 type="text"
                 value={account}
                 onChange={(e) => setAccount(e.target.value)}
-                className="flex-1 rounded-xl border border-line bg-surface-3 px-3.5 py-3 text-[14px] text-ink outline-none"
+                placeholder="Nomor rekening"
+                required
+                className="flex-1 rounded-xl border border-line bg-surface-3 px-3.5 py-3 text-[14px] text-ink outline-none placeholder:text-placeholder"
               />
             </div>
           </div>
@@ -188,8 +175,8 @@ export function DaftarAgen() {
             disabled={!agree}
             className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-ink px-3.5 py-[15px] text-[15px] font-bold text-surface disabled:opacity-60"
           >
-            {submitted ? "Akun agen aktif ✓" : "Aktifkan akun agen saya"}
-            {!submitted && <ArrowRight />}
+            Aktifkan akun agen saya
+            <ArrowRight />
           </button>
         </div>
       </form>
