@@ -1,0 +1,238 @@
+import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
+import { Link, useLocation } from "wouter";
+import { AppBar } from "../components/AppBar";
+import { AppShell } from "../components/AppShell";
+import { ChevronDown } from "../components/icons";
+import {
+  buildSellCarResult,
+  fetchSellCarData,
+  getBrands,
+  getYears,
+  type SellCarData,
+  type SellCarFormData,
+} from "../lib/sellCar";
+
+const INITIAL_FORM: SellCarFormData = {
+  brand: "",
+  model: "",
+  year: "",
+  variant: "",
+  transmission: "",
+  color: "",
+  mileage: "",
+  plate: "",
+  stnk: "",
+};
+
+const PLATES = ["B - DKI Jakarta", "D - Bandung", "F - Bogor", "L - Surabaya", "AB - Yogyakarta", "Lainnya"];
+const COLORS = ["Hitam", "Putih", "Abu-abu", "Silver", "Merah", "Biru", "Cokelat", "Lainnya"];
+
+function Field({
+  label,
+  required = false,
+  hint,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[12px] font-semibold text-ink">
+        {label} {required && <span className="text-[#E36356]">*</span>}
+      </span>
+      {children}
+      {hint && <span className="mt-1 block text-[10px] leading-[1.4] text-muted">{hint}</span>}
+    </label>
+  );
+}
+
+function SelectField({
+  value,
+  onChange,
+  placeholder,
+  disabled = false,
+  children,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  disabled?: boolean;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}
+        className="h-11 w-full appearance-none rounded-[12px] border border-line bg-surface px-3.5 pr-9 text-[13px] text-ink outline-none transition focus:border-teal-deep disabled:bg-field disabled:text-placeholder"
+      >
+        <option value="">{placeholder}</option>
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted" />
+    </div>
+  );
+}
+
+export function JualMobil() {
+  const [, navigate] = useLocation();
+  const [data, setData] = useState<SellCarData | null>(null);
+  const [form, setForm] = useState(INITIAL_FORM);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetchSellCarData()
+      .then(setData)
+      .catch(() => setError("Matrix harga belum dapat dimuat. Coba refresh halaman."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const brands = useMemo(() => (data ? getBrands(data.rows) : []), [data]);
+  const modelOptions = useMemo(() => {
+    if (!data) return [];
+    return data.rows
+      .filter((row) => !form.brand || row.brand === form.brand)
+      .filter((row, index, rows) => rows.findIndex((item) => item.model === row.model && item.variant === row.variant) === index)
+      .sort((a, b) => `${a.model} ${a.variant}`.localeCompare(`${b.model} ${b.variant}`));
+  }, [data, form.brand]);
+  const years = useMemo(
+    () => (data ? getYears(data.rows, form.brand, form.model, form.variant) : []),
+    [data, form.brand, form.model, form.variant],
+  );
+
+  function update<K extends keyof SellCarFormData>(key: K, value: SellCarFormData[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!data) return;
+    const result = buildSellCarResult(data, form);
+    if (!result) {
+      setError("Data mobil belum memiliki harga di matrix. Silakan pilih kombinasi lain.");
+      return;
+    }
+    sessionStorage.setItem("mobix-sell-car-result", JSON.stringify(result));
+    navigate("/jual-mobil/hasil");
+  }
+
+  return (
+    <AppShell>
+      <AppBar title="Jual Mobil" subtitle="Prediksi harga mobil Anda" />
+      <main className="px-3.5 pb-8">
+        <section className="rounded-[22px] border border-line bg-surface p-[18px] shadow-sm">
+          <div className="mb-5">
+            <div className="mb-1 text-[12px] font-medium text-teal-deep">Cek harga mobil</div>
+            <h1 className="m-0 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-ink">
+              Mulai Jual Mobil Anda
+            </h1>
+            <p className="m-0 mt-2 text-[12px] leading-[1.5] text-muted">
+              Isi data kendaraan untuk mendapatkan prediksi harga terbaik dari Mobix.
+            </p>
+          </div>
+
+          <form onSubmit={submit} className="space-y-3.5">
+            <Field label="Merek" required>
+              <SelectField
+                value={form.brand}
+                onChange={(value) => setForm({ ...INITIAL_FORM, brand: value })}
+                placeholder={loading ? "Memuat merek..." : "Pilih atau cari merek..."}
+                disabled={loading}
+              >
+                {brands.map((brand) => <option key={brand} value={brand}>{brand}</option>)}
+              </SelectField>
+            </Field>
+
+            <Field label="Model" required>
+              <SelectField
+                value={form.model && form.variant ? `${form.model}|${form.variant}` : ""}
+                onChange={(value) => {
+                  const [model, variant] = value.split("|");
+                  setForm((current) => ({ ...current, model: model ?? "", variant: variant ?? "", year: "" }));
+                }}
+                placeholder="Pilih merek terlebih dahulu"
+                disabled={!form.brand}
+              >
+                {modelOptions.map((option) => (
+                  <option key={`${option.model}|${option.variant}`} value={`${option.model}|${option.variant}`}>
+                    {option.model} - {option.variant}
+                  </option>
+                ))}
+              </SelectField>
+            </Field>
+
+            <Field label="Tahun Pabrik" required hint="Tahun mobil tersebut diproduksi.">
+              <SelectField
+                value={form.year}
+                onChange={(value) => update("year", value)}
+                placeholder="Pilih tahun pabrik"
+                disabled={!form.variant}
+              >
+                {years.map((year) => <option key={year} value={year}>{year}</option>)}
+              </SelectField>
+            </Field>
+
+            <Field label="Transmisi" required>
+              <SelectField value={form.transmission} onChange={(value) => update("transmission", value)} placeholder="Pilih transmisi...">
+                <option value="Manual">Manual</option>
+                <option value="Automatic">Automatic</option>
+              </SelectField>
+            </Field>
+
+            <Field label="Warna" required hint="Pilih warna atau gunakan input manual jika tidak tersedia.">
+              <SelectField value={form.color} onChange={(value) => update("color", value)} placeholder="Pilih warna">
+                {COLORS.map((color) => <option key={color} value={color}>{color}</option>)}
+              </SelectField>
+            </Field>
+
+            <Field label="Jarak Tempuh (KM)" hint="Contoh: 50.000">
+              <input
+                type="number"
+                min="0"
+                value={form.mileage}
+                onChange={(event) => update("mileage", event.target.value)}
+                placeholder="Contoh: 50.000"
+                className="h-11 w-full rounded-[12px] border border-line bg-surface px-3.5 text-[13px] text-ink outline-none transition placeholder:text-placeholder focus:border-teal-deep"
+              />
+            </Field>
+
+            <Field label="Plat" required hint="Bisa dicek melalui kode provinsi pada plat kendaraan.">
+              <SelectField value={form.plate} onChange={(value) => update("plate", value)} placeholder="Pilih plat">
+                {PLATES.map((plate) => <option key={plate} value={plate}>{plate}</option>)}
+              </SelectField>
+            </Field>
+
+            <Field label="Masa Berlaku STNK">
+              <input
+                type="month"
+                value={form.stnk}
+                onChange={(event) => update("stnk", event.target.value)}
+                className="h-11 w-full rounded-[12px] border border-line bg-surface px-3.5 text-[13px] text-ink outline-none transition focus:border-teal-deep"
+              />
+            </Field>
+
+            {error && <div className="rounded-[12px] bg-danger-bg px-3 py-2.5 text-[11px] leading-[1.45] text-danger">{error}</div>}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="mt-1 flex h-12 w-full items-center justify-center rounded-[12px] bg-teal-deep text-[14px] font-extrabold text-white transition hover:bg-[#078e8b] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Prediksi Harga Mobil Anda!
+            </button>
+          </form>
+        </section>
+
+        <Link href="/" className="mt-4 block text-center text-[12px] font-semibold text-muted no-underline">
+          Kembali ke Beranda
+        </Link>
+      </main>
+    </AppShell>
+  );
+}

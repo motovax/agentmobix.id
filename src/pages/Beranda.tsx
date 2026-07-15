@@ -226,8 +226,16 @@ export function Beranda() {
           className="rounded-b-[26px] px-[18px] pb-[18px] pt-5 text-surface"
           style={{ background: "linear-gradient(155deg,#0E1B1E,#1B3438)" }}
         >
-          <div className="text-[20px] font-extrabold -tracking-[0.02em]">
-            mobi<span className="text-teal">x</span>
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-[20px] font-extrabold -tracking-[0.02em]">
+              mobi<span className="text-teal">x</span>
+            </div>
+            <Link
+              href="/jual-mobil"
+              className="rounded-full bg-teal px-3.5 py-2 text-[11px] font-extrabold text-ink no-underline"
+            >
+              Cek Harga
+            </Link>
           </div>
           <h1 className="m-0 mb-1 mt-3.5 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2]">
             Mau Jual Mobil{" "}

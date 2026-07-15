@@ -10,6 +10,8 @@ import { Lokasi } from "./pages/Lokasi";
 import { ShareSheet } from "./pages/ShareSheet";
 import { PromoList } from "./pages/PromoList";
 import { PromoDetail } from "./pages/PromoDetail";
+import { JualMobil } from "./pages/JualMobil";
+import { JualMobilHasil } from "./pages/JualMobilHasil";
 
 function ScrollToTopOnRouteChange() {
   const [location] = useLocation();
@@ -39,6 +41,8 @@ export default function App() {
       <Route path="/promo/:slug" component={PromoDetail} />
       <Route path="/lokasi" component={Lokasi} />
       <Route path="/share" component={ShareSheet} />
+      <Route path="/jual-mobil/hasil" component={JualMobilHasil} />
+      <Route path="/jual-mobil" component={JualMobil} />
       <Route component={Beranda} />
     </Switch>
     </>
