@@ -362,8 +362,13 @@ async function fetchCategoriesUncached(): Promise<string[]> {
 export async function fetchBrands(): Promise<string[]> {
   return (await get<string[]>("/daftar-merek")).data ?? [];
 }
+// Branches the API returns but that should not be shown to users
+// (no address/coords, not customer-facing).
+const HIDDEN_CABANG = new Set(["SURABAYA"]);
+
 export async function fetchCabang(): Promise<CabangDetail[]> {
-  return (await get<CabangDetail[]>("/daftar-cabang")).data ?? [];
+  const all = (await get<CabangDetail[]>("/daftar-cabang")).data ?? [];
+  return all.filter((c) => !HIDDEN_CABANG.has((c.nama ?? "").trim().toUpperCase()));
 }
 
 const CATEGORY_ACRONYMS = new Set(["MPV", "SUV", "LCGC"]);
