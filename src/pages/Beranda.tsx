@@ -18,8 +18,8 @@ import { useAsync } from "../lib/useAsync";
 
 const BUDGET_CHIPS = [
   { label: "< Rp100jt", href: "/katalog?harga_max=100000000" },
-  { label: "Rp100?150jt", href: "/katalog?harga_min=100000000&harga_max=150000000" },
-  { label: "Rp150?200jt", href: "/katalog?harga_min=150000000&harga_max=200000000" },
+  { label: "Rp100–150jt", href: "/katalog?harga_min=100000000&harga_max=150000000" },
+  { label: "Rp150–200jt", href: "/katalog?harga_min=150000000&harga_max=200000000" },
   { label: "> Rp200jt", href: "/katalog?harga_min=200000000" },
   { label: "Matic", href: "/katalog?transmisi=AUTOMATIC" },
 ];
@@ -154,7 +154,7 @@ export function Beranda() {
             hari ini
           </h1>
           <p className="m-0 mb-3.5 text-[12px] text-white/65">
-            2.400+ unit ready ? inspeksi 175 titik ? garansi mesin
+            2.400+ unit ready · inspeksi 175 titik · garansi mesin
           </p>
           <form
             onSubmit={(e) => {
@@ -167,7 +167,7 @@ export function Beranda() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Cari Avanza, Brio, Xpander?"
+              placeholder="Cari Avanza, Brio, Xpander…"
               enterKeyHint="search"
               className="min-w-0 flex-1 bg-transparent text-[13.5px] font-medium text-ink outline-none placeholder:text-placeholder"
             />
@@ -175,7 +175,7 @@ export function Beranda() {
           {debouncedQ && (
             <div className="mt-2 overflow-hidden rounded-2xl bg-surface shadow-[0_8px_24px_-10px_rgba(14,27,30,0.3)]">
               {searchLoading && (
-                <div className="px-3.5 py-3 text-[12px] text-muted">Mencari?</div>
+                <div className="px-3.5 py-3 text-[12px] text-muted">Mencari…</div>
               )}
               {!searchLoading &&
                 (searchResults ?? []).map((u) => (
@@ -194,7 +194,7 @@ export function Beranda() {
                         {u.title}
                       </div>
                       <div className="text-[11px] text-muted">
-                        Rp {formatJt(u.price)} ? {u.year} ? {u.branch}
+                        Rp {formatJt(u.price)} · {u.year} · {u.branch}
                       </div>
                     </div>
                   </Link>
@@ -209,7 +209,7 @@ export function Beranda() {
                   href={`/katalog?q=${encodeURIComponent(debouncedQ)}`}
                   className="block border-t border-line px-3.5 py-2.5 text-center text-[12px] font-bold text-teal-deep no-underline"
                 >
-                  Lihat semua hasil di katalog ?
+                  Lihat semua hasil di katalog →
                 </Link>
               )}
             </div>
@@ -337,17 +337,17 @@ export function Beranda() {
             href="/daftar"
             className="mt-3 inline-block rounded-xl bg-teal px-4 py-2.5 text-[12.5px] font-extrabold text-ink no-underline"
           >
-            Gabung jadi agen ?
+            Gabung jadi agen →
           </Link>
         </section>
 
         {/* FOOTER */}
         <footer className="px-[18px] pb-1 pt-[26px] text-center text-[11px] text-muted">
-          ? {new Date().getFullYear()} agenmobix.id ?{" "}
+          © {new Date().getFullYear()} agenmobix.id ·{" "}
           <a href="#" className="font-semibold text-teal-deep no-underline">
             Berita
           </a>{" "}
-          ?{" "}
+          ·{" "}
           <a href="#" className="font-semibold text-teal-deep no-underline">
             Customer Care
           </a>
