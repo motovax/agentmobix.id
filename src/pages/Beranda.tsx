@@ -230,11 +230,11 @@ export function Beranda() {
             mobi<span className="text-teal">x</span>
           </div>
           <h1 className="m-0 mb-1 mt-3.5 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2]">
-            Jual mobil{" "}
+            Mau Jual Mobil{" "}
             <span className="font-serif text-[22px] font-semibold italic text-teal">
-              apa
+              Apa
             </span>{" "}
-            hari ini
+            Hari Ini?
           </h1>
           <p className="m-0 mb-3.5 text-[12px] text-white/65">
             2.400+ unit ready · inspeksi 175 titik · garansi mesin
