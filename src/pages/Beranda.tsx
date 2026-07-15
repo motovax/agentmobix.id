@@ -111,14 +111,14 @@ export function Beranda() {
   const [debouncedQ, setDebouncedQ] = useState("");
   const [searchResults, setSearchResults] = useState<CardUnit[] | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [recItems, setRecItems] = useState<CardUnit[]>([]);
   const [recNextPage, setRecNextPage] = useState(1);
   const [recTotalPages, setRecTotalPages] = useState<number | null>(null);
   const [recLoading, setRecLoading] = useState(false);
   const [recError, setRecError] = useState(false);
   const recLoadingRef = useRef(false);
-  const recStartedRef = useRef(false);
-  const recSentinelRef = useRef<HTMLDivElement>(null);
+  const recRequestRef = useRef(0);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedQ(query.trim()), 350);
@@ -153,51 +153,52 @@ export function Beranda() {
   const hasMoreRecommendations =
     recTotalPages === null || recNextPage <= recTotalPages;
 
-  const loadRecommendations = useCallback(async () => {
-    if (recLoadingRef.current) return;
-    if (recTotalPages !== null && recNextPage > recTotalPages) return;
+  const loadRecommendations = useCallback(async (options?: {
+    page?: number;
+    replace?: boolean;
+  }) => {
+    const page = options?.page ?? recNextPage;
+    const replace = options?.replace ?? false;
+    if (recLoadingRef.current && !replace) return;
+    if (!replace && recTotalPages !== null && page > recTotalPages) return;
 
     recLoadingRef.current = true;
+    const requestId = ++recRequestRef.current;
     setRecLoading(true);
     setRecError(false);
+    if (replace) {
+      setRecItems([]);
+      setRecNextPage(1);
+      setRecTotalPages(null);
+    }
 
     try {
       const result = await fetchUnits({
-        page: recNextPage,
+        page,
         limit: REC_BATCH_SIZE,
+        kategori: activeCategory ? [activeCategory] : undefined,
       });
+      if (requestId !== recRequestRef.current) return;
+      const nextItems = result.items.map(toCardUnit);
       setRecItems((current) =>
-        appendUniqueUnits(current, result.items.map(toCardUnit)),
+        replace ? nextItems : appendUniqueUnits(current, nextItems),
       );
       setRecTotalPages(result.totalPages);
-      setRecNextPage((page) => page + 1);
+      setRecNextPage(page + 1);
     } catch {
+      if (requestId !== recRequestRef.current) return;
       setRecError(true);
     } finally {
-      recLoadingRef.current = false;
-      setRecLoading(false);
+      if (requestId === recRequestRef.current) {
+        recLoadingRef.current = false;
+        setRecLoading(false);
+      }
     }
-  }, [recNextPage, recTotalPages]);
+  }, [activeCategory, recNextPage, recTotalPages]);
 
   useEffect(() => {
-    if (recStartedRef.current) return;
-    recStartedRef.current = true;
-    loadRecommendations();
-  }, [loadRecommendations]);
-
-  useEffect(() => {
-    const sentinel = recSentinelRef.current;
-    if (!sentinel || !hasMoreRecommendations) return;
-
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) loadRecommendations();
-      },
-      { rootMargin: "260px" },
-    );
-    obs.observe(sentinel);
-    return () => obs.disconnect();
-  }, [hasMoreRecommendations, loadRecommendations]);
+    loadRecommendations({ page: 1, replace: true });
+  }, [activeCategory]);
 
   return (
     <AppShell>
@@ -291,27 +292,6 @@ export function Beranda() {
           </div>
         </header>
 
-        {/* FILTER TIPE BODI */}
-        <div className="px-[18px] pt-4">
-          <div className="scroll-x -mx-[18px] flex gap-2 overflow-x-auto px-[18px] pb-0.5">
-            <Link
-              href="/katalog"
-              className="flex-shrink-0 whitespace-nowrap rounded-full border border-teal-tint-border bg-teal-tint px-[15px] py-[9px] text-[12px] font-bold text-teal-deep no-underline"
-            >
-              Semua
-            </Link>
-            {(categories.data ?? []).map((c) => (
-              <Link
-                key={c}
-                href={`/katalog?kategori=${encodeURIComponent(c)}`}
-                className="flex-shrink-0 whitespace-nowrap rounded-full border border-line bg-surface px-[15px] py-[9px] text-[12px] font-bold text-mid no-underline"
-              >
-                {prettyCategory(c)}
-              </Link>
-            ))}
-          </div>
-        </div>
-
         {/* CARI PER MEREK */}
         <section className="px-[18px] pt-[22px]">
           <div className="flex items-baseline justify-between gap-2">
@@ -350,11 +330,11 @@ export function Beranda() {
           </div>
         </section>
 
-        {/* REKOMENDASI UNTUKMU */}
+        {/* LIVE KATALOG */}
         <section className="px-[18px] pt-[22px]">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="m-0 -tracking-[0.01em] text-[15px] font-extrabold text-ink">
-              Rekomendasi untukmu
+              Live katalog
             </h2>
             <Link
               href="/katalog"
@@ -362,6 +342,33 @@ export function Beranda() {
             >
               Filter
             </Link>
+          </div>
+          <div className="scroll-x -mx-[18px] mt-3 flex gap-2 overflow-x-auto px-[18px] pb-0.5">
+            <button
+              type="button"
+              onClick={() => setActiveCategory(null)}
+              className={`flex-shrink-0 whitespace-nowrap rounded-full border px-[15px] py-[9px] text-[12px] font-bold ${
+                activeCategory === null
+                  ? "border-teal-tint-border bg-teal-tint text-teal-deep"
+                  : "border-line bg-surface text-mid"
+              }`}
+            >
+              Semua
+            </button>
+            {(categories.data ?? []).map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setActiveCategory(c)}
+                className={`flex-shrink-0 whitespace-nowrap rounded-full border px-[15px] py-[9px] text-[12px] font-bold ${
+                  activeCategory === c
+                    ? "border-teal-tint-border bg-teal-tint text-teal-deep"
+                    : "border-line bg-surface text-mid"
+                }`}
+              >
+                {prettyCategory(c)}
+              </button>
+            ))}
           </div>
           <div className="mt-3 grid grid-cols-3 gap-2">
             {recItems.map((u) => (
@@ -372,18 +379,15 @@ export function Beranda() {
                 <RecSkeleton key={`rec-skeleton-${i}`} />
               ))}
           </div>
-          {hasMoreRecommendations && (
-            <div ref={recSentinelRef} className="h-px" aria-hidden="true" />
-          )}
           {!recLoading && recError && recItems.length === 0 && (
             <div className="py-6 text-center text-[12px] text-muted">
-              Gagal memuat rekomendasi.
+              Gagal memuat katalog.
             </div>
           )}
           {!recLoading && recError && recItems.length > 0 && (
             <button
               type="button"
-              onClick={loadRecommendations}
+              onClick={() => loadRecommendations()}
               className="mt-2 w-full rounded-xl border border-line bg-surface px-3 py-2 text-[12px] font-bold text-teal-deep"
             >
               Coba muat lagi
@@ -391,8 +395,17 @@ export function Beranda() {
           )}
           {!recLoading && !recError && recItems.length === 0 && (
             <div className="py-6 text-center text-[12px] text-muted">
-              Belum ada unit rekomendasi.
+              Belum ada unit katalog.
             </div>
+          )}
+          {!recLoading && !recError && recItems.length > 0 && hasMoreRecommendations && (
+            <button
+              type="button"
+              onClick={() => loadRecommendations()}
+              className="mt-3 w-full rounded-xl border border-teal-tint-border bg-teal-tint px-3 py-3 text-[12.5px] font-extrabold text-teal-deep"
+            >
+              Muat lebih banyak
+            </button>
           )}
         </section>
 
