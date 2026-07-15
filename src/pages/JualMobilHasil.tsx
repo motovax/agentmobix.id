@@ -49,7 +49,7 @@ export function JualMobilHasil() {
           <h1 className="m-0 text-[22px] font-extrabold tracking-[-0.02em] text-ink">Prediksi Harga Mobil Kamu</h1>
           <div className="mt-5 text-center">
             <div className="text-[12px] text-muted">Rekomendasi Harga</div>
-            <div className="mt-1 text-[21px] font-extrabold leading-tight text-teal-deep">
+            <div className="mt-1 whitespace-nowrap text-[clamp(14px,5vw,21px)] font-extrabold leading-tight text-teal-deep">
               {formatRupiah(result.recommendedPrice)} - {formatRupiah(result.recommendedPrice)}
             </div>
           </div>
