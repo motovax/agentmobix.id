@@ -3,7 +3,7 @@ import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { Photo, Skeleton } from "../components/ui";
 import {
-  Close,
+  ChevronLeft,
   ShareArrow,
   Copy,
   Download,
@@ -934,25 +934,11 @@ export function ShareSheet() {
   const showAiOriginalToggle = activeMedia?.kind === "image" && activeHasAiBackground;
 
   return (
-    <AppShell bg="bg-ink">
-      {/* backdrop */}
-      <div className="pt-10 text-center">
-        <Link
-          href={backHref}
-          aria-label="Tutup"
-          className="mb-[18px] inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.12] text-surface no-underline"
-        >
-          <Close />
-        </Link>
-        <div className="text-[13px] text-[#A4D7D7]">Bagikan unit ini ke jaringan kamu</div>
-      </div>
-
+    <AppShell>
       {/* sheet */}
-      <div className="mt-5 min-h-[560px] rounded-t-[28px] bg-surface-2 px-4 pb-5 pt-[18px]">
-        <div className="mx-auto mb-[18px] h-1 w-10 rounded-full bg-[#D4DEDF]" />
-
+      <div className="min-h-[560px] px-4 pb-5 pt-[18px]">
         {/* shareable preview */}
-        <div className="mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
+        <div className="relative mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
           {activeMedia?.kind === "video" ? (
             <div className="relative aspect-video bg-black">
               <video
@@ -962,7 +948,7 @@ export function ShareSheet() {
                 playsInline
                 preload="metadata"
               />
-              <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-lg bg-ink/80 px-2.5 py-1 text-[11px] font-bold text-surface">
+              <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-lg bg-ink/80 px-2.5 py-1 text-[11px] font-bold text-surface">
                 <Play size={13} />
                 Video
               </div>
@@ -987,6 +973,13 @@ export function ShareSheet() {
             />
           </Photo>
           )}
+          <Link
+            href={backHref}
+            aria-label="Kembali"
+            className="absolute left-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
+          >
+            <ChevronLeft />
+          </Link>
           <div className="px-3.5 py-3">
             {loading || !unit ? (
               <div className="space-y-2">
