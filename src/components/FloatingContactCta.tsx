@@ -50,7 +50,7 @@ export function FloatingContactCta({
     <div
       ref={rootRef}
       className={[
-        "fixed right-[18px] z-40 flex flex-col items-end gap-2",
+        "fixed left-1/2 z-40 flex w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 flex-col items-end gap-2",
         bottomClassName,
       ].join(" ")}
     >
