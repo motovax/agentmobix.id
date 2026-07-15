@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { AppBar } from "../components/AppBar";
 import { AppShell } from "../components/AppShell";
-import { ChevronDown } from "../components/icons";
+import { Camera, ChevronDown, Sparkles } from "../components/icons";
 import {
   buildSellCarResult,
   fetchSellCarData,
@@ -198,6 +198,7 @@ export function JualMobil() {
   const [, navigate] = useLocation();
   const [data, setData] = useState<SellCarData | null>(null);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [activeTab, setActiveTab] = useState<"form" | "ai">("form");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -252,95 +253,159 @@ export function JualMobil() {
             </p>
           </div>
 
-          <form onSubmit={submit} className="space-y-3.5">
-            <Field label="Merek" required>
-              <SelectField
-                value={form.brand}
-                onChange={(value) => setForm({ ...INITIAL_FORM, brand: value })}
-                placeholder={loading ? "Memuat merek..." : "Pilih atau cari merek..."}
-                disabled={loading}
-              >
-                {brands.map((brand) => <option key={brand} value={brand}>{brand}</option>)}
-              </SelectField>
-            </Field>
-
-            <Field label="Model" required>
-              <SelectField
-                value={form.model && form.variant ? `${form.model}|${form.variant}` : ""}
-                onChange={(value) => {
-                  const [model, variant] = value.split("|");
-                  setForm((current) => ({ ...current, model: model ?? "", variant: variant ?? "", year: "" }));
-                }}
-                placeholder="Pilih merek terlebih dahulu"
-                disabled={!form.brand}
-              >
-                {modelOptions.map((option) => (
-                  <option key={`${option.model}|${option.variant}`} value={`${option.model}|${option.variant}`}>
-                    {option.model} - {option.variant}
-                  </option>
-                ))}
-              </SelectField>
-            </Field>
-
-            <Field label="Tahun Pabrik" required hint="Tahun mobil tersebut diproduksi.">
-              <SelectField
-                value={form.year}
-                onChange={(value) => update("year", value)}
-                placeholder="Pilih tahun pabrik"
-                disabled={!form.variant}
-              >
-                {years.map((year) => <option key={year} value={year}>{year}</option>)}
-              </SelectField>
-            </Field>
-
-            <Field label="Transmisi" required>
-              <SelectField value={form.transmission} onChange={(value) => update("transmission", value)} placeholder="Pilih transmisi...">
-                <option value="Manual">Manual</option>
-                <option value="Automatic">Automatic</option>
-              </SelectField>
-            </Field>
-
-            <Field label="Warna" required hint="Pilih warna atau gunakan input manual jika tidak tersedia.">
-              <SelectField value={form.color} onChange={(value) => update("color", value)} placeholder="Pilih warna">
-                {COLORS.map((color) => <option key={color} value={color}>{color}</option>)}
-              </SelectField>
-            </Field>
-
-            <Field label="Jarak Tempuh (KM)" hint="Contoh: 50.000">
-              <input
-                type="text"
-                inputMode="numeric"
-                value={formatThousands(form.mileage)}
-                onChange={(event) => update("mileage", event.target.value.replace(/\D/g, ""))}
-                placeholder="Contoh: 50.000"
-                className="h-11 w-full rounded-[12px] border border-line bg-surface px-3.5 text-[13px] text-ink outline-none transition placeholder:text-placeholder focus:border-teal-deep"
-              />
-            </Field>
-
-            <Field label="Plat" required hint="Bisa dicek melalui kode provinsi pada plat kendaraan.">
-              <SelectField value={form.plate} onChange={(value) => update("plate", value)} placeholder="Pilih plat">
-                {PLATES.map((plate) => <option key={plate} value={plate}>{plate}</option>)}
-              </SelectField>
-            </Field>
-
-            <Field label="Masa Berlaku STNK" hint="Pilih bulan dan tahun masa berlaku STNK.">
-              <MonthYearPicker
-                value={form.stnk}
-                onChange={(value) => update("stnk", value)}
-                placeholder="Pilih bulan dan tahun"
-              />
-            </Field>
-
-            {error && <div className="rounded-[12px] bg-danger-bg px-3 py-2.5 text-[11px] leading-[1.45] text-danger">{error}</div>}
-
+          <div className="mb-4 grid grid-cols-2 rounded-[14px] border border-line bg-field p-1">
             <button
-              type="submit"
-              disabled={loading}
-              className="mt-1 flex h-12 w-full items-center justify-center rounded-[12px] bg-teal-deep text-[14px] font-extrabold text-white transition hover:bg-[#078e8b] disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              onClick={() => setActiveTab("form")}
+              aria-pressed={activeTab === "form"}
+              className={`flex h-10 items-center justify-center rounded-[10px] text-[12px] font-extrabold transition ${
+                activeTab === "form" ? "bg-surface text-teal-deep shadow-sm" : "text-muted"
+              }`}
             >
-              Prediksi Harga Mobil Anda!
+              Isi Form
             </button>
-          </form>
+            <button
+              type="button"
+              onClick={() => setActiveTab("ai")}
+              aria-pressed={activeTab === "ai"}
+              className={`flex h-10 items-center justify-center gap-1.5 rounded-[10px] text-[12px] font-extrabold transition ${
+                activeTab === "ai" ? "bg-surface text-teal-deep shadow-sm" : "text-muted"
+              }`}
+            >
+              Bantuan AI
+              <span className="rounded-full bg-teal-tint px-1.5 py-0.5 text-[8px] font-extrabold uppercase leading-none text-teal-deep">
+                Soon
+              </span>
+            </button>
+          </div>
+
+          {activeTab === "form" ? (
+            <form onSubmit={submit} className="space-y-3.5">
+              <Field label="Merek" required>
+                <SelectField
+                  value={form.brand}
+                  onChange={(value) => setForm({ ...INITIAL_FORM, brand: value })}
+                  placeholder={loading ? "Memuat merek..." : "Pilih atau cari merek..."}
+                  disabled={loading}
+                >
+                  {brands.map((brand) => <option key={brand} value={brand}>{brand}</option>)}
+                </SelectField>
+              </Field>
+
+              <Field label="Model" required>
+                <SelectField
+                  value={form.model && form.variant ? `${form.model}|${form.variant}` : ""}
+                  onChange={(value) => {
+                    const [model, variant] = value.split("|");
+                    setForm((current) => ({ ...current, model: model ?? "", variant: variant ?? "", year: "" }));
+                  }}
+                  placeholder="Pilih merek terlebih dahulu"
+                  disabled={!form.brand}
+                >
+                  {modelOptions.map((option) => (
+                    <option key={`${option.model}|${option.variant}`} value={`${option.model}|${option.variant}`}>
+                      {option.model} - {option.variant}
+                    </option>
+                  ))}
+                </SelectField>
+              </Field>
+
+              <Field label="Tahun Pabrik" required hint="Tahun mobil tersebut diproduksi.">
+                <SelectField
+                  value={form.year}
+                  onChange={(value) => update("year", value)}
+                  placeholder="Pilih tahun pabrik"
+                  disabled={!form.variant}
+                >
+                  {years.map((year) => <option key={year} value={year}>{year}</option>)}
+                </SelectField>
+              </Field>
+
+              <Field label="Transmisi" required>
+                <SelectField value={form.transmission} onChange={(value) => update("transmission", value)} placeholder="Pilih transmisi...">
+                  <option value="Manual">Manual</option>
+                  <option value="Automatic">Automatic</option>
+                </SelectField>
+              </Field>
+
+              <Field label="Warna" required hint="Pilih warna atau gunakan input manual jika tidak tersedia.">
+                <SelectField value={form.color} onChange={(value) => update("color", value)} placeholder="Pilih warna">
+                  {COLORS.map((color) => <option key={color} value={color}>{color}</option>)}
+                </SelectField>
+              </Field>
+
+              <Field label="Jarak Tempuh (KM)" hint="Contoh: 50.000">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={formatThousands(form.mileage)}
+                  onChange={(event) => update("mileage", event.target.value.replace(/\D/g, ""))}
+                  placeholder="Contoh: 50.000"
+                  className="h-11 w-full rounded-[12px] border border-line bg-surface px-3.5 text-[13px] text-ink outline-none transition placeholder:text-placeholder focus:border-teal-deep"
+                />
+              </Field>
+
+              <Field label="Plat" required hint="Bisa dicek melalui kode provinsi pada plat kendaraan.">
+                <SelectField value={form.plate} onChange={(value) => update("plate", value)} placeholder="Pilih plat">
+                  {PLATES.map((plate) => <option key={plate} value={plate}>{plate}</option>)}
+                </SelectField>
+              </Field>
+
+              <Field label="Masa Berlaku STNK" hint="Pilih bulan dan tahun masa berlaku STNK.">
+                <MonthYearPicker
+                  value={form.stnk}
+                  onChange={(value) => update("stnk", value)}
+                  placeholder="Pilih bulan dan tahun"
+                />
+              </Field>
+
+              {error && <div className="rounded-[12px] bg-danger-bg px-3 py-2.5 text-[11px] leading-[1.45] text-danger">{error}</div>}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-1 flex h-12 w-full items-center justify-center rounded-[12px] bg-teal-deep text-[14px] font-extrabold text-white transition hover:bg-[#078e8b] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Prediksi Harga Mobil Anda!
+              </button>
+            </form>
+          ) : (
+            <section className="rounded-[18px] border border-teal-tint-border bg-teal-tint p-4">
+              <div className="mb-3 flex items-start gap-3">
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[14px] bg-surface text-teal-deep">
+                  <Sparkles size={22} />
+                </div>
+                <div>
+                  <div className="mb-1 inline-flex rounded-full bg-surface px-2 py-1 text-[10px] font-extrabold uppercase text-teal-deep">
+                    Coming Soon
+                  </div>
+                  <h2 className="m-0 text-[18px] font-extrabold leading-[1.25] text-ink">
+                    AIFalcon bantu hitungkan harga
+                  </h2>
+                  <p className="m-0 mt-1.5 text-[12px] leading-[1.5] text-muted">
+                    Nanti cukup foto kendaraan dan STNK. AIFalcon akan membaca detail mobil lalu membuat estimasi harga secara otomatis.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-2.5">
+                {["Foto kendaraan", "Foto STNK"].map((label) => (
+                  <button
+                    key={label}
+                    type="button"
+                    disabled
+                    className="flex h-14 w-full items-center gap-3 rounded-[14px] border border-dashed border-teal-tint-border bg-surface/70 px-3 text-left text-[12px] font-bold text-mid disabled:cursor-not-allowed disabled:opacity-80"
+                  >
+                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[12px] bg-field text-teal-deep">
+                      <Camera size={18} />
+                    </span>
+                    <span className="flex-1">{label}</span>
+                    <span className="text-[10px] font-extrabold uppercase text-placeholder">Soon</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
         </section>
 
         <Link href="/" className="mt-4 block text-center text-[12px] font-semibold text-muted no-underline">
