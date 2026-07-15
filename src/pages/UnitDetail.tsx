@@ -5,10 +5,10 @@ import "@splidejs/react-splide/css/core";
 import { Link, useParams } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
-import { waHref } from "../components/FloatingContactCta";
+import { ContactActionMenu } from "../components/FloatingContactCta";
 import { Photo, Skeleton } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
-import { Calculator, Chat, ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
+import { ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
 import {
   fetchUnitDetail,
   mobixImage,
@@ -1714,25 +1714,7 @@ export function UnitDetail() {
       </main>
 
       {/* STICKY ACTIONS */}
-      <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-40 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[48px_48px_minmax(0,1fr)] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
-        <a
-          href={waHref(unitAdminMessage ?? "")}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Tanya admin tentang unit ini"
-          className="flex h-12 items-center justify-center rounded-2xl border border-line bg-surface text-teal-deep no-underline"
-        >
-          <Chat size={21} />
-        </a>
-        <a
-          href={waHref(unitCalculationMessage ?? "")}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Minta hitungan untuk unit ini"
-          className="flex h-12 items-center justify-center rounded-2xl border border-line bg-surface text-teal-deep no-underline"
-        >
-          <Calculator size={20} />
-        </a>
+      <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-40 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
         {shareHref ? (
           <Link
             href={shareHref}
@@ -1751,6 +1733,13 @@ export function UnitDetail() {
             <ShareArrow size={14} />
           </button>
         )}
+        <ContactActionMenu
+          adminMessage={unitAdminMessage ?? ""}
+          calculationMessage={unitCalculationMessage ?? ""}
+          adminLabel="Tanya Unit"
+          calculationLabel="Minta Hitungan"
+          buttonClassName="flex h-12 w-full items-center justify-center rounded-2xl border border-teal-tint-border bg-teal text-ink"
+        />
       </div>
     </AppShell>
   );

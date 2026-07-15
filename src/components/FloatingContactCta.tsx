@@ -13,14 +13,18 @@ export function waHref(message: string) {
   return `https://wa.me/${ADMIN_PHONE}?text=${encodeURIComponent(message)}`;
 }
 
-export function FloatingContactCta({
+export function ContactActionMenu({
   adminMessage = DEFAULT_ADMIN_MESSAGE,
   calculationMessage = DEFAULT_CALCULATION_MESSAGE,
-  bottomClassName = "bottom-[calc(12px+env(safe-area-inset-bottom))]",
+  adminLabel = "Tanya Admin",
+  calculationLabel = "Minta Hitungan",
+  buttonClassName = "flex h-14 w-14 items-center justify-center rounded-full border border-teal-tint-border bg-teal text-ink shadow-nav",
 }: {
   adminMessage?: string;
   calculationMessage?: string;
-  bottomClassName?: string;
+  adminLabel?: string;
+  calculationLabel?: string;
+  buttonClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -47,15 +51,9 @@ export function FloatingContactCta({
   }, [open]);
 
   return (
-    <div
-      ref={rootRef}
-      className={[
-        "fixed left-1/2 z-40 flex w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 flex-col items-end gap-2",
-        bottomClassName,
-      ].join(" ")}
-    >
+    <div ref={rootRef} className="relative flex flex-col items-end">
       {open && (
-        <div className="w-[192px] overflow-hidden rounded-2xl border border-line bg-surface p-1.5 shadow-nav">
+        <div className="absolute bottom-[calc(100%+8px)] right-0 w-[192px] overflow-hidden rounded-2xl border border-line bg-surface p-1.5 shadow-nav">
           <a
             href={waHref(adminMessage)}
             target="_blank"
@@ -64,7 +62,7 @@ export function FloatingContactCta({
             className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-bold text-teal-deep no-underline"
           >
             <Chat size={18} />
-            Tanya Admin
+            {adminLabel}
           </a>
           <a
             href={waHref(calculationMessage)}
@@ -74,7 +72,7 @@ export function FloatingContactCta({
             className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-bold text-teal-deep no-underline"
           >
             <Calculator size={18} />
-            Minta Hitungan
+            {calculationLabel}
           </a>
         </div>
       )}
@@ -83,10 +81,34 @@ export function FloatingContactCta({
         aria-label="Buka pilihan kontak"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="flex h-14 w-14 items-center justify-center rounded-full border border-teal-tint-border bg-teal text-ink shadow-nav"
+        className={buttonClassName}
       >
         <Chat size={24} />
       </button>
+    </div>
+  );
+}
+
+export function FloatingContactCta({
+  adminMessage = DEFAULT_ADMIN_MESSAGE,
+  calculationMessage = DEFAULT_CALCULATION_MESSAGE,
+  bottomClassName = "bottom-[calc(12px+env(safe-area-inset-bottom))]",
+}: {
+  adminMessage?: string;
+  calculationMessage?: string;
+  bottomClassName?: string;
+}) {
+  return (
+    <div
+      className={[
+        "fixed left-1/2 z-40 flex w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 flex-col items-end gap-2",
+        bottomClassName,
+      ].join(" ")}
+    >
+      <ContactActionMenu
+        adminMessage={adminMessage}
+        calculationMessage={calculationMessage}
+      />
     </div>
   );
 }
