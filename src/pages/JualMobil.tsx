@@ -389,7 +389,7 @@ export function JualMobil() {
               </div>
 
               <div className="grid gap-2.5">
-                {["Foto kendaraan", "Foto STNK"].map((label) => (
+                {["Foto kendaraan", "Foto STNK", "Foto KM mobil"].map((label) => (
                   <button
                     key={label}
                     type="button"
