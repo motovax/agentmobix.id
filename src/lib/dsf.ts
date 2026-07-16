@@ -52,6 +52,63 @@ export interface DsfSimParams {
   brand?: string;
   model?: string;
   year?: number;
+  category?: string;
+}
+
+export interface DsfSimulationRules {
+  vehicleType: "PC" | "CV";
+  minDpPercent: number;
+  fixedDpPercent?: number;
+  paymentType: "ADDB" | "ADDM";
+  loanPackageName: string;
+}
+
+function isCvCategory(category?: string) {
+  const normalized = (category ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+  return normalized === "truck" || normalized === "truk" || normalized === "pickup" || normalized === "van";
+}
+
+/** Resolve the DSF package rules for the unit and selected tenor. */
+export function getDsfSimulationRules(
+  params: Pick<DsfSimParams, "category" | "year" | "tenor">,
+): DsfSimulationRules {
+  if (isCvCategory(params.category)) {
+    return {
+      vehicleType: "CV",
+      minDpPercent: 25,
+      fixedDpPercent: 25,
+      paymentType: "ADDB",
+      loanPackageName: "MOCIL PLUS",
+    };
+  }
+
+  if (params.tenor === 12) {
+    return {
+      vehicleType: "PC",
+      minDpPercent: 30,
+      paymentType: "ADDM",
+      loanPackageName: "MOCIL 1 YR",
+    };
+  }
+
+  // 2012-2013 is an explicit exception to the age-based package rule.
+  if (params.year === 2012 || params.year === 2013) {
+    return {
+      vehicleType: "PC",
+      minDpPercent: 15,
+      paymentType: "ADDB",
+      loanPackageName: "PAKET C",
+    };
+  }
+
+  const manufacturedYear = params.year ?? 2020;
+  const vehicleAge = new Date().getFullYear() - manufacturedYear;
+  return {
+    vehicleType: "PC",
+    minDpPercent: 15,
+    paymentType: "ADDB",
+    loanPackageName: vehicleAge < 10 ? "PAKET C11" : "MOCIL SPC - PC",
+  };
 }
 
 function buildDsfSimulationPayload(params: DsfSimParams) {
@@ -60,13 +117,17 @@ function buildDsfSimulationPayload(params: DsfSimParams) {
     dpPercent,
     tenor,
     simulationType = "DP",
-    simulationValue = dpPercent,
+    simulationValue,
     cashPriceTarget,
-    paymentType = "ADDB",
     brand = "Unknown",
     model = "Unknown",
     year = 2020,
   } = params;
+  const rules = getDsfSimulationRules({ ...params, year });
+  const effectiveSimulationValue =
+    simulationType === "DP"
+      ? rules.fixedDpPercent ?? Math.max(simulationValue ?? dpPercent, rules.minDpPercent)
+      : simulationValue ?? dpPercent;
 
   return {
     UnitPrice: unitPrice,
@@ -75,8 +136,8 @@ function buildDsfSimulationPayload(params: DsfSimParams) {
     Brand: brand,
     Model: model,
     ManufacturedYear: String(year),
-    LoanPackageName: "MOCIL SPC - PC",
-    PaymentType: paymentType,
+    LoanPackageName: rules.loanPackageName,
+    PaymentType: rules.paymentType,
     Refund: {
       IsApplied: "YES",
       Showroom: "PT DIGITAL SUMBER SEJAHTERA MOTOR",
@@ -96,7 +157,7 @@ function buildDsfSimulationPayload(params: DsfSimParams) {
       AdminFee: 5500000,
     },
     SimulationType: simulationType,
-    SimulationValue: simulationValue,
+    SimulationValue: effectiveSimulationValue,
     TenorInMonths: tenor,
   };
 }

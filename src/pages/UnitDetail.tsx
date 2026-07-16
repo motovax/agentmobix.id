@@ -31,6 +31,7 @@ import {
 } from "../lib/installment";
 import {
   findAllParamsForAllIn,
+  getDsfSimulationRules,
   resolveSmartCreditPrice,
   simulateKreditWithSignal,
   type DsfSimMethod,
@@ -49,7 +50,6 @@ const MAX_DP_PERCENT = 60;
 const TDP_RANGE_MAX_PERCENT = 80;
 const MIN_INSTALLMENT_RATE = 0.005;
 const MAX_INSTALLMENT_RATE = 0.05;
-const INSTALLMENT_RANGE_DP_GUARD_PERCENT = MIN_DP_PERCENT;
 
 type UnitMedia =
   | { kind: "image"; id: string; url: string; item: GalleryItem }
@@ -166,13 +166,20 @@ export function UnitDetail() {
 
   const originalPrice = unit?.harga ?? 0;
   const price = builderPrice > 0 ? builderPrice : originalPrice;
+  const dsfRules = getDsfSimulationRules({
+    category: unit?.category,
+    year: unit?.year,
+    tenor,
+  });
+  const minDsfDpPercent = dsfRules.minDpPercent;
+  const maxDsfDpPercent = dsfRules.fixedDpPercent ?? MAX_DP_PERCENT;
   const minimumBuilderPrice = minBuilderPrice(originalPrice);
   const estimatedCommission = estimateBuilderCommission(originalPrice, price);
   const priceDelta = price - originalPrice;
   const creditPriceForBounds = price;
   const minTdpAmount = Math.max(
     0,
-    Math.round(unit?.tdp && unit.tdp > 0 ? unit.tdp : creditPriceForBounds * (MIN_DP_PERCENT / 100)),
+    Math.round(unit?.tdp && unit.tdp > 0 ? unit.tdp : creditPriceForBounds * (minDsfDpPercent / 100)),
   );
   const maxTdpAmount = Math.max(
     minTdpAmount,
@@ -184,7 +191,7 @@ export function UnitDetail() {
       ? Math.floor(
           monthlyInstallment(
             creditPriceForBounds,
-            INSTALLMENT_RANGE_DP_GUARD_PERCENT,
+            minDsfDpPercent,
             tenor,
           ) / 10000,
         ) * 10000
@@ -352,10 +359,10 @@ export function UnitDetail() {
   }
 
   function toDpPercentFromAmount(amount: number) {
-    if (!price) return MIN_DP_PERCENT;
+    if (!price) return minDsfDpPercent;
     const next = Math.round((amount / price) * 100);
-    if (Number.isNaN(next)) return MIN_DP_PERCENT;
-    return clampValue(next, MIN_DP_PERCENT, MAX_DP_PERCENT);
+    if (Number.isNaN(next)) return minDsfDpPercent;
+    return clampValue(next, minDsfDpPercent, maxDsfDpPercent);
   }
 
   useEffect(() => {
@@ -363,6 +370,11 @@ export function UnitDetail() {
     setBuilderPrice(unit.harga);
     setBuilderPriceInput(formatDpValue(unit.harga));
   }, [unit?.id, unit?.harga]);
+
+  useEffect(() => {
+    const nextPercent = dsfRules.fixedDpPercent ?? Math.max(dpPercent, minDsfDpPercent);
+    if (nextPercent !== dpPercent) setDpPercent(nextPercent);
+  }, [dpPercent, dsfRules.fixedDpPercent, minDsfDpPercent]);
 
   useEffect(() => {
     setDpPercentInput(String(Math.round(displayDpPercent * 10) / 10));
@@ -451,8 +463,8 @@ export function UnitDetail() {
   function handleDpPercentBlur() {
     const parsed = Number(dpPercentInput);
     const nextPercent = Number.isFinite(parsed)
-      ? clampValue(parsed, MIN_DP_PERCENT, MAX_DP_PERCENT)
-      : MIN_DP_PERCENT;
+      ? clampValue(parsed, minDsfDpPercent, maxDsfDpPercent)
+      : minDsfDpPercent;
     setDpPercent(nextPercent);
     setDpPercentInput(String(Math.round(nextPercent * 10) / 10));
   }
@@ -529,7 +541,7 @@ export function UnitDetail() {
     setSimulationMethod(nextMethod);
 
     if (nextMethod === "DP") {
-      setDpPercent(clampValue(displayDpPercent, MIN_DP_PERCENT, MAX_DP_PERCENT));
+      setDpPercent(clampValue(displayDpPercent, minDsfDpPercent, maxDsfDpPercent));
       return;
     }
 
@@ -613,13 +625,14 @@ export function UnitDetail() {
       const result = await resolveSmartCreditPrice(
         {
           unitPrice: price,
-          dpPercent: MIN_DP_PERCENT,
+          dpPercent: minDsfDpPercent,
           simulationType: "DP",
-          simulationValue: MIN_DP_PERCENT,
-          tenor: 60,
+          simulationValue: minDsfDpPercent,
+          tenor,
           brand: unit?.brand,
           model: unit?.type,
           year: unit?.year,
+          category: unit?.category,
         },
         price,
         controller.signal,
@@ -635,7 +648,7 @@ export function UnitDetail() {
       alive = false;
       controller.abort();
     };
-  }, [price, unit?.brand, unit?.type, unit?.year]);
+  }, [price, unit?.brand, unit?.type, unit?.year, unit?.category, tenor, minDsfDpPercent]);
 
   useEffect(() => {
     if (!price) {
@@ -655,14 +668,15 @@ export function UnitDetail() {
         ? await findAllParamsForAllIn(
             {
               unitPrice: price,
-              dpPercent: MIN_DP_PERCENT,
+              dpPercent: minDsfDpPercent,
               simulationType: "DP",
-              simulationValue: MIN_DP_PERCENT,
+              simulationValue: minDsfDpPercent,
               paymentType: "ADDB",
               tenor,
               brand: unit?.brand,
               model: unit?.type,
               year: unit?.year,
+              category: unit?.category,
             },
             Math.max(0, price - dpMinimEffectiveDp),
             controller.signal,
@@ -682,6 +696,7 @@ export function UnitDetail() {
               brand: unit?.brand,
               model: unit?.type,
               year: unit?.year,
+              category: unit?.category,
             },
             controller.signal,
           );
@@ -725,14 +740,23 @@ export function UnitDetail() {
           findAllParamsForAllIn(
             {
               unitPrice: price,
-              dpPercent: MIN_DP_PERCENT,
+              dpPercent: getDsfSimulationRules({
+                category: unit?.category,
+                year: unit?.year,
+                tenor: rowTenor,
+              }).minDpPercent,
               simulationType: "DP",
-              simulationValue: MIN_DP_PERCENT,
+              simulationValue: getDsfSimulationRules({
+                category: unit?.category,
+                year: unit?.year,
+                tenor: rowTenor,
+              }).minDpPercent,
               paymentType: "ADDB",
               tenor: rowTenor,
               brand: unit?.brand,
               model: unit?.type,
               year: unit?.year,
+              category: unit?.category,
             },
             Math.round(price * DP_MINIM_ALL_IN_PERCENT[rowTenor]),
             controller.signal,
@@ -760,8 +784,8 @@ export function UnitDetail() {
     setLightbox(false);
     setSimTab("reguler");
     setSimulationMethod("DP");
-    setDpPercent(MIN_DP_PERCENT);
-    setDpPercentInput(String(MIN_DP_PERCENT));
+    setDpPercent(minDsfDpPercent);
+    setDpPercentInput(String(minDsfDpPercent));
     setBuilderPrice(0);
     setBuilderPriceInput("");
     setTdpAmount(0);
@@ -1263,8 +1287,8 @@ export function UnitDetail() {
                 </div>
                 <input
                   type="range"
-                  min={MIN_DP_PERCENT}
-                  max={MAX_DP_PERCENT}
+                  min={minDsfDpPercent}
+                  max={maxDsfDpPercent}
                   step={1}
                   value={dpPercent}
                   onChange={(e) => setDpPercent(Number(e.target.value))}
@@ -1272,8 +1296,8 @@ export function UnitDetail() {
                   className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#E0E7E9] accent-ink"
                 />
                 <div className="mt-1.5 flex items-center justify-between text-[10px] font-semibold text-muted">
-                  <span>{MIN_DP_PERCENT}%</span>
-                  <span>{MAX_DP_PERCENT}%</span>
+                  <span>{minDsfDpPercent}%</span>
+                  <span>{maxDsfDpPercent}%</span>
                 </div>
               </div>
             )}
