@@ -29,6 +29,39 @@ export type SellCarFormData = {
   stnk: string;
 };
 
+export type SellCarAIPhotoKind = "vehicle" | "stnk" | "odometer";
+
+export type SellCarAIExtracted = {
+  brand: string;
+  model: string;
+  variant: string;
+  year: number;
+  transmission: string;
+  color: string;
+  mileage: number;
+  plate_no: string;
+  plate_region: string;
+  stnk_expiry: string;
+};
+
+export type SellCarAICandidate = {
+  brand: string;
+  model: string;
+  variant: string;
+  year: number;
+  confidence: number;
+};
+
+export type SellCarAIExtraction = {
+  request_id: string;
+  extracted: SellCarAIExtracted;
+  confidence: Record<string, number>;
+  candidates: SellCarAICandidate[];
+  needs_confirmation: string[];
+  warnings: string[];
+  mrp_version: string;
+};
+
 export type PriceAdjustment = {
   label: string;
   amount: number;
@@ -70,6 +103,35 @@ async function mrpFetch(path: string, init: RequestInit = {}): Promise<Response>
   return fetch(`${API_BASE}${path}`, { ...init, headers });
 }
 
+async function prepareAIPhoto(file: File): Promise<File> {
+  if (typeof createImageBitmap !== "function") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxWidth = 1600;
+    const scale = Math.min(1, maxWidth / bitmap.width);
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      bitmap.close();
+      return file;
+    }
+    context.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+    if (!blob) return file;
+    return new File([blob], `${file.name.replace(/\.[^.]+$/, "") || "foto"}.jpg`, {
+      type: "image/jpeg",
+      lastModified: file.lastModified,
+    });
+  } catch {
+    return file;
+  }
+}
+
 async function readAPIError(response: Response, fallback: string): Promise<string> {
   try {
     const body = await response.json() as { message?: string; error?: string };
@@ -88,6 +150,72 @@ export async function fetchSellCarData(): Promise<SellCarData> {
     sourceSheet: "brand sheets",
     mrpVersion: data.mrp_version || "",
     rows: (data.options || []).map((option) => ({ ...option, price: 0, notes: "" })),
+  };
+}
+
+export async function fetchSellCarAIExtraction(
+  photos: Record<SellCarAIPhotoKind, File>,
+): Promise<SellCarAIExtraction> {
+  if (!API_KEY) throw new Error("API key MRP belum dikonfigurasi.");
+  const entries = await Promise.all(
+    (Object.entries(photos) as Array<[SellCarAIPhotoKind, File]>).map(async ([kind, file]) => [kind, await prepareAIPhoto(file)] as const),
+  );
+  const body = new FormData();
+  for (const [kind, file] of entries) body.append(kind, file, file.name);
+  const response = await fetch(`${API_BASE}/api/mrp/ai-extract`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${API_KEY}` },
+    body,
+  });
+  if (!response.ok) {
+    throw new Error(await readAPIError(response, "AIFalcon belum dapat membaca foto. Coba lagi."));
+  }
+  return response.json() as Promise<SellCarAIExtraction>;
+}
+
+function plateRegionFormValue(region: string): string {
+  const normalized = region.trim().toUpperCase();
+  const values: Record<string, string> = {
+    B: "B - DKI Jakarta",
+    D: "D - Bandung",
+    F: "F - Bogor",
+    L: "L - Surabaya",
+    AB: "AB - Yogyakarta",
+  };
+  return values[normalized] || (normalized ? "Lainnya" : "");
+}
+
+export function applySellCarAIExtraction(
+  current: SellCarFormData,
+  result: SellCarAIExtraction,
+  rows: PriceRow[],
+): SellCarFormData {
+  const extracted = result.extracted;
+  const matched = rows.find((row) =>
+    row.brand === extracted.brand &&
+    row.model === extracted.model &&
+    row.variant === extracted.variant &&
+    row.year === extracted.year
+  ) ?? result.candidates
+    .map((candidate) => rows.find((row) =>
+      row.brand === candidate.brand &&
+      row.model === candidate.model &&
+      row.variant === candidate.variant &&
+      row.year === candidate.year
+    ))
+    .find((row): row is PriceRow => Boolean(row));
+
+  return {
+    ...current,
+    brand: matched?.brand || "",
+    model: matched?.model || "",
+    variant: matched?.variant || "",
+    year: matched ? String(matched.year) : "",
+    transmission: extracted.transmission || "",
+    color: extracted.color || "",
+    mileage: extracted.mileage > 0 ? String(extracted.mileage) : "",
+    plate: plateRegionFormValue(extracted.plate_region),
+    stnk: extracted.stnk_expiry || "",
   };
 }
 

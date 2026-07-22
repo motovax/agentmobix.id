@@ -3,12 +3,16 @@ import type { FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { AppBar } from "../components/AppBar";
 import { AppShell } from "../components/AppShell";
-import { Camera, ChevronDown, Sparkles } from "../components/icons";
+import { Camera, Check, ChevronDown, Sparkles } from "../components/icons";
 import {
+  applySellCarAIExtraction,
+  fetchSellCarAIExtraction,
   fetchSellCarQuote,
   fetchSellCarData,
   getBrands,
   getYears,
+  type SellCarAIExtraction,
+  type SellCarAIPhotoKind,
   type SellCarData,
   type SellCarFormData,
 } from "../lib/sellCar";
@@ -41,6 +45,30 @@ const MONTHS = [
   "November",
   "Desember",
 ];
+
+type AIPhotoSelection = { file: File; previewUrl: string };
+
+const AI_PHOTO_INPUTS: Array<{
+  kind: SellCarAIPhotoKind;
+  label: string;
+  hint: string;
+}> = [
+  { kind: "vehicle", label: "Foto kendaraan", hint: "Tampak luar, terang, dan seluruh mobil terlihat" },
+  { kind: "stnk", label: "Foto STNK", hint: "Pastikan data kendaraan dan masa berlaku terbaca" },
+  { kind: "odometer", label: "Foto KM mobil", hint: "Foto panel odometer dari arah depan" },
+];
+
+const AI_REVIEW_LABELS: Record<string, string> = {
+  brand: "merek",
+  model: "model",
+  variant: "varian",
+  year: "tahun",
+  transmission: "transmisi",
+  color: "warna",
+  mileage: "kilometer",
+  plate: "plat",
+  stnk: "masa berlaku STNK",
+};
 
 function formatThousands(value: string): string {
   const digits = value.replace(/\D/g, "");
@@ -194,6 +222,63 @@ function MonthYearPicker({
   );
 }
 
+function AIPhotoField({
+  item,
+  selection,
+  disabled,
+  onSelect,
+}: {
+  item: (typeof AI_PHOTO_INPUTS)[number];
+  selection?: AIPhotoSelection;
+  disabled: boolean;
+  onSelect: (file: File) => void;
+}) {
+  return (
+    <label
+      className={`flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition ${
+        selection
+          ? "border-teal-tint-border bg-surface"
+          : "border-dashed border-teal-tint-border bg-surface/70"
+      } ${disabled ? "pointer-events-none opacity-60" : "hover:border-teal-deep"}`}
+    >
+      <input
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+        capture="environment"
+        className="sr-only"
+        disabled={disabled}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) onSelect(file);
+          event.target.value = "";
+        }}
+      />
+      {selection ? (
+        <img
+          src={selection.previewUrl}
+          alt=""
+          className="h-11 w-11 flex-shrink-0 rounded-[10px] bg-field object-cover"
+        />
+      ) : (
+        <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[12px] bg-field text-teal-deep">
+          <Camera size={19} />
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block text-[12px] font-bold text-mid">{item.label}</span>
+        <span className="mt-0.5 block text-[10px] leading-[1.35] text-muted">
+          {selection ? selection.file.name : item.hint}
+        </span>
+      </span>
+      {selection && (
+        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-teal-tint text-teal-deep">
+          <Check size={13} />
+        </span>
+      )}
+    </label>
+  );
+}
+
 export function JualMobil() {
   const [, navigate] = useLocation();
   const [data, setData] = useState<SellCarData | null>(null);
@@ -202,6 +287,19 @@ export function JualMobil() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [aiPhotos, setAIPhotos] = useState<Partial<Record<SellCarAIPhotoKind, AIPhotoSelection>>>({});
+  const aiPhotosRef = useRef(aiPhotos);
+  const [aiAnalyzing, setAIAnalyzing] = useState(false);
+  const [aiError, setAIError] = useState("");
+  const [aiReview, setAIReview] = useState<SellCarAIExtraction | null>(null);
+
+  useEffect(() => {
+    aiPhotosRef.current = aiPhotos;
+  }, [aiPhotos]);
+
+  useEffect(() => () => {
+    Object.values(aiPhotosRef.current).forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
+  }, []);
 
   useEffect(() => {
     fetchSellCarData()
@@ -243,6 +341,50 @@ export function JualMobil() {
     }
   }
 
+  function selectAIPhoto(kind: SellCarAIPhotoKind, file: File) {
+    if (file.size > 12 * 1024 * 1024) {
+      setAIError("Ukuran satu foto maksimal 12 MB.");
+      return;
+    }
+    setAIError("");
+    setAIPhotos((current) => {
+      const previous = current[kind];
+      if (previous) URL.revokeObjectURL(previous.previewUrl);
+      return {
+        ...current,
+        [kind]: { file, previewUrl: URL.createObjectURL(file) },
+      };
+    });
+  }
+
+  async function analyzeWithAI() {
+    if (aiAnalyzing) return;
+    if (!data) {
+      setAIError("Matrix harga belum tersedia. Refresh halaman lalu coba lagi.");
+      return;
+    }
+    const vehicle = aiPhotos.vehicle?.file;
+    const stnk = aiPhotos.stnk?.file;
+    const odometer = aiPhotos.odometer?.file;
+    if (!vehicle || !stnk || !odometer) {
+      setAIError("Lengkapi ketiga foto agar AIFalcon dapat membaca data kendaraan.");
+      return;
+    }
+    setAIError("");
+    setAIAnalyzing(true);
+    try {
+      const result = await fetchSellCarAIExtraction({ vehicle, stnk, odometer });
+      setForm((current) => applySellCarAIExtraction(current, result, data.rows));
+      setAIReview(result);
+      setError("");
+      setActiveTab("form");
+    } catch (cause) {
+      setAIError(cause instanceof Error ? cause.message : "AIFalcon belum dapat membaca foto.");
+    } finally {
+      setAIAnalyzing(false);
+    }
+  }
+
   return (
     <AppShell>
       <AppBar title="Jual Mobil" subtitle="Prediksi harga mobil Anda" />
@@ -278,14 +420,35 @@ export function JualMobil() {
               }`}
             >
               Bantuan AI
-              <span className="rounded-full bg-teal-tint px-1.5 py-0.5 text-[8px] font-extrabold uppercase leading-none text-teal-deep">
-                Soon
-              </span>
+              <Sparkles size={13} />
             </button>
           </div>
 
           {activeTab === "form" ? (
             <form onSubmit={submit} className="space-y-3.5">
+              {aiReview && (
+                <div className="rounded-[14px] border border-teal-tint-border bg-teal-tint px-3.5 py-3">
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-surface text-teal-deep">
+                      <Sparkles size={15} />
+                    </span>
+                    <div>
+                      <div className="text-[12px] font-extrabold text-ink">Data berhasil dibaca AIFalcon</div>
+                      <p className="m-0 mt-1 text-[10px] leading-[1.45] text-muted">
+                        Periksa semua isian sebelum menghitung harga
+                        {aiReview.needs_confirmation.length > 0 && (
+                          <>, terutama {aiReview.needs_confirmation.map((key) => AI_REVIEW_LABELS[key] || key).join(", ")}.</>
+                        )}
+                      </p>
+                      {aiReview.warnings.map((warning) => (
+                        <p key={warning} className="m-0 mt-1 text-[10px] font-semibold leading-[1.4] text-[#8A6A17]">
+                          {warning}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
               <Field label="Merek" required>
                 <SelectField
                   value={form.brand}
@@ -381,34 +544,49 @@ export function JualMobil() {
                   <Sparkles size={22} />
                 </div>
                 <div>
-                  <div className="mb-1 inline-flex rounded-full bg-surface px-2 py-1 text-[10px] font-extrabold uppercase text-teal-deep">
-                    Coming Soon
+                  <div className="mb-1 inline-flex rounded-full bg-surface px-2 py-1 text-[10px] font-extrabold text-teal-deep">
+                    Isi otomatis dari foto
                   </div>
                   <h2 className="m-0 text-[18px] font-extrabold leading-[1.25] text-ink">
                     AIFalcon bantu hitungkan harga
                   </h2>
                   <p className="m-0 mt-1.5 text-[12px] leading-[1.5] text-muted">
-                    Nanti cukup foto kendaraan dan STNK. AIFalcon akan membaca detail mobil lalu membuat estimasi harga secara otomatis.
+                    Unggah tiga foto. AIFalcon akan membaca data kendaraan, lalu Anda tetap dapat memeriksa dan mengubah hasilnya.
                   </p>
                 </div>
               </div>
 
               <div className="grid gap-2.5">
-                {["Foto kendaraan", "Foto STNK", "Foto KM mobil"].map((label) => (
-                  <button
-                    key={label}
-                    type="button"
-                    disabled
-                    className="flex h-14 w-full items-center gap-3 rounded-[14px] border border-dashed border-teal-tint-border bg-surface/70 px-3 text-left text-[12px] font-bold text-mid disabled:cursor-not-allowed disabled:opacity-80"
-                  >
-                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[12px] bg-field text-teal-deep">
-                      <Camera size={18} />
-                    </span>
-                    <span className="flex-1">{label}</span>
-                    <span className="text-[10px] font-extrabold uppercase text-placeholder">Soon</span>
-                  </button>
+                {AI_PHOTO_INPUTS.map((item) => (
+                  <AIPhotoField
+                    key={item.kind}
+                    item={item}
+                    selection={aiPhotos[item.kind]}
+                    disabled={aiAnalyzing}
+                    onSelect={(file) => selectAIPhoto(item.kind, file)}
+                  />
                 ))}
               </div>
+
+              <p className="m-0 mt-3 text-[10px] leading-[1.45] text-muted">
+                Foto dipakai hanya untuk membaca data kendaraan. AIFalcon tidak mengambil nama, alamat, nomor rangka, atau nomor mesin dari STNK.
+              </p>
+
+              {aiError && (
+                <div className="mt-3 rounded-[12px] bg-danger-bg px-3 py-2.5 text-[11px] leading-[1.45] text-danger">
+                  {aiError}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => void analyzeWithAI()}
+                disabled={aiAnalyzing || loading || !data || AI_PHOTO_INPUTS.some((item) => !aiPhotos[item.kind])}
+                className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-[12px] bg-teal-deep text-[13px] font-extrabold text-white transition hover:bg-[#078e8b] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Sparkles size={16} />
+                {aiAnalyzing ? "AIFalcon sedang membaca foto..." : "Baca Data Kendaraan"}
+              </button>
             </section>
           )}
         </section>
