@@ -15,6 +15,44 @@ function normalizeCaptionValue(value: string) {
     .replace(/[^a-z0-9]+/g, "");
 }
 
+function normalizeCaptionWords(value: string) {
+  return value
+    .normalize("NFKD")
+    .toLocaleLowerCase("id-ID")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+export function formatCaptionReadability(caption: string) {
+  const paragraphs = caption
+    .split(/\n+/)
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean);
+  if (paragraphs.length > 1) return paragraphs.join("\n\n");
+
+  const singleParagraph = paragraphs[0] ?? "";
+  return singleParagraph.replace(/([.!?])\s+(?=[A-Z])/g, "$1\n\n");
+}
+
+export function removeCaptionParagraphsContaining(
+  caption: string,
+  protectedTerms: string[],
+) {
+  const normalizedTerms = protectedTerms
+    .map(normalizeCaptionWords)
+    .filter(Boolean);
+  return caption
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .filter((paragraph) => {
+      const normalizedParagraph = ` ${normalizeCaptionWords(paragraph)} `;
+      return !normalizedTerms.some((term) => normalizedParagraph.includes(` ${term} `));
+    })
+    .join("\n\n");
+}
+
 function captionHasFact(caption: string, fact: RequiredCaptionFact) {
   const normalizedCaption = normalizeCaptionValue(caption);
   const matches = fact.matches?.length ? fact.matches : [fact.line];

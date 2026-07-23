@@ -38,6 +38,8 @@ import { formatJt, formatOdometer, formatRupiah } from "../lib/format";
 import { estimateBuilderCommission } from "../lib/commission";
 import {
   ensureRequiredCaptionFacts,
+  formatCaptionReadability,
+  removeCaptionParagraphsContaining,
   type RequiredCaptionSection,
 } from "../lib/shareCaption";
 
@@ -97,20 +99,6 @@ function stripPriceFromCaption(caption: string) {
     .replace(/[ \t]+,/g, ",")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-}
-
-function formatCaptionReadability(caption: string) {
-  const paragraphs = caption
-    .split(/\n+/)
-    .map((line) => line.replace(/[ \t]+/g, " ").trim())
-    .filter(Boolean);
-  if (paragraphs.length > 1) return paragraphs.join("\n\n");
-
-  const sentences = (paragraphs[0] ?? "")
-    .match(/[^.!?]+(?:[.!?]+|$)/g)
-    ?.map((sentence) => sentence.trim())
-    .filter(Boolean);
-  return sentences && sentences.length > 1 ? sentences.join("\n\n") : paragraphs[0] ?? "";
 }
 
 function usefulVehicleText(value: string | null | undefined) {
@@ -956,6 +944,28 @@ export function ShareSheet() {
         ],
       },
     ];
+    const protectedAiFactTerms = [
+      "km",
+      "kilometer",
+      "pajak",
+      "stnk",
+      "harga",
+      "tdp",
+      "cicilan",
+      "tenor",
+      "transmisi",
+      "matic",
+      "manual",
+      "kepemilikan",
+      "bpkb",
+      "cabang",
+      branch,
+      taxInfo,
+      formatRupiah(captionPrice),
+      formatJt(shareTdp),
+      formatJt(shareCicilan),
+      `${shareTenor} bulan`,
+    ].filter(Boolean);
 
     const variants = [
       `${unit.nama}${colorInfo}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}\n\nReady di ${branch}. Chat saya untuk cek unit.`,
@@ -985,13 +995,17 @@ export function ShareSheet() {
         dp_pct: shareDpPercent ?? undefined,
         caption_saat_ini: captionText || autoCaption,
         style_hint: shouldHidePriceInCaption
-          ? `${styleHint} Keep the unit name, exact odometer, tax/STNK validity, transmission, ownership, DP Minim package, installment, tenor, and branch from the current caption. Only mention verified condition details. Do not claim accident-free, flood-free, or complete service history. Do not mention any vehicle price or credit price.`
-          : `${styleHint} Keep the unit name, exact odometer, tax/STNK validity, transmission, ownership, price, TDP, installment, tenor, and branch from the current caption. Only mention verified condition details. Do not claim accident-free, flood-free, or complete service history.`,
+          ? `${styleHint} Write only a short selling hook and CTA using verified non-numeric selling points. Do not repeat specifications, odometer, tax/STNK, transmission, ownership, pricing, financing, tenor, or branch; the application will add those facts separately. Do not claim accident-free, flood-free, or complete service history.`
+          : `${styleHint} Write only a short selling hook and CTA using verified non-numeric selling points. Do not repeat specifications, odometer, tax/STNK, transmission, ownership, price, TDP, installment, tenor, or branch; the application will add those facts separately. Do not claim accident-free, flood-free, or complete service history.`,
       });
       const safeCaption = shouldHidePriceInCaption ? stripPriceFromCaption(aiCaption) : aiCaption;
+      const aiSellingCopy = removeCaptionParagraphsContaining(
+        formatCaptionReadability(safeCaption),
+        protectedAiFactTerms,
+      );
       setCaptionText(
         ensureRequiredCaptionFacts(
-          formatCaptionReadability(safeCaption),
+          aiSellingCopy,
           requiredCaptionSections,
         ),
       );
