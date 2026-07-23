@@ -26,6 +26,7 @@ import {
   suggestShareCaption,
   generateAIBackground,
   fetchAIBackgroundStatus,
+  prettyTransmisi,
   titleCase,
   type GalleryItem,
   type ProductDetail,
@@ -33,7 +34,7 @@ import {
   type AIBackgroundResponse,
 } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
-import { formatJt, formatRupiah } from "../lib/format";
+import { formatJt, formatOdometer, formatRupiah } from "../lib/format";
 import { estimateBuilderCommission } from "../lib/commission";
 
 /* ---- business logic ---- */
@@ -91,6 +92,90 @@ function stripPriceFromCaption(caption: string) {
     .replace(/\s{2,}/g, " ")
     .replace(/\s+,/g, ",")
     .trim();
+}
+
+function usefulVehicleText(value: string | null | undefined) {
+  const text = (value ?? "").replace(/\s+/g, " ").trim();
+  if (!text || /^(?:-|n\/?a|null|tidak ada(?: data)?|belum ada(?: data)?)$/i.test(text)) {
+    return "";
+  }
+  return text;
+}
+
+function formatShareDate(value: string) {
+  const isoDate = value.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!isoDate) return value;
+  const [, year, month, day] = isoDate;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+function taxValidityCaption(value: string | null | undefined) {
+  const raw = usefulVehicleText(value);
+  if (!raw) return "";
+
+  const isoDate = raw.match(/(\d{4}-\d{2}-\d{2})/)?.[1];
+  const formatted = formatShareDate(raw);
+  if (!isoDate) return `Pajak/STNK s.d. ${formatted}`;
+
+  const today = new Date();
+  const todayKey = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0"),
+  ].join("-");
+  return isoDate < todayKey
+    ? `Pajak/STNK jatuh tempo ${formatted}`
+    : `Pajak/STNK berlaku s.d. ${formatted}`;
+}
+
+function detailSpec(unit: ProductDetail, label: string) {
+  return usefulVehicleText(
+    unit.spesifikasi.find((item) => item.label.toLowerCase() === label.toLowerCase())?.value,
+  );
+}
+
+function sellingPointCaption(description: string) {
+  const points = usefulVehicleText(description)
+    .split(/[.!?]+/)
+    .map((point) => point.trim())
+    .filter(Boolean)
+    .filter((point) => !/^harga\b/i.test(point))
+    .slice(0, 2);
+  if (points.length === 0) return "";
+  if (points.length === 1) return points[0];
+  return `${points[0]} dan ${points[1].charAt(0).toLowerCase()}${points[1].slice(1)}`;
+}
+
+function shareVehicleFacts(unit: ProductDetail) {
+  const facts = [
+    unit.odometer > 0 ? `KM ${formatOdometer(unit.odometer)}` : "",
+    taxValidityCaption(unit.stnk_expiry),
+    usefulVehicleText(unit.transmisi)
+      ? `transmisi ${prettyTransmisi(unit.transmisi)}`
+      : "",
+  ];
+  const ownership = detailSpec(unit, "Status Kepemilikan");
+  if (ownership) {
+    facts.push(`kepemilikan ${ownership}`);
+  } else if (usefulVehicleText(unit.bpkb_name)) {
+    facts.push("BPKB tersedia");
+  }
+
+  const sellingPoints = sellingPointCaption(unit.deskripsi);
+  const note = usefulVehicleText(unit.notes_unit);
+  return {
+    summary: facts.filter(Boolean).join(", "),
+    condition: [
+      sellingPoints ? `Keunggulan: ${sellingPoints}` : "",
+      note && !/^[\d\s.,%]+$/.test(note) ? `Catatan unit: ${note}` : "",
+    ].filter(Boolean).join(". "),
+  };
 }
 
 async function fetchRawBlob(pathOrUrl: string, cache: Map<string, Blob>) {
@@ -405,18 +490,20 @@ export function ShareSheet() {
   const shareCommission =
     positiveParamNumber(searchParams, "komisi") ??
     (unit && sharePrice ? estimateBuilderCommission(unit.harga, sharePrice) : 0);
+  const vehicleFacts = unit ? shareVehicleFacts(unit) : null;
+  const vehicleIntro = unit
+    ? `${unit.nama}.${vehicleFacts?.summary ? ` ${vehicleFacts.summary}.` : ""}${
+        vehicleFacts?.condition ? ` ${vehicleFacts.condition}.` : ""
+      }`
+    : "";
   const autoCaption = unit
     ? isDpMinimShare
-      ? `${unit.nama}, KM ${Math.round(
-          unit.odometer / 1000,
-        )}rb. Paket DP Minim ${formatJt(paymentValue)}, cicilan ${formatJt(
+      ? `${vehicleIntro} Paket DP Minim ${formatJt(paymentValue)}, cicilan ${formatJt(
           shareCicilan,
         )}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${titleCase(
           unit.lokasi || "Mobix",
         )}, bisa cek langsung. Chat saya ya`
-      : `${unit.nama}, KM ${Math.round(
-          unit.odometer / 1000,
-        )}rb. Harga ${formatRupiah(captionPrice)}. Cukup TDP ${formatJt(shareTdp)}, cicilan ${formatJt(
+      : `${vehicleIntro} Harga ${formatRupiah(captionPrice)}. Cukup TDP ${formatJt(shareTdp)}, cicilan ${formatJt(
           shareCicilan,
         )}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${titleCase(
           unit.lokasi || "Mobix",
@@ -744,7 +831,9 @@ export function ShareSheet() {
       CAPTION_STYLE_HINTS[captionSuggestionIndex.current % CAPTION_STYLE_HINTS.length];
     const color = titleCase(unit.color || "");
     const branch = titleCase(unit.lokasi || "Mobix");
-    const km = `${Math.round(unit.odometer / 1000)}rb`;
+    const km = formatOdometer(unit.odometer);
+    const taxInfo = taxValidityCaption(unit.stnk_expiry);
+    const facts = shareVehicleFacts(unit);
     const tdp = formatJt(shareTdp);
     const installment = formatJt(shareCicilan);
     const creditPackage = isDpMinimShare
@@ -769,15 +858,18 @@ export function ShareSheet() {
       unit.transmisi ? `transmisi ${titleCase(unit.transmisi)}` : "",
       color ? `warna ${color}` : "",
       `KM ${km}`,
+      taxInfo,
     ].filter(Boolean).join(", ");
+    const factLead = facts.summary ? `${facts.summary}.` : `KM ${km}.`;
+    const conditionInfo = facts.condition ? ` ${facts.condition}.` : "";
 
     const variants = [
-      `${unit.nama}${colorInfo}, KM ${km}, incaran menarik buat yang mau ${category} siap dilirik. ${packageWithPrice}; ready di ${branch}, chat saya untuk cek unit.`,
-      `Mau ${category} yang paketnya jelas? ${unit.nama} ready di ${branch}: ${packageWithPrice}. Minat, langsung chat saya.`,
-      `${unit.nama} opsi manis buat upgrade tanpa ribet: ${specs}. ${packageWithPrice}; cek unitnya di ${branch}.`,
-      `${unit.nama}${colorInfo} cepat bikin orang melirik, apalagi paketnya sudah jelas: ${packageWithPrice}. Chat saya kalau mau cek.`,
-      `${unit.nama} ready di ${branch}, paket kreditnya ringan buat mulai dilirik: ${packageWithPrice}.${dpInfo} Mau saya bantu cek unit?`,
-      `Cari ${category} praktis dan menarik? ${unit.nama}${colorInfo}, KM ${km}, bisa jadi pilihan pas dengan ${packageWithPrice}.`,
+      `${unit.nama}${colorInfo}. ${factLead}${conditionInfo} ${packageWithPrice}; ready di ${branch}, chat saya untuk cek unit.`,
+      `Mau ${category} yang paketnya jelas? ${unit.nama}. ${factLead}${conditionInfo} ${packageWithPrice}. Minat, langsung chat saya.`,
+      `${unit.nama} opsi manis buat upgrade tanpa ribet: ${specs}.${conditionInfo} ${packageWithPrice}; cek unitnya di ${branch}.`,
+      `${unit.nama}${colorInfo}. ${factLead}${conditionInfo} Paketnya sudah jelas: ${packageWithPrice}. Chat saya kalau mau cek.`,
+      `${unit.nama} ready di ${branch}. ${factLead}${conditionInfo} ${packageWithPrice}.${dpInfo} Mau saya bantu cek unit?`,
+      `Cari ${category} praktis dan menarik? ${unit.nama}${colorInfo}. ${factLead}${conditionInfo} ${packageWithPrice}.`,
     ];
 
     try {
@@ -799,8 +891,8 @@ export function ShareSheet() {
         dp_pct: shareDpPercent ?? undefined,
         caption_saat_ini: captionText || autoCaption,
         style_hint: shouldHidePriceInCaption
-          ? `${styleHint} Do not mention any vehicle price or credit price; mention paket DP Minim or TDP konsumen, installment, and tenor only.`
-          : styleHint,
+          ? `${styleHint} Keep the exact odometer and tax/STNK validity from the current caption. Only mention verified condition details. Do not claim accident-free, flood-free, or complete service history. Do not mention any vehicle price or credit price; mention paket DP Minim or TDP konsumen, installment, and tenor only.`
+          : `${styleHint} Keep the exact odometer and tax/STNK validity from the current caption. Only mention verified condition details. Do not claim accident-free, flood-free, or complete service history.`,
       });
       setCaptionText(shouldHidePriceInCaption ? stripPriceFromCaption(aiCaption) : aiCaption);
       captionSuggestionIndex.current += 1;

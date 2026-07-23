@@ -87,6 +87,9 @@ export interface ProductDetail {
   odometer: number;
   transmisi: string;
   aging: number;
+  stnk_expiry?: string;
+  bpkb_name?: string;
+  notes_unit?: string;
 }
 
 export interface ApiEnvelope<T> {
