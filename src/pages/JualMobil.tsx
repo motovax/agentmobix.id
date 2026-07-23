@@ -292,6 +292,7 @@ export function JualMobil() {
   const [aiAnalyzing, setAIAnalyzing] = useState(false);
   const [aiError, setAIError] = useState("");
   const [aiReview, setAIReview] = useState<SellCarAIExtraction | null>(null);
+  const [stnkConsent, setStnkConsent] = useState(false);
 
   useEffect(() => {
     aiPhotosRef.current = aiPhotos;
@@ -342,6 +343,10 @@ export function JualMobil() {
   }
 
   function selectAIPhoto(kind: SellCarAIPhotoKind, file: File) {
+    if (kind === "stnk" && !stnkConsent) {
+      setAIError("Setujui pemrosesan foto STNK sebelum mengunggah foto.");
+      return;
+    }
     if (file.size > 12 * 1024 * 1024) {
       setAIError("Ukuran satu foto maksimal 12 MB.");
       return;
@@ -361,6 +366,10 @@ export function JualMobil() {
     if (aiAnalyzing) return;
     if (!data) {
       setAIError("Matrix harga belum tersedia. Refresh halaman lalu coba lagi.");
+      return;
+    }
+    if (!stnkConsent) {
+      setAIError("Persetujuan pemrosesan foto STNK diperlukan untuk melanjutkan.");
       return;
     }
     const vehicle = aiPhotos.vehicle?.file;
@@ -556,21 +565,55 @@ export function JualMobil() {
                 </div>
               </div>
 
+              <div className="mb-3 rounded-[14px] border border-[#E8D7A2] bg-[#FFF9E8] p-3">
+                <div className="text-[11px] font-extrabold text-ink">Privasi foto STNK</div>
+                <p className="m-0 mt-1 text-[10px] leading-[1.5] text-muted">
+                  Foto STNK dapat memuat data pribadi. Anda dapat menutupi nama, alamat, nomor rangka, dan nomor mesin selama data kendaraan serta masa berlaku STNK tetap terbaca. Foto hanya digunakan AIFalcon untuk membaca data kendaraan; informasi pribadi tersebut tidak diambil ke hasil prediksi.
+                </p>
+                <label className="mt-2.5 flex cursor-pointer items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={stnkConsent}
+                    disabled={aiAnalyzing}
+                    onChange={(event) => {
+                      const agreed = event.target.checked;
+                      setStnkConsent(agreed);
+                      setAIError("");
+                      if (!agreed) {
+                        setAIPhotos((current) => {
+                          const stnkPhoto = current.stnk;
+                          if (!stnkPhoto) return current;
+                          URL.revokeObjectURL(stnkPhoto.previewUrl);
+                          const remaining = { ...current };
+                          delete remaining.stnk;
+                          return remaining;
+                        });
+                      }
+                    }}
+                    className="mt-0.5 h-4 w-4 flex-shrink-0 accent-teal-deep"
+                  />
+                  <span className="text-[10px] font-semibold leading-[1.45] text-mid">
+                    Saya memahami foto STNK berisi data pribadi dan menyetujui pemrosesannya untuk membaca data kendaraan serta membuat prediksi harga.
+                  </span>
+                </label>
+                {!stnkConsent && (
+                  <p className="m-0 mt-2 text-[10px] font-semibold leading-[1.4] text-[#8A6A17]">
+                    Persetujuan diperlukan sebelum foto STNK dapat dipilih.
+                  </p>
+                )}
+              </div>
+
               <div className="grid gap-2.5">
                 {AI_PHOTO_INPUTS.map((item) => (
                   <AIPhotoField
                     key={item.kind}
                     item={item}
                     selection={aiPhotos[item.kind]}
-                    disabled={aiAnalyzing}
+                    disabled={aiAnalyzing || (item.kind === "stnk" && !stnkConsent)}
                     onSelect={(file) => selectAIPhoto(item.kind, file)}
                   />
                 ))}
               </div>
-
-              <p className="m-0 mt-3 text-[10px] leading-[1.45] text-muted">
-                Foto dipakai hanya untuk membaca data kendaraan. AIFalcon tidak mengambil nama, alamat, nomor rangka, atau nomor mesin dari STNK.
-              </p>
 
               {aiError && (
                 <div className="mt-3 rounded-[12px] bg-danger-bg px-3 py-2.5 text-[11px] leading-[1.45] text-danger">
@@ -581,7 +624,7 @@ export function JualMobil() {
               <button
                 type="button"
                 onClick={() => void analyzeWithAI()}
-                disabled={aiAnalyzing || loading || !data || AI_PHOTO_INPUTS.some((item) => !aiPhotos[item.kind])}
+                disabled={aiAnalyzing || loading || !data || !stnkConsent || AI_PHOTO_INPUTS.some((item) => !aiPhotos[item.kind])}
                 className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-[12px] bg-teal-deep text-[13px] font-extrabold text-white transition hover:bg-[#078e8b] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Sparkles size={16} />
