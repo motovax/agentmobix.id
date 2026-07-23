@@ -88,10 +88,25 @@ function positiveParamNumber(params: URLSearchParams, key: string): number | nul
 
 function stripPriceFromCaption(caption: string) {
   return caption
-    .replace(/\b(?:dengan\s+)?harga(?:\s+kredit)?\s+(?:Rp\s*)?[\d.,]+(?:\s*(?:jt|juta|miliar))?[,.]?\s*/gi, "")
-    .replace(/\s{2,}/g, " ")
-    .replace(/\s+,/g, ",")
+    .replace(/\b(?:dengan[ \t]+)?harga(?:[ \t]+kredit)?[ \t]+(?:Rp[ \t]*)?[\d.,]+(?:[ \t]*(?:jt|juta|miliar))?[,.]?[ \t]*/gi, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+,/g, ",")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function formatCaptionReadability(caption: string) {
+  const paragraphs = caption
+    .split(/\n+/)
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean);
+  if (paragraphs.length > 1) return paragraphs.join("\n\n");
+
+  const sentences = (paragraphs[0] ?? "")
+    .match(/[^.!?]+(?:[.!?]+|$)/g)
+    ?.map((sentence) => sentence.trim())
+    .filter(Boolean);
+  return sentences && sentences.length > 1 ? sentences.join("\n\n") : paragraphs[0] ?? "";
 }
 
 function usefulVehicleText(value: string | null | undefined) {
@@ -169,8 +184,10 @@ function shareVehicleFacts(unit: ProductDetail) {
 
   const sellingPoints = sellingPointCaption(unit.deskripsi);
   const note = usefulVehicleText(unit.notes_unit);
+  const factItems = facts.filter(Boolean);
   return {
-    summary: facts.filter(Boolean).join(", "),
+    summary: factItems.join(", "),
+    lines: factItems.map((fact) => `• ${fact}`).join("\n"),
     condition: [
       sellingPoints ? `Keunggulan: ${sellingPoints}` : "",
       note && !/^[\d\s.,%]+$/.test(note) ? `Catatan unit: ${note}` : "",
@@ -491,23 +508,24 @@ export function ShareSheet() {
     positiveParamNumber(searchParams, "komisi") ??
     (unit && sharePrice ? estimateBuilderCommission(unit.harga, sharePrice) : 0);
   const vehicleFacts = unit ? shareVehicleFacts(unit) : null;
-  const vehicleIntro = unit
-    ? `${unit.nama}.${vehicleFacts?.summary ? ` ${vehicleFacts.summary}.` : ""}${
-        vehicleFacts?.condition ? ` ${vehicleFacts.condition}.` : ""
-      }`
-    : "";
   const autoCaption = unit
     ? isDpMinimShare
-      ? `${vehicleIntro} Paket DP Minim ${formatJt(paymentValue)}, cicilan ${formatJt(
-          shareCicilan,
-        )}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${titleCase(
-          unit.lokasi || "Mobix",
-        )}, bisa cek langsung. Chat saya ya`
-      : `${vehicleIntro} Harga ${formatRupiah(captionPrice)}. Cukup TDP ${formatJt(shareTdp)}, cicilan ${formatJt(
-          shareCicilan,
-        )}/bln tenor ${shareTenor} bulan. Unit ready di cabang ${titleCase(
-          unit.lokasi || "Mobix",
-        )}, bisa cek langsung. Chat saya ya`
+      ? [
+          unit.nama,
+          vehicleFacts?.lines,
+          vehicleFacts?.condition,
+          `Paket DP Minim ${formatJt(paymentValue)}\nCicilan ${formatJt(shareCicilan)}/bln • Tenor ${shareTenor} bulan`,
+          `Unit ready di cabang ${titleCase(unit.lokasi || "Mobix")}, bisa cek langsung.`,
+          "Chat saya ya",
+        ].filter(Boolean).join("\n\n")
+      : [
+          unit.nama,
+          vehicleFacts?.lines,
+          vehicleFacts?.condition,
+          `Harga ${formatRupiah(captionPrice)}\nTDP ${formatJt(shareTdp)} • Cicilan ${formatJt(shareCicilan)}/bln • Tenor ${shareTenor} bulan`,
+          `Unit ready di cabang ${titleCase(unit.lokasi || "Mobix")}, bisa cek langsung.`,
+          "Chat saya ya",
+        ].filter(Boolean).join("\n\n")
     : "";
 
   function replaceAiBackgroundFiles(entries: Array<[string, File, string]>) {
@@ -860,16 +878,17 @@ export function ShareSheet() {
       `KM ${km}`,
       taxInfo,
     ].filter(Boolean).join(", ");
-    const factLead = facts.summary ? `${facts.summary}.` : `KM ${km}.`;
+    const factBlock = facts.lines || `• KM ${km}`;
     const conditionInfo = facts.condition ? ` ${facts.condition}.` : "";
+    const readablePackage = `${packageWithPrice.charAt(0).toUpperCase()}${packageWithPrice.slice(1)}`;
 
     const variants = [
-      `${unit.nama}${colorInfo}. ${factLead}${conditionInfo} ${packageWithPrice}; ready di ${branch}, chat saya untuk cek unit.`,
-      `Mau ${category} yang paketnya jelas? ${unit.nama}. ${factLead}${conditionInfo} ${packageWithPrice}. Minat, langsung chat saya.`,
-      `${unit.nama} opsi manis buat upgrade tanpa ribet: ${specs}.${conditionInfo} ${packageWithPrice}; cek unitnya di ${branch}.`,
-      `${unit.nama}${colorInfo}. ${factLead}${conditionInfo} Paketnya sudah jelas: ${packageWithPrice}. Chat saya kalau mau cek.`,
-      `${unit.nama} ready di ${branch}. ${factLead}${conditionInfo} ${packageWithPrice}.${dpInfo} Mau saya bantu cek unit?`,
-      `Cari ${category} praktis dan menarik? ${unit.nama}${colorInfo}. ${factLead}${conditionInfo} ${packageWithPrice}.`,
+      `${unit.nama}${colorInfo}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}\n\nReady di ${branch}. Chat saya untuk cek unit.`,
+      `Mau ${category} yang paketnya jelas?\n\n${unit.nama}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}\n\nMinat? Langsung chat saya.`,
+      `${unit.nama}\n\n${specs}${conditionInfo ? `\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}\n\nCek unitnya di ${branch}.`,
+      `${unit.nama}${colorInfo}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\nPaketnya sudah jelas: ${packageWithPrice}.\n\nChat saya kalau mau cek.`,
+      `${unit.nama}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\nReady di ${branch}.\n${readablePackage}.${dpInfo}\n\nMau saya bantu cek unit?`,
+      `Cari ${category} praktis dan menarik?\n\n${unit.nama}${colorInfo}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}.`,
     ];
 
     try {
@@ -894,7 +913,8 @@ export function ShareSheet() {
           ? `${styleHint} Keep the exact odometer and tax/STNK validity from the current caption. Only mention verified condition details. Do not claim accident-free, flood-free, or complete service history. Do not mention any vehicle price or credit price; mention paket DP Minim or TDP konsumen, installment, and tenor only.`
           : `${styleHint} Keep the exact odometer and tax/STNK validity from the current caption. Only mention verified condition details. Do not claim accident-free, flood-free, or complete service history.`,
       });
-      setCaptionText(shouldHidePriceInCaption ? stripPriceFromCaption(aiCaption) : aiCaption);
+      const safeCaption = shouldHidePriceInCaption ? stripPriceFromCaption(aiCaption) : aiCaption;
+      setCaptionText(formatCaptionReadability(safeCaption));
       captionSuggestionIndex.current += 1;
     } catch {
       const nextCaption = variants[captionSuggestionIndex.current % variants.length];
@@ -1321,8 +1341,8 @@ export function ShareSheet() {
             <textarea
               value={captionText}
               onChange={(e) => setCaptionText(e.target.value)}
-              rows={4}
-              className="min-h-[96px] w-full resize-y bg-transparent text-[12px] leading-[1.55] text-mid outline-none"
+              rows={8}
+              className="min-h-[164px] w-full resize-y bg-transparent text-[12px] leading-[1.55] text-mid outline-none"
             />
           )}
         </div>
