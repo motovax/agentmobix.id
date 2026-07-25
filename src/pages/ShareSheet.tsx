@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
+import { FloatingPicAgentCta } from "../components/FloatingPicAgentCta";
 import { Photo, Skeleton } from "../components/ui";
 import {
   ChevronLeft,
@@ -1142,7 +1143,7 @@ export function ShareSheet() {
   return (
     <AppShell>
       {/* sheet */}
-      <div className="min-h-[560px] px-4 pb-5 pt-[18px]">
+      <div className="min-h-[560px] px-4 pb-24 pt-[18px]">
         {/* shareable preview */}
         <div className="relative mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
           {activeMedia?.kind === "video" ? (
@@ -1585,6 +1586,7 @@ export function ShareSheet() {
           </button>
         </div>
       </div>
+      <FloatingPicAgentCta unit={unit} />
     </AppShell>
   );
 }
