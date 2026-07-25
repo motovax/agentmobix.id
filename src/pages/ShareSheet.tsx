@@ -728,7 +728,7 @@ export function ShareSheet() {
     let current = initial;
     onProgress(current.progress || (current.status === "done" ? 100 : 10));
 
-    for (let attempt = 0; attempt < 120; attempt += 1) {
+    for (let attempt = 0; attempt < 180; attempt += 1) {
       if (current.status === "done" || current.status === "failed") {
         return current;
       }
@@ -774,6 +774,7 @@ export function ShareSheet() {
             merek: unit.brand,
             warna: unit.color,
             tahun: unit.year,
+            plate_no: unit.plate_no,
             force,
           });
           const result = await waitForAIBackgroundJob(started, (progress) =>

@@ -146,6 +146,7 @@ export interface AIBackgroundRequest {
   merek?: string;
   warna?: string;
   tahun?: number;
+  plate_no?: string;
   angle_hint?: string;
   force?: boolean;
 }
