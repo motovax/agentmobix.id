@@ -239,14 +239,16 @@ export function Beranda() {
               >
                 Cek Harga Unit
               </Link>
-              <button
-                type="button"
-                onClick={logout}
-                aria-label={`Keluar dari akun ${user?.display_name || user?.username}`}
-                className="rounded-full border border-white/20 bg-white/10 px-2.5 py-2 text-[10px] font-extrabold text-white min-[390px]:text-[11px]"
-              >
-                Keluar
-              </button>
+              {user && (
+                <button
+                  type="button"
+                  onClick={logout}
+                  aria-label={`Keluar dari akun ${user.display_name || user.username}`}
+                  className="rounded-full border border-white/20 bg-white/10 px-2.5 py-2 text-[10px] font-extrabold text-white min-[390px]:text-[11px]"
+                >
+                  Keluar
+                </button>
+              )}
             </div>
           </div>
           <h1 className="m-0 mb-1 mt-3.5 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2]">

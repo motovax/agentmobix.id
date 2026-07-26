@@ -28,10 +28,14 @@ function ScrollToTopOnRouteChange() {
   return null;
 }
 
-export default function App() {
+export default function App({
+  requiresAgentLogin,
+}: {
+  requiresAgentLogin: boolean;
+}) {
   const { user, isLoading } = useAuth();
 
-  if (isLoading) {
+  if (requiresAgentLogin && isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-app-bg">
         <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-teal-tint-border border-t-teal-deep" />
@@ -39,7 +43,7 @@ export default function App() {
     );
   }
 
-  if (!user) {
+  if (requiresAgentLogin && !user) {
     return <Login />;
   }
 

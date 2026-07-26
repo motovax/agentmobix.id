@@ -8,7 +8,6 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "serve": "go run ./cmd/webserver",
     "typecheck": "tsc -b --noEmit",
     "lint": "tsc -b --noEmit"
   },
