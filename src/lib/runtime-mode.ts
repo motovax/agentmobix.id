@@ -1,11 +1,17 @@
-const DEFAULT_AGENT_USER_AGENT_TOKEN = "AgenMobix";
+const DEFAULT_AGENT_USER_AGENT_TOKENS = "AgenMobix,AgentMobix";
 
 export function isAgentUserAgent(
   userAgent: string,
-  token = import.meta.env.VITE_AGENT_USER_AGENT_TOKEN ||
-    DEFAULT_AGENT_USER_AGENT_TOKEN,
+  configuredTokens: string = String(
+    import.meta.env.VITE_AGENT_USER_AGENT_TOKENS ||
+      import.meta.env.VITE_AGENT_USER_AGENT_TOKEN ||
+      DEFAULT_AGENT_USER_AGENT_TOKENS,
+  ),
 ) {
-  const normalizedToken = token.trim().toLowerCase();
-  if (!normalizedToken) return false;
-  return userAgent.toLowerCase().includes(normalizedToken);
+  const normalizedUserAgent = userAgent.toLowerCase();
+  return configuredTokens
+    .split(",")
+    .map((token) => token.trim().toLowerCase())
+    .filter(Boolean)
+    .some((token) => normalizedUserAgent.includes(token));
 }

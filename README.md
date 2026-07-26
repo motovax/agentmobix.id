@@ -40,16 +40,17 @@ VITE_MOBIX_API_KEY=
 VITE_MOBIX_API_BASE=https://mobix.motovax.com
 VITE_MOBIX_IMAGE_BASE=https://mobix.motovax.com
 VITE_MOTOVAX_AUTH_API_BASE=https://mobix.motovax.com
-VITE_AGENT_USER_AGENT_TOKEN=AgenMobix
+VITE_AGENT_USER_AGENT_TOKENS=AgenMobix,AgentMobix
 VITE_STRAPI_API_KEY=
 VITE_CMS_API_BASE=https://api.mobixbydss.id/api
 VITE_CMS_IMAGE_BASE=https://api.mobixbydss.id
 ```
 
 Browser biasa menampilkan situs publik. WebView yang User-Agent-nya mengandung
-token `VITE_AGENT_USER_AGENT_TOKEN` menampilkan gerbang login MotoVax sebelum
-konten aplikasi dirender. Sesi pengguna disimpan di browser dan diverifikasi
-ulang melalui `GET /api/auth/me` setiap aplikasi dibuka.
+salah satu token pada `VITE_AGENT_USER_AGENT_TOKENS` menampilkan gerbang login
+MotoVax sebelum konten aplikasi dirender. Pisahkan beberapa token dengan koma.
+Sesi pengguna disimpan di browser dan diverifikasi ulang melalui
+`GET /api/auth/me` setiap aplikasi dibuka.
 
 ## Deployment
 

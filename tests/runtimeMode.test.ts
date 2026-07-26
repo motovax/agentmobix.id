@@ -6,8 +6,19 @@ describe("deteksi mode AgenMobix", () => {
     expect(isAgentUserAgent("Mozilla/5.0 AgenMobix/1.4.0", "agenmobix")).toBe(true);
   });
 
+  test("mendeteksi ejaan AgentMobix yang digunakan nama aplikasi", () => {
+    expect(
+      isAgentUserAgent(
+        "Mozilla/5.0 AgentMobix/1.4.0",
+        "AgenMobix,AgentMobix",
+      ),
+    ).toBe(true);
+  });
+
   test("tidak mengaktifkan portal agen untuk browser biasa", () => {
-    expect(isAgentUserAgent("Mozilla/5.0 Chrome/140.0", "AgenMobix")).toBe(false);
+    expect(
+      isAgentUserAgent("Mozilla/5.0 Chrome/140.0", "AgenMobix,AgentMobix"),
+    ).toBe(false);
   });
 
   test("fail closed jika token konfigurasi kosong", () => {
