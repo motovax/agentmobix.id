@@ -15,6 +15,7 @@ import {
 } from "../lib/mobix";
 import { formatJt, formatKm } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
+import { useAuth } from "../lib/auth";
 
 const BUDGET_CHIPS = [
   { label: "< Rp100jt", href: "/katalog?harga_max=100000000" },
@@ -106,6 +107,7 @@ function buildQueryRequest(q: string) {
 }
 
 export function Beranda() {
+  const { user, logout } = useAuth();
   const [, navigate] = useLocation();
   const [query, setQuery] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -230,12 +232,22 @@ export function Beranda() {
             <div className="text-[20px] font-extrabold -tracking-[0.02em]">
               mobi<span className="text-teal">x</span>
             </div>
-            <Link
-              href="/jual-mobil"
-              className="rounded-full bg-teal px-3.5 py-2 text-[11px] font-extrabold text-ink no-underline"
-            >
-              Cek Harga Unit
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/jual-mobil"
+                className="rounded-full bg-teal px-3 py-2 text-[10px] font-extrabold text-ink no-underline min-[390px]:text-[11px]"
+              >
+                Cek Harga Unit
+              </Link>
+              <button
+                type="button"
+                onClick={logout}
+                aria-label={`Keluar dari akun ${user?.display_name || user?.username}`}
+                className="rounded-full border border-white/20 bg-white/10 px-2.5 py-2 text-[10px] font-extrabold text-white min-[390px]:text-[11px]"
+              >
+                Keluar
+              </button>
+            </div>
           </div>
           <h1 className="m-0 mb-1 mt-3.5 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2]">
             Mau Jual Mobil{" "}

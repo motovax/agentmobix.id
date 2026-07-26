@@ -12,6 +12,8 @@ import { PromoList } from "./pages/PromoList";
 import { PromoDetail } from "./pages/PromoDetail";
 import { JualMobil } from "./pages/JualMobil";
 import { JualMobilHasil } from "./pages/JualMobilHasil";
+import { Login } from "./pages/Login";
+import { useAuth } from "./lib/auth";
 
 function ScrollToTopOnRouteChange() {
   const [location] = useLocation();
@@ -27,6 +29,20 @@ function ScrollToTopOnRouteChange() {
 }
 
 export default function App() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-app-bg">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-teal-tint-border border-t-teal-deep" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
+
   return (
     <>
       <ScrollToTopOnRouteChange />

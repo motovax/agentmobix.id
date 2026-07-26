@@ -39,10 +39,15 @@ Required env values:
 VITE_MOBIX_API_KEY=
 VITE_MOBIX_API_BASE=https://mobix.motovax.com
 VITE_MOBIX_IMAGE_BASE=https://mobix.motovax.com
+VITE_MOTOVAX_AUTH_API_BASE=https://mobix.motovax.com
 VITE_STRAPI_API_KEY=
 VITE_CMS_API_BASE=https://api.mobixbydss.id/api
 VITE_CMS_IMAGE_BASE=https://api.mobixbydss.id
 ```
+
+Seluruh halaman aplikasi dilindungi login akun MotoVax. Sesi pengguna disimpan
+di browser sampai waktu kedaluwarsa dari API, lalu diverifikasi ulang melalui
+`GET /api/auth/me` setiap aplikasi dibuka.
 
 ## Deployment
 
