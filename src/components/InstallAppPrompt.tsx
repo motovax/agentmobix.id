@@ -10,17 +10,13 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }
 
-const DISMISSED_KEY = "agenmobix-install-prompt-dismissed";
-
 export function InstallAppPrompt() {
   const [installEvent, setInstallEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [showIosHelp, setShowIosHelp] = useState(false);
   const [showAndroidHelp, setShowAndroidHelp] = useState(false);
   const [showManualSteps, setShowManualSteps] = useState(false);
-  const [dismissed, setDismissed] = useState(
-    () => sessionStorage.getItem(DISMISSED_KEY) === "true",
-  );
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     if (isStandaloneMode()) return;
@@ -57,7 +53,6 @@ export function InstallAppPrompt() {
   }
 
   const dismiss = () => {
-    sessionStorage.setItem(DISMISSED_KEY, "true");
     setDismissed(true);
   };
 
@@ -66,7 +61,6 @@ export function InstallAppPrompt() {
       setShowManualSteps(true);
       return;
     }
-    if (!installEvent) return;
     await installEvent.prompt();
     const choice = await installEvent.userChoice;
     if (choice.outcome === "accepted") setInstallEvent(null);
