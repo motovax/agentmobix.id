@@ -17,6 +17,10 @@ export function isIosDevice(userAgent: string, platform: string) {
   );
 }
 
+export function isAndroidDevice(userAgent: string) {
+  return /Android/i.test(userAgent);
+}
+
 export function isStandaloneMode() {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||

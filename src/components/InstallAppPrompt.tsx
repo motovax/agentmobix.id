@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { isIosDevice, isStandaloneMode } from "../lib/pwa";
+import {
+  isAndroidDevice,
+  isIosDevice,
+  isStandaloneMode,
+} from "../lib/pwa";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -12,7 +16,8 @@ export function InstallAppPrompt() {
   const [installEvent, setInstallEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [showIosHelp, setShowIosHelp] = useState(false);
-  const [showIosSteps, setShowIosSteps] = useState(false);
+  const [showAndroidHelp, setShowAndroidHelp] = useState(false);
+  const [showManualSteps, setShowManualSteps] = useState(false);
   const [dismissed, setDismissed] = useState(
     () => sessionStorage.getItem(DISMISSED_KEY) === "true",
   );
@@ -21,7 +26,9 @@ export function InstallAppPrompt() {
     if (isStandaloneMode()) return;
 
     const ios = isIosDevice(navigator.userAgent, navigator.platform);
+    const android = isAndroidDevice(navigator.userAgent);
     if (ios) setShowIosHelp(true);
+    if (android) setShowAndroidHelp(true);
 
     const handleInstallPrompt = (event: Event) => {
       event.preventDefault();
@@ -30,6 +37,7 @@ export function InstallAppPrompt() {
     const handleInstalled = () => {
       setInstallEvent(null);
       setShowIosHelp(false);
+      setShowAndroidHelp(false);
     };
 
     window.addEventListener("beforeinstallprompt", handleInstallPrompt);
@@ -40,7 +48,11 @@ export function InstallAppPrompt() {
     };
   }, []);
 
-  if (dismissed || (!installEvent && !showIosHelp) || isStandaloneMode()) {
+  if (
+    dismissed ||
+    (!installEvent && !showIosHelp && !showAndroidHelp) ||
+    isStandaloneMode()
+  ) {
     return null;
   }
 
@@ -50,8 +62,8 @@ export function InstallAppPrompt() {
   };
 
   const install = async () => {
-    if (showIosHelp) {
-      setShowIosSteps(true);
+    if (!installEvent) {
+      setShowManualSteps(true);
       return;
     }
     if (!installEvent) return;
@@ -84,7 +96,7 @@ export function InstallAppPrompt() {
           <p className="m-0 mt-1 text-[11px] leading-[1.5] text-white/70">
             Akses katalog lebih cepat langsung dari layar utama smartphone.
           </p>
-          {(installEvent || showIosHelp) && (
+          {(installEvent || showIosHelp || showAndroidHelp) && (
             <button
               type="button"
               onClick={install}
@@ -93,13 +105,23 @@ export function InstallAppPrompt() {
               Tambahkan ke layar utama
             </button>
           )}
-          {showIosSteps && (
+          {showManualSteps && (
             <div
               role="status"
               className="mt-2 rounded-[10px] bg-white/10 px-3 py-2 text-[11px] leading-[1.55] text-white/85"
             >
-              Ketuk ikon <strong>Bagikan</strong> di Safari, lalu pilih{" "}
-              <strong>Tambahkan ke Layar Utama</strong>.
+              {showIosHelp ? (
+                <>
+                  Ketuk ikon <strong>Bagikan</strong> di Safari, lalu pilih{" "}
+                  <strong>Tambahkan ke Layar Utama</strong>.
+                </>
+              ) : (
+                <>
+                  Buka menu browser <strong>⋮</strong>, lalu pilih{" "}
+                  <strong>Instal aplikasi</strong> atau{" "}
+                  <strong>Tambahkan ke layar utama</strong>.
+                </>
+              )}
             </div>
           )}
         </div>
