@@ -4,11 +4,14 @@ import "./index.css";
 import App from "./App.tsx";
 import { AuthProvider } from "./lib/auth";
 import { isAgentUserAgent } from "./lib/runtime-mode";
+import { registerServiceWorker } from "./lib/pwa";
 
 // User-Agent ditentukan secara sinkron sebelum React di-mount. Karena #root
 // masih kosong pada titik ini, konten publik tidak sempat tampil pada WebView
 // AgenMobix sebelum gerbang autentikasi dipilih.
 const requiresAgentLogin = isAgentUserAgent(navigator.userAgent);
+
+registerServiceWorker();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

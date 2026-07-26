@@ -14,6 +14,7 @@ import { JualMobil } from "./pages/JualMobil";
 import { JualMobilHasil } from "./pages/JualMobilHasil";
 import { Login } from "./pages/Login";
 import { useAuth } from "./lib/auth";
+import { InstallAppPrompt } from "./components/InstallAppPrompt";
 
 function ScrollToTopOnRouteChange() {
   const [location] = useLocation();
@@ -50,21 +51,22 @@ export default function App({
   return (
     <>
       <ScrollToTopOnRouteChange />
-    <Switch>
-      <Route path="/" component={Beranda} />
-      <Route path="/katalog" component={Katalog} />
-      <Route path="/unit/:slug" component={UnitDetail} />
-      <Route path="/daftar" component={DaftarAgen} />
-      <Route path="/ai" component={AiMobix} />
-      <Route path="/hot-deals" component={HotDeals} />
-      <Route path="/promo" component={PromoList} />
-      <Route path="/promo/:slug" component={PromoDetail} />
-      <Route path="/lokasi" component={Lokasi} />
-      <Route path="/share" component={ShareSheet} />
-      <Route path="/jual-mobil/hasil" component={JualMobilHasil} />
-      <Route path="/jual-mobil" component={JualMobil} />
-      <Route component={Beranda} />
-    </Switch>
+      <Switch>
+        <Route path="/" component={Beranda} />
+        <Route path="/katalog" component={Katalog} />
+        <Route path="/unit/:slug" component={UnitDetail} />
+        <Route path="/daftar" component={DaftarAgen} />
+        <Route path="/ai" component={AiMobix} />
+        <Route path="/hot-deals" component={HotDeals} />
+        <Route path="/promo" component={PromoList} />
+        <Route path="/promo/:slug" component={PromoDetail} />
+        <Route path="/lokasi" component={Lokasi} />
+        <Route path="/share" component={ShareSheet} />
+        <Route path="/jual-mobil/hasil" component={JualMobilHasil} />
+        <Route path="/jual-mobil" component={JualMobil} />
+        <Route component={Beranda} />
+      </Switch>
+      <InstallAppPrompt />
     </>
   );
 }

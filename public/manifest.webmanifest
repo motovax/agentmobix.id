@@ -1,0 +1,28 @@
+{
+  "id": "/",
+  "name": "Agen Mobix",
+  "short_name": "Agen Mobix",
+  "description": "Katalog dan program keagenan Mobix dalam genggaman.",
+  "lang": "id-ID",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F4F5F5",
+  "theme_color": "#0E1B1E",
+  "categories": ["business", "shopping"],
+  "icons": [
+    {
+      "src": "/mobix-logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/mobix-logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
