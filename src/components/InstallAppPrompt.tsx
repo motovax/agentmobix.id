@@ -77,32 +77,34 @@ export function InstallAppPrompt() {
   return (
     <aside
       aria-label="Pasang aplikasi Agen Mobix"
-      className="fixed bottom-[calc(112px+env(safe-area-inset-bottom))] left-1/2 z-[10000] w-[calc(100%-24px)] max-w-[388px] -translate-x-1/2 rounded-[18px] border border-white/10 bg-ink px-4 py-3.5 text-white shadow-[0_16px_48px_rgba(14,27,30,0.35)]"
+      className="fixed bottom-[calc(112px+env(safe-area-inset-bottom))] left-1/2 z-[10000] w-[calc(100%-20px)] max-w-[396px] -translate-x-1/2 rounded-[22px] border border-teal/30 bg-ink px-5 py-[18px] text-white shadow-[0_20px_60px_rgba(14,27,30,0.48)] ring-1 ring-black/5"
     >
       <button
         type="button"
         onClick={dismiss}
         aria-label="Tutup ajakan instalasi"
-        className="absolute right-2.5 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-lg leading-none text-white/75"
+        className="absolute right-2.5 top-2.5 flex h-6 w-6 items-center justify-center rounded-full text-base leading-none text-white/40 transition-colors hover:bg-white/10 hover:text-white/70"
       >
         ×
       </button>
-      <div className="flex gap-3 pr-7">
+      <div className="flex gap-3.5 pr-5">
         <img
           src="/mobix-logo.png"
           alt=""
-          className="h-11 w-11 flex-shrink-0 rounded-xl bg-white object-contain"
+          className="h-14 w-14 flex-shrink-0 rounded-2xl bg-white object-contain shadow-[0_8px_22px_rgba(0,0,0,0.24)]"
         />
         <div className="min-w-0">
-          <div className="text-[13px] font-extrabold">Pasang Agen Mobix</div>
-          <p className="m-0 mt-1 text-[11px] leading-[1.5] text-white/70">
+          <div className="text-[16px] font-extrabold tracking-[-0.01em]">
+            Pasang Agen Mobix
+          </div>
+          <p className="m-0 mt-1 text-[12px] leading-[1.55] text-white/70">
             Akses katalog lebih cepat langsung dari layar utama smartphone.
           </p>
           {(installEvent || showIosHelp || showAndroidHelp) && (
             <button
               type="button"
               onClick={install}
-              className="mt-2 rounded-[10px] bg-teal px-3 py-2 text-[11px] font-extrabold text-ink"
+              className="mt-3 w-full rounded-[13px] bg-teal px-4 py-3 text-[12.5px] font-extrabold text-ink shadow-[0_8px_24px_rgba(54,215,210,0.28)] transition-transform active:scale-[0.98]"
             >
               Tambahkan ke layar utama
             </button>
@@ -126,7 +128,7 @@ export function InstallAppPrompt() {
               )}
             </div>
           )}
-          <label className="mt-2.5 flex cursor-pointer items-center gap-2 text-[10.5px] text-white/70">
+          <label className="mt-3 flex cursor-pointer items-center gap-2 text-[10.5px] text-white/55">
             <input
               type="checkbox"
               checked={hidePermanently}
