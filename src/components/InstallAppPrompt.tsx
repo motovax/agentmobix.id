@@ -10,13 +10,18 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }
 
+const HIDDEN_KEY = "agenmobix-install-prompt-hidden";
+
 export function InstallAppPrompt() {
   const [installEvent, setInstallEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [showIosHelp, setShowIosHelp] = useState(false);
   const [showAndroidHelp, setShowAndroidHelp] = useState(false);
   const [showManualSteps, setShowManualSteps] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(
+    () => localStorage.getItem(HIDDEN_KEY) === "true",
+  );
+  const [hidePermanently, setHidePermanently] = useState(false);
 
   useEffect(() => {
     if (isStandaloneMode()) return;
@@ -53,6 +58,9 @@ export function InstallAppPrompt() {
   }
 
   const dismiss = () => {
+    if (hidePermanently) {
+      localStorage.setItem(HIDDEN_KEY, "true");
+    }
     setDismissed(true);
   };
 
@@ -69,7 +77,7 @@ export function InstallAppPrompt() {
   return (
     <aside
       aria-label="Pasang aplikasi Agen Mobix"
-      className="fixed bottom-[calc(88px+env(safe-area-inset-bottom))] left-1/2 z-[10000] w-[calc(100%-24px)] max-w-[388px] -translate-x-1/2 rounded-[18px] border border-white/10 bg-ink px-4 py-3.5 text-white shadow-[0_16px_48px_rgba(14,27,30,0.35)]"
+      className="fixed bottom-[calc(112px+env(safe-area-inset-bottom))] left-1/2 z-[10000] w-[calc(100%-24px)] max-w-[388px] -translate-x-1/2 rounded-[18px] border border-white/10 bg-ink px-4 py-3.5 text-white shadow-[0_16px_48px_rgba(14,27,30,0.35)]"
     >
       <button
         type="button"
@@ -118,6 +126,15 @@ export function InstallAppPrompt() {
               )}
             </div>
           )}
+          <label className="mt-2.5 flex cursor-pointer items-center gap-2 text-[10.5px] text-white/70">
+            <input
+              type="checkbox"
+              checked={hidePermanently}
+              onChange={(event) => setHidePermanently(event.target.checked)}
+              className="h-3.5 w-3.5 accent-teal"
+            />
+            Jangan tampilkan lagi
+          </label>
         </div>
       </div>
     </aside>
