@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
-  buildMobixUnitLink,
+  buildAgenMobixUnitLink,
   ensureRequiredCaptionFacts,
   formatCaptionReadability,
   removeCaptionParagraphsContaining,
@@ -24,19 +24,21 @@ const sections = [
   },
 ];
 
-describe("buildMobixUnitLink", () => {
+describe("buildAgenMobixUnitLink", () => {
   test("builds an absolute HTTPS unit link", () => {
-    expect(buildMobixUnitLink("A1271VOA")).toBe("https://mobix.id/u/A1271VOA");
-  });
-
-  test("trims and safely encodes the unit identifier", () => {
-    expect(buildMobixUnitLink(" B 1234 XYZ ")).toBe(
-      "https://mobix.id/u/B%201234%20XYZ",
+    expect(buildAgenMobixUnitLink("toyota-calya-2019")).toBe(
+      "https://agenmobix.id/unit/toyota-calya-2019",
     );
   });
 
-  test("falls back to the absolute Mobix homepage", () => {
-    expect(buildMobixUnitLink()).toBe("https://mobix.id");
+  test("trims and safely encodes the unit identifier", () => {
+    expect(buildAgenMobixUnitLink(" toyota calya 2019 ")).toBe(
+      "https://agenmobix.id/unit/toyota%20calya%202019",
+    );
+  });
+
+  test("falls back to the absolute AgenMobix homepage", () => {
+    expect(buildAgenMobixUnitLink()).toBe("https://agenmobix.id");
   });
 });
 

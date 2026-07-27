@@ -8,11 +8,11 @@ export interface RequiredCaptionSection {
   facts: RequiredCaptionFact[];
 }
 
-export function buildMobixUnitLink(plateNo?: string | null) {
-  const normalizedPlateNo = plateNo?.trim();
-  return normalizedPlateNo
-    ? `https://mobix.id/u/${encodeURIComponent(normalizedPlateNo)}`
-    : "https://mobix.id";
+export function buildAgenMobixUnitLink(slug?: string | null) {
+  const normalizedSlug = slug?.trim();
+  return normalizedSlug
+    ? `https://agenmobix.id/unit/${encodeURIComponent(normalizedSlug)}`
+    : "https://agenmobix.id";
 }
 
 function normalizeCaptionValue(value: string) {
