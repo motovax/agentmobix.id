@@ -8,6 +8,13 @@ export interface RequiredCaptionSection {
   facts: RequiredCaptionFact[];
 }
 
+export function buildMobixUnitLink(plateNo?: string | null) {
+  const normalizedPlateNo = plateNo?.trim();
+  return normalizedPlateNo
+    ? `https://mobix.id/u/${encodeURIComponent(normalizedPlateNo)}`
+    : "https://mobix.id";
+}
+
 function normalizeCaptionValue(value: string) {
   return value
     .normalize("NFKD")

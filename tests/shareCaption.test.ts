@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  buildMobixUnitLink,
   ensureRequiredCaptionFacts,
   formatCaptionReadability,
   removeCaptionParagraphsContaining,
@@ -22,6 +23,22 @@ const sections = [
     ],
   },
 ];
+
+describe("buildMobixUnitLink", () => {
+  test("builds an absolute HTTPS unit link", () => {
+    expect(buildMobixUnitLink("A1271VOA")).toBe("https://mobix.id/u/A1271VOA");
+  });
+
+  test("trims and safely encodes the unit identifier", () => {
+    expect(buildMobixUnitLink(" B 1234 XYZ ")).toBe(
+      "https://mobix.id/u/B%201234%20XYZ",
+    );
+  });
+
+  test("falls back to the absolute Mobix homepage", () => {
+    expect(buildMobixUnitLink()).toBe("https://mobix.id");
+  });
+});
 
 describe("ensureRequiredCaptionFacts", () => {
   test("leaves a caption unchanged when every required value is present", () => {

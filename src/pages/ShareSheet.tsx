@@ -38,6 +38,7 @@ import { useAsync } from "../lib/useAsync";
 import { formatJt, formatOdometer, formatRupiah } from "../lib/format";
 import { estimateBuilderCommission } from "../lib/commission";
 import {
+  buildMobixUnitLink,
   ensureRequiredCaptionFacts,
   formatCaptionReadability,
   removeCaptionParagraphsContaining,
@@ -695,7 +696,7 @@ export function ShareSheet() {
     });
   }
 
-  const link = unit ? `mobix.id/u/${unit.plate_no}` : "mobix.id";
+  const link = buildMobixUnitLink(unit?.plate_no);
 
   function showCopiedState(what: "caption" | "link", fromShare = false) {
     setCopied(what);
