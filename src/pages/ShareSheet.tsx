@@ -1526,7 +1526,7 @@ export function ShareSheet() {
                   </button>
                   <button
                     onClick={() => {
-                      void copy("link", `https://${link}`);
+                      void copy("link", link);
                       setShowChannels(false);
                     }}
                     className="flex flex-col items-center gap-1.5 py-4 text-teal-deep transition-colors hover:bg-teal-deep/10"
