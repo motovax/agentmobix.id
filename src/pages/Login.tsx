@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { AppShell } from "../components/AppShell";
 import { useAuth } from "../lib/auth";
+import { MOTOVAX_SALES_AGENT_APP_URL } from "../lib/salesAgent";
 
 export function Login() {
   const { login } = useAuth();
@@ -96,6 +97,34 @@ export function Login() {
               {isSubmitting ? "Memeriksa akun…" : "Masuk"}
             </button>
           </form>
+
+          <div className="my-6 flex items-center gap-3" aria-hidden="true">
+            <span className="h-px flex-1 bg-line" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-placeholder">
+              atau
+            </span>
+            <span className="h-px flex-1 bg-line" />
+          </div>
+
+          <div className="rounded-2xl border border-teal-tint-border bg-teal-pale p-4 text-center">
+            <p className="m-0 text-[13px] font-bold leading-5 text-ink">
+              Minta link login atau ingin masuk sebagai Sales Agent?
+            </p>
+            <p className="mb-4 mt-1 text-[12px] leading-5 text-muted">
+              Gunakan aplikasi MotoVax untuk mengakses akun Sales Agent.
+            </p>
+            <a
+              href={MOTOVAX_SALES_AGENT_APP_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-11 w-full items-center justify-center rounded-xl bg-teal-deep px-4 text-[13px] font-extrabold text-white no-underline transition active:scale-[0.99]"
+            >
+              Buka aplikasi MotoVax
+            </a>
+            <p className="mb-0 mt-2 text-[11px] font-semibold text-teal-deep">
+              mobix.motovax.com
+            </p>
+          </div>
         </div>
 
         <p className="mb-0 mt-10 text-center text-[11px] leading-5 text-muted">
