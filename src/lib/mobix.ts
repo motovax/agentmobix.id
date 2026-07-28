@@ -331,8 +331,7 @@ function isNullableScanError(error: unknown) {
   return error instanceof Error && /cannot scan NULL|can't scan into dest/i.test(error.message);
 }
 
-// Cached: both Beranda and Katalog request categories on mount, and each
-// uncached call fans out one probe request per category.
+// Cached: both Beranda and Katalog request categories on mount.
 let categoriesPromise: Promise<string[]> | null = null;
 
 /** Live filter values (GET endpoints, see /docs). */
@@ -347,21 +346,7 @@ export function fetchCategories(): Promise<string[]> {
 }
 
 async function fetchCategoriesUncached(): Promise<string[]> {
-  const categories = (await get<string[]>("/daftar-kategori")).data ?? [];
-  const checks = await Promise.allSettled(
-    categories.map((category) =>
-      post<ProductListItem[]>("/daftar-produk", buildListBody({
-        page: 1,
-        limit: 1,
-        kategori: [category],
-      })),
-    ),
-  );
-
-  return categories.filter((_, index) => {
-    const check = checks[index];
-    return check.status === "fulfilled" || !isNullableScanError(check.reason);
-  });
+  return (await get<string[]>("/daftar-kategori")).data ?? [];
 }
 export async function fetchBrands(): Promise<string[]> {
   return (await get<string[]>("/daftar-merek")).data ?? [];
@@ -391,6 +376,7 @@ export interface ListResult {
 }
 
 const LIST_FALLBACK_CATEGORIES = ["HATCHBACK", "LCGC", "MPV", "PICKUP", "SUV", "TRUK", "VAN"];
+const LIST_FALLBACK_CONCURRENCY = 2;
 const PLATE_FUZZY_CANDIDATE_LIMIT = 500;
 const PRICE_FILTER_CANDIDATE_LIMIT = 500;
 
@@ -417,16 +403,20 @@ async function fetchUnitsByCategoryFallback(req: ListRequest): Promise<ListResul
   const limit = req.limit ?? 12;
   const offset = (page - 1) * limit;
   const fallbackLimit = page * limit;
-  const settled = await Promise.allSettled(
-    LIST_FALLBACK_CATEGORIES.map((category) =>
-      post<ProductListItem[]>("/daftar-produk", buildListBody({
-        ...req,
-        page: 1,
-        limit: fallbackLimit,
-        kategori: [category],
-      })),
-    ),
-  );
+  const settled: PromiseSettledResult<ApiEnvelope<ProductListItem[]>>[] = [];
+  for (let i = 0; i < LIST_FALLBACK_CATEGORIES.length; i += LIST_FALLBACK_CONCURRENCY) {
+    const batch = LIST_FALLBACK_CATEGORIES.slice(i, i + LIST_FALLBACK_CONCURRENCY);
+    settled.push(...await Promise.allSettled(
+      batch.map((category) =>
+        post<ProductListItem[]>("/daftar-produk", buildListBody({
+          ...req,
+          page: 1,
+          limit: fallbackLimit,
+          kategori: [category],
+        })),
+      ),
+    ));
+  }
 
   const fulfilled = settled
     .filter((entry): entry is PromiseFulfilledResult<ApiEnvelope<ProductListItem[]>> =>
