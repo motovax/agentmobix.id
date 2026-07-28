@@ -182,9 +182,24 @@ export interface ListRequest {
   plate_no?: string;
 }
 
+const INDONESIAN_PLATE_PREFIXES = new Set([
+  "A", "AA", "AB", "AD", "AE", "AG",
+  "B", "BA", "BB", "BD", "BE", "BG", "BH", "BK", "BL", "BM", "BN", "BP",
+  "CC", "CD",
+  "D", "DA", "DB", "DC", "DD", "DE", "DG", "DH", "DK", "DL", "DM", "DN", "DP", "DR", "DT", "DW",
+  "E", "EA", "EB", "ED",
+  "F", "G", "H",
+  "K", "KB", "KH", "KT", "KU",
+  "L", "M", "N",
+  "P", "PA", "PB",
+  "R", "RI",
+  "S", "T", "W", "Z",
+]);
+
 /** Returns true if the query looks like a full or partial Indonesian plate number. */
 export function isPlateQuery(q: string): boolean {
-  return /^[A-Z]{1,2}\s*\d{1,4}\s*[A-Z]{0,3}$/i.test(q.trim());
+  const match = q.trim().match(/^([A-Z]{1,2})\s*\d{1,4}\s*[A-Z]{0,3}$/i);
+  return match ? INDONESIAN_PLATE_PREFIXES.has(match[1].toUpperCase()) : false;
 }
 
 function normalizePlateQuery(q: string): string {
