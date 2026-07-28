@@ -13,9 +13,9 @@ import {
   prettyCategory,
   titleCase,
   toCardUnit,
-  classifyQuery,
   type CardUnit,
 } from "../lib/mobix";
+import { buildCatalogSearchParams } from "../lib/catalogSearch";
 import { useAsync } from "../lib/useAsync";
 
 const LIMIT = 12;
@@ -258,23 +258,9 @@ export function Katalog() {
   }, [query]);
 
   const kategori = activeCat || undefined;
-  const classification = debounced ? classifyQuery(debounced) : null;
 
   function buildSearchParams() {
-    const fromQuery = classification ? {
-      judul:       classification.param === "judul"       ? classification.value : undefined,
-      merek:       classification.param === "merek"       ? classification.value : undefined,
-      bahan_bakar: classification.param === "bahan_bakar" ? classification.value : undefined,
-      transmisi:   classification.param === "transmisi"   ? classification.value : undefined,
-      plate_no:    classification.param === "plate_no"    ? classification.value : undefined,
-    } : {};
-    return {
-      ...fromQuery,
-      transmisi: fromQuery.transmisi ?? (filters.transmisi ? [filters.transmisi] : undefined),
-      lokasi: filters.lokasi ? [filters.lokasi] : undefined,
-      harga_awal: filters.priceMin,
-      harga_akhir: filters.priceMax,
-    };
+    return buildCatalogSearchParams(debounced, filters);
   }
 
   // initial / filter-changed load (page 1)

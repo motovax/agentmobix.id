@@ -3,8 +3,9 @@ import { Link } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { BottomNav } from "../components/BottomNav";
 import { FloatingContactCta } from "../components/FloatingContactCta";
+import { UnitRow } from "../components/UnitRow";
 import { Search } from "../components/icons";
-import { Photo, Skeleton } from "../components/ui";
+import { Photo, Skeleton, SkeletonRow } from "../components/ui";
 import {
   fetchUnits,
   fetchCategories,
@@ -14,6 +15,7 @@ import {
   toCardUnit,
   type CardUnit,
 } from "../lib/mobix";
+import { buildCatalogSearchParams } from "../lib/catalogSearch";
 import { formatJt, formatKm } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import { useAuth } from "../lib/auth";
@@ -38,6 +40,7 @@ const BRANDS = [
 ];
 
 const REC_BATCH_SIZE = 6;
+const SEARCH_BATCH_SIZE = 12;
 
 function appendUniqueUnits(current: CardUnit[], next: CardUnit[]) {
   const seen = new Set(current.map((unit) => unit.id));
@@ -107,17 +110,37 @@ function RecSkeleton() {
 
 export function Beranda() {
   const { user, logout } = useAuth();
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [recItems, setRecItems] = useState<CardUnit[]>([]);
+  const [recTotal, setRecTotal] = useState(0);
   const [recNextPage, setRecNextPage] = useState(1);
   const [recTotalPages, setRecTotalPages] = useState<number | null>(null);
   const [recLoading, setRecLoading] = useState(false);
   const [recError, setRecError] = useState(false);
+  const [loadedRequestKey, setLoadedRequestKey] = useState<string | null>(null);
   const recLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const searchResultsRef = useRef<HTMLElement | null>(null);
   const recLoadingRef = useRef(false);
   const recRequestRef = useRef(0);
 
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setDebouncedQuery(query.trim()),
+      400,
+    );
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
   const categories = useAsync(fetchCategories, []);
+  const isSearchActive = debouncedQuery.length > 0;
+  const currentRequestKey = `${debouncedQuery}\u0000${activeCategory ?? ""}`;
+  const searchIsPending =
+    query.trim() !== debouncedQuery ||
+    (isSearchActive &&
+      (recLoading || loadedRequestKey !== currentRequestKey));
   const hasMoreRecommendations =
     recTotalPages === null || recNextPage <= recTotalPages;
 
@@ -136,6 +159,7 @@ export function Beranda() {
     setRecError(false);
     if (replace) {
       setRecItems([]);
+      setRecTotal(0);
       setRecNextPage(1);
       setRecTotalPages(null);
     }
@@ -143,7 +167,8 @@ export function Beranda() {
     try {
       const result = await fetchUnits({
         page,
-        limit: REC_BATCH_SIZE,
+        limit: isSearchActive ? SEARCH_BATCH_SIZE : REC_BATCH_SIZE,
+        ...buildCatalogSearchParams(debouncedQuery),
         kategori: activeCategory ? [activeCategory] : undefined,
       });
       if (requestId !== recRequestRef.current) return;
@@ -151,26 +176,44 @@ export function Beranda() {
       setRecItems((current) =>
         replace ? nextItems : appendUniqueUnits(current, nextItems),
       );
+      setRecTotal(result.total);
       setRecTotalPages(result.totalPages);
       setRecNextPage(page + 1);
+      setLoadedRequestKey(currentRequestKey);
     } catch {
       if (requestId !== recRequestRef.current) return;
       setRecError(true);
+      setLoadedRequestKey(currentRequestKey);
     } finally {
       if (requestId === recRequestRef.current) {
         recLoadingRef.current = false;
         setRecLoading(false);
       }
     }
-  }, [activeCategory, recNextPage, recTotalPages]);
+  }, [
+    activeCategory,
+    currentRequestKey,
+    debouncedQuery,
+    isSearchActive,
+    recNextPage,
+    recTotalPages,
+  ]);
 
   useEffect(() => {
     loadRecommendations({ page: 1, replace: true });
-  }, [activeCategory]);
+  }, [activeCategory, debouncedQuery]);
 
   useEffect(() => {
     const target = recLoadMoreRef.current;
-    if (!target || recError || recLoading || !hasMoreRecommendations) return;
+    if (
+      isSearchActive ||
+      !target ||
+      recError ||
+      recLoading ||
+      !hasMoreRecommendations
+    ) {
+      return;
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -183,7 +226,13 @@ export function Beranda() {
 
     observer.observe(target);
     return () => observer.disconnect();
-  }, [hasMoreRecommendations, loadRecommendations, recError, recLoading]);
+  }, [
+    hasMoreRecommendations,
+    isSearchActive,
+    loadRecommendations,
+    recError,
+    recLoading,
+  ]);
 
   return (
     <AppShell>
@@ -226,16 +275,91 @@ export function Beranda() {
           <p className="m-0 mb-3.5 text-[12px] text-white/65">
             2.400+ unit ready · inspeksi 175 titik · garansi mesin
           </p>
-          <Link
-            href="/katalog?focus=1"
-            aria-label="Cari merek, tipe, atau nomor polisi di katalog"
-            className="flex items-center gap-2.5 rounded-2xl bg-surface px-3.5 py-[13px] text-inherit no-underline shadow-[0_8px_24px_-10px_rgba(14,27,30,0.3)]"
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              setDebouncedQuery(query.trim());
+              setSuggestionsOpen(false);
+              window.requestAnimationFrame(() =>
+                searchResultsRef.current?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                }),
+              );
+            }}
+            className="flex items-center gap-2.5 rounded-2xl bg-surface px-3.5 py-[13px] shadow-[0_8px_24px_-10px_rgba(14,27,30,0.3)]"
           >
             <Search size={16} strokeWidth={2} className="flex-shrink-0 text-teal-deep" />
-            <span className="min-w-0 flex-1 text-[13.5px] font-medium text-placeholder">
-              Cari merek, tipe, atau nopol…
-            </span>
-          </Link>
+            <input
+              value={query}
+              onFocus={() => setSuggestionsOpen(true)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setSuggestionsOpen(true);
+              }}
+              placeholder="Cari merek, tipe, atau nopol…"
+              enterKeyHint="search"
+              aria-label="Cari merek, tipe, atau nomor polisi"
+              className="min-w-0 flex-1 bg-transparent text-[13.5px] font-medium text-ink outline-none placeholder:text-placeholder"
+            />
+          </form>
+          {query.trim() && suggestionsOpen && (
+            <div className="mt-2 overflow-hidden rounded-2xl bg-surface text-ink shadow-[0_8px_24px_-10px_rgba(14,27,30,0.3)]">
+              {searchIsPending && (
+                <div className="px-3.5 py-3 text-[12px] text-muted">
+                  Mencari…
+                </div>
+              )}
+              {!searchIsPending &&
+                !recError &&
+                recItems.slice(0, 5).map((unit) => (
+                  <Link
+                    key={unit.id}
+                    href={`/unit/${unit.slug}`}
+                    className="flex items-center gap-2.5 border-b border-line px-3 py-2.5 text-inherit no-underline last:border-b-0"
+                  >
+                    <Photo
+                      className="h-10 w-14 flex-shrink-0 overflow-hidden rounded-lg"
+                      src={unit.thumbnail}
+                      alt={unit.title}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="line-clamp-1 text-[12.5px] font-bold text-ink">
+                        {unit.title}
+                      </div>
+                      <div className="text-[11px] text-muted">
+                        Rp {formatJt(unit.price)} · {unit.year} · {unit.branch}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              {!searchIsPending && recError && (
+                <div className="px-3.5 py-3 text-[12px] text-muted">
+                  Gagal memuat suggestion. Coba ketik ulang.
+                </div>
+              )}
+              {!searchIsPending && !recError && recItems.length === 0 && (
+                <div className="px-3.5 py-3 text-[12px] text-muted">
+                  Tidak ada unit yang cocok dengan "{debouncedQuery}".
+                </div>
+              )}
+              {!searchIsPending && !recError && recItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSuggestionsOpen(false);
+                    searchResultsRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    });
+                  }}
+                  className="block w-full border-t border-line bg-surface px-3.5 py-2.5 text-center text-[12px] font-bold text-teal-deep"
+                >
+                  Lihat semua {recTotal} hasil di beranda →
+                </button>
+              )}
+            </div>
+          )}
           <div className="scroll-x -mx-[18px] mt-3 flex gap-2 overflow-x-auto px-[18px] pb-0.5">
             {BUDGET_CHIPS.map((c) => (
               <Link
@@ -250,57 +374,73 @@ export function Beranda() {
         </header>
 
         {/* CARI PER MEREK */}
-        <section className="px-[18px] pt-3">
-          <div className="flex items-baseline justify-between gap-2">
-            <h2 className="m-0 -tracking-[0.01em] text-[15px] font-extrabold text-ink">
-              Cari per merek
-            </h2>
-            <Link
-              href="/katalog"
-              className="whitespace-nowrap text-[11.5px] font-bold text-teal-deep no-underline"
-            >
-              Semua merek
-            </Link>
-          </div>
-          <div className="scroll-x -mx-[18px] mt-3 flex gap-2 overflow-x-auto px-[18px] pb-0.5">
-            {BRANDS.map((b) => (
+        {!query.trim() && (
+          <section className="px-[18px] pt-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="m-0 -tracking-[0.01em] text-[15px] font-extrabold text-ink">
+                Cari per merek
+              </h2>
               <Link
-                key={b.label}
-                href={b.label === "Lainnya" ? "/katalog" : `/katalog?q=${encodeURIComponent(b.label)}`}
-                className="flex w-[74px] flex-shrink-0 flex-col items-center gap-1 rounded-[14px] border border-line bg-surface px-1 pb-2 pt-2 no-underline"
+                href="/katalog"
+                className="whitespace-nowrap text-[11.5px] font-bold text-teal-deep no-underline"
               >
-                <span className="flex h-[28px] w-[28px] items-center justify-center overflow-hidden rounded-full border border-line bg-surface">
-                  {b.logo ? (
-                    <img
-                      src={b.logo}
-                      alt={b.label}
-                      loading="lazy"
-                      className="h-full w-full object-contain p-1"
-                    />
-                  ) : (
-                    <span className="text-[13px] font-extrabold text-mid">+</span>
-                  )}
-                </span>
-                <span className="w-full truncate text-center text-[10px] font-semibold text-muted">
-                  {b.label}
-                </span>
+                Semua merek
               </Link>
-            ))}
-          </div>
-        </section>
+            </div>
+            <div className="scroll-x -mx-[18px] mt-3 flex gap-2 overflow-x-auto px-[18px] pb-0.5">
+              {BRANDS.map((brand) => (
+                <Link
+                  key={brand.label}
+                  href={
+                    brand.label === "Lainnya"
+                      ? "/katalog"
+                      : `/katalog?q=${encodeURIComponent(brand.label)}`
+                  }
+                  className="flex w-[74px] flex-shrink-0 flex-col items-center gap-1 rounded-[14px] border border-line bg-surface px-1 pb-2 pt-2 no-underline"
+                >
+                  <span className="flex h-[28px] w-[28px] items-center justify-center overflow-hidden rounded-full border border-line bg-surface">
+                    {brand.logo ? (
+                      <img
+                        src={brand.logo}
+                        alt={brand.label}
+                        loading="lazy"
+                        className="h-full w-full object-contain p-1"
+                      />
+                    ) : (
+                      <span className="text-[13px] font-extrabold text-mid">
+                        +
+                      </span>
+                    )}
+                  </span>
+                  <span className="w-full truncate text-center text-[10px] font-semibold text-muted">
+                    {brand.label}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* LIVE KATALOG */}
-        <section className="px-[18px] pt-3">
+        <section ref={searchResultsRef} className="scroll-mt-3 px-[18px] pt-3">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="m-0 -tracking-[0.01em] text-[15px] font-extrabold text-ink">
-              Live katalog
+              {isSearchActive
+                ? `Hasil pencarian "${debouncedQuery}"`
+                : "Live katalog"}
             </h2>
-            <Link
-              href="/katalog"
-              className="whitespace-nowrap text-[11.5px] font-bold text-teal-deep no-underline"
-            >
-              Filter
-            </Link>
+            {isSearchActive && !recLoading ? (
+              <span className="whitespace-nowrap text-[11.5px] font-bold text-teal-deep">
+                {recTotal} unit
+              </span>
+            ) : (
+              <Link
+                href="/katalog"
+                className="whitespace-nowrap text-[11.5px] font-bold text-teal-deep no-underline"
+              >
+                Filter
+              </Link>
+            )}
           </div>
           <div className="scroll-x -mx-[18px] mt-3 flex gap-2 overflow-x-auto px-[18px] pb-0.5">
             <button
@@ -329,35 +469,92 @@ export function Beranda() {
               </button>
             ))}
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2.5">
-            {recItems.map((u) => (
-              <RecCard key={u.id} unit={u} />
-            ))}
-            {recLoading &&
-              Array.from({ length: recItems.length ? 2 : 6 }).map((_, i) => (
-                <RecSkeleton key={`rec-skeleton-${i}`} />
+          {isSearchActive ? (
+            <div className="mt-3 flex flex-col gap-2.5">
+              {recLoading &&
+                recItems.length === 0 &&
+                Array.from({ length: 5 }).map((_, index) => (
+                  <SkeletonRow key={`search-skeleton-${index}`} />
+                ))}
+              {recItems.map((unit) => (
+                <UnitRow key={unit.id} unit={unit} />
               ))}
-          </div>
-          {!recLoading && recError && recItems.length === 0 && (
-            <div className="py-6 text-center text-[12px] text-muted">
-              Gagal memuat katalog.
+              {!recLoading && recError && recItems.length === 0 && (
+                <div className="rounded-2xl border border-line bg-surface px-4 py-8 text-center text-[13px] text-muted">
+                  Gagal memuat hasil pencarian.
+                </div>
+              )}
+              {!recLoading && recError && recItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => loadRecommendations()}
+                  className="mt-1 rounded-[14px] border border-line bg-surface py-3.5 text-[14px] font-bold text-ink"
+                >
+                  Coba muat lagi
+                </button>
+              )}
+              {!recLoading && !recError && recItems.length === 0 && (
+                <div className="rounded-2xl border border-line bg-surface px-4 py-10 text-center text-[13px] text-muted">
+                  Tidak ada unit yang cocok dengan pencarianmu.
+                </div>
+              )}
+              {!recLoading &&
+                !recError &&
+                recItems.length > 0 &&
+                hasMoreRecommendations && (
+                  <button
+                    type="button"
+                    onClick={() => loadRecommendations()}
+                    className="mt-1 rounded-[14px] border border-line bg-surface py-3.5 text-[14px] font-bold text-ink"
+                  >
+                    Muat lebih banyak
+                  </button>
+                )}
+              {recLoading && recItems.length > 0 && (
+                <div className="py-2 text-center text-[12px] text-muted">
+                  Memuat…
+                </div>
+              )}
             </div>
+          ) : (
+            <>
+              <div className="mt-3 grid grid-cols-2 gap-2.5">
+                {recItems.map((unit) => (
+                  <RecCard key={unit.id} unit={unit} />
+                ))}
+                {recLoading &&
+                  Array.from({ length: recItems.length ? 2 : 6 }).map(
+                    (_, index) => (
+                      <RecSkeleton key={`rec-skeleton-${index}`} />
+                    ),
+                  )}
+              </div>
+              {!recLoading && recError && recItems.length === 0 && (
+                <div className="py-6 text-center text-[12px] text-muted">
+                  Gagal memuat katalog.
+                </div>
+              )}
+              {!recLoading && recError && recItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => loadRecommendations()}
+                  className="mt-2 w-full rounded-xl border border-line bg-surface px-3 py-2 text-[12px] font-bold text-teal-deep"
+                >
+                  Coba muat lagi
+                </button>
+              )}
+              {!recLoading && !recError && recItems.length === 0 && (
+                <div className="py-6 text-center text-[12px] text-muted">
+                  Belum ada unit katalog.
+                </div>
+              )}
+              <div
+                ref={recLoadMoreRef}
+                className="h-1"
+                aria-hidden="true"
+              />
+            </>
           )}
-          {!recLoading && recError && recItems.length > 0 && (
-            <button
-              type="button"
-              onClick={() => loadRecommendations()}
-              className="mt-2 w-full rounded-xl border border-line bg-surface px-3 py-2 text-[12px] font-bold text-teal-deep"
-            >
-              Coba muat lagi
-            </button>
-          )}
-          {!recLoading && !recError && recItems.length === 0 && (
-            <div className="py-6 text-center text-[12px] text-muted">
-              Belum ada unit katalog.
-            </div>
-          )}
-          <div ref={recLoadMoreRef} className="h-1" aria-hidden="true" />
         </section>
 
         {/* BANNER KEAGENAN */}
