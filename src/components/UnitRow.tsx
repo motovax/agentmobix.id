@@ -1,10 +1,15 @@
 import { Link } from "wouter";
-import type { CardUnit } from "../lib/mobix";
+import {
+  compactFinancingLabel,
+  hasAvailableFinancing,
+  type CardUnit,
+} from "../lib/mobix";
 import { formatJt, formatKm } from "../lib/format";
 import { Photo, ThumbBadge } from "./ui";
 
 /** Catalog list row — whole row links to the unit detail. */
 export function UnitRow({ unit }: { unit: CardUnit }) {
+  const financingAvailable = hasAvailableFinancing(unit.pembiayaan);
   return (
     <Link
       href={`/unit/${unit.slug}`}
@@ -38,8 +43,14 @@ export function UnitRow({ unit }: { unit: CardUnit }) {
             </div>
           )}
         </div>
-        <div className="mt-px text-[11px] text-muted">
-          TDP {formatJt(unit.tdp)} · {formatJt(unit.cicilan)}/bln · {formatKm(unit.km)}
+        <div
+          className={`mt-px text-[11px] ${
+            financingAvailable ? "text-muted" : "font-semibold text-[#9A5A00]"
+          }`}
+        >
+          {financingAvailable
+            ? `TDP ${formatJt(unit.tdp)} · ${formatJt(unit.cicilan)}/bln · ${formatKm(unit.km)}`
+            : `${compactFinancingLabel(unit.pembiayaan)} · ${formatKm(unit.km)}`}
         </div>
         <div className="mt-1.5">
           <div className="text-[10px] text-muted">Komisi</div>

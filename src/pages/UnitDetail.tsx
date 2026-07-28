@@ -5,7 +5,7 @@ import "@splidejs/react-splide/css/core";
 import { Link, useParams } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
-import { ContactActionMenu } from "../components/FloatingContactCta";
+import { ContactActionMenu, waHref } from "../components/FloatingContactCta";
 import { Photo, Skeleton } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
 import { ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
@@ -166,6 +166,8 @@ export function UnitDetail() {
 
   const originalPrice = unit?.harga ?? 0;
   const price = builderPrice > 0 ? builderPrice : originalPrice;
+  const financingEligible = unit?.pembiayaan.eligible === true;
+  const financingIneligible = unit?.pembiayaan.status === "ineligible";
   const dsfRules = getDsfSimulationRules({
     category: unit?.category,
     year: unit?.year,
@@ -230,7 +232,7 @@ export function UnitDetail() {
   const tdpSimulationAmount = tdpAmount > 0 ? tdpAmount : defaultTdpAmount;
   const monthlySimulationAmount =
     monthlyAmount > 0 ? monthlyAmount : defaultMonthlyAmount;
-  const simPending = price > 0 && simResult === null && !simError;
+  const simPending = financingEligible && price > 0 && simResult === null && !simError;
   const simCreditPrice =
     typeof simResult?.hargaKredit === "number" &&
     Number.isFinite(simResult.hargaKredit) &&
@@ -303,12 +305,20 @@ export function UnitDetail() {
         cicilan: String(Math.round(displayMonthly)),
         tdp: String(Math.round(shareTdp)),
       }).toString()}`
-    : null;
+    : financingIneligible && unit
+      ? `/share?${new URLSearchParams({
+          u: unit.slug,
+          harga: String(Math.round(price)),
+          komisi: String(Math.round(estimatedCommission)),
+        }).toString()}`
+      : null;
   const unitAdminMessage = unit
     ? `Halo AI Mobix! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
     : undefined;
   const unitCalculationMessage = unit
-    ? `Halo Admin, saya mau minta hitungan leasing untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}.\n1. DP minim\n2. Cicilan ringan\n3. Cair All in`
+    ? financingIneligible
+      ? `Halo Admin, saya mau menanyakan opsi pembiayaan lain untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Unit ini tidak eligible pembiayaan DSF karena usia kendaraan.`
+      : `Halo Admin, saya mau minta hitungan leasing untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}.\n1. DP minim\n2. Cicilan ringan\n3. Cair All in`
     : undefined;
   function formatDpValue(value: number) {
     return currencyFormatter.format(Math.max(0, Math.round(value || 0)));
@@ -608,7 +618,7 @@ export function UnitDetail() {
   }
 
   useEffect(() => {
-    if (!price) {
+    if (!financingEligible || !price) {
       setSmartCreditPrice(null);
       setSmartCreditPriceLoading(false);
       setSmartCreditPriceError(false);
@@ -648,10 +658,19 @@ export function UnitDetail() {
       alive = false;
       controller.abort();
     };
-  }, [price, unit?.brand, unit?.type, unit?.year, unit?.category, tenor, minDsfDpPercent]);
+  }, [
+    financingEligible,
+    price,
+    unit?.brand,
+    unit?.type,
+    unit?.year,
+    unit?.category,
+    tenor,
+    minDsfDpPercent,
+  ]);
 
   useEffect(() => {
-    if (!price) {
+    if (!financingEligible || !price) {
       setSimResult(null);
       setSimLoading(false);
       setSimError(false);
@@ -710,6 +729,7 @@ export function UnitDetail() {
       controller.abort();
     };
   }, [
+    financingEligible,
     price,
     unit?.brand,
     unit?.type,
@@ -725,7 +745,7 @@ export function UnitDetail() {
   ]);
 
   useEffect(() => {
-    if (simTab !== "dpminim" || !price) {
+    if (!financingEligible || simTab !== "dpminim" || !price) {
       setDpMinimRows(null);
       setDpMinimTableLoading(false);
       return;
@@ -776,7 +796,15 @@ export function UnitDetail() {
       alive = false;
       controller.abort();
     };
-  }, [simTab, price, unit?.brand, unit?.type, unit?.year, dpMinimTableKey]);
+  }, [
+    financingEligible,
+    simTab,
+    price,
+    unit?.brand,
+    unit?.type,
+    unit?.year,
+    dpMinimTableKey,
+  ]);
 
   useEffect(() => {
     setActiveThumb(0);
@@ -1121,7 +1149,11 @@ export function UnitDetail() {
                   Harga asli {formatRupiah(originalPrice)}
                 </div>
               )}
-              {simTab === "dpminim" ? (
+              {financingIneligible ? (
+                <div className="mt-1 text-[12px] font-semibold text-[#9A5A00]">
+                  Pembiayaan DSF tidak tersedia
+                </div>
+              ) : simTab === "dpminim" ? (
                 <div className="mt-1 text-[12px] font-semibold text-teal-deep">
                   TDP Konsumen : {shareDp !== null ? formatRupiah(shareDp) : "Hitung DP Minim dulu"}
                 </div>
@@ -1207,6 +1239,29 @@ export function UnitDetail() {
         </div>
 
         {/* CALCULATOR */}
+        {financingIneligible ? (
+          <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4">
+            <div className="rounded-[18px] border border-[#E8C98B] bg-[#FFF8E8] p-4">
+              <div className="inline-flex rounded-full bg-[#F7DFAC] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#7A4700]">
+                Tidak eligible DSF
+              </div>
+              <div className="mt-2.5 text-[15px] font-extrabold text-ink">
+                Simulasi kredit DSF tidak tersedia
+              </div>
+              <p className="m-0 mt-1.5 text-[12px] leading-[1.6] text-mid">
+                {unit.pembiayaan.message}
+              </p>
+              <a
+                href={waHref(unitCalculationMessage ?? "")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex w-full items-center justify-center rounded-[12px] bg-ink px-4 py-3 text-[13px] font-extrabold text-surface no-underline"
+              >
+                Tanya opsi pembiayaan lain
+              </a>
+            </div>
+          </div>
+        ) : (
         <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4">
           <div className="rounded-[18px] border border-line bg-surface p-4">
             <div className="mb-3.5 flex items-center justify-between">
@@ -1673,6 +1728,7 @@ export function UnitDetail() {
             </p>
           </div>
         </div>
+        )}
 
         {/* KELENGKAPAN DOKUMEN */}
         {docs.length > 0 && (
@@ -1753,7 +1809,9 @@ export function UnitDetail() {
             disabled
             className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl bg-ink/35 px-3 text-[12px] font-bold text-surface"
           >
-            <span className="truncate">Menunggu DSF</span>
+            <span className="truncate">
+              {unit.pembiayaan.status === "unavailable" ? "Simulasi belum tersedia" : "Menunggu DSF"}
+            </span>
             <ShareArrow size={14} />
           </button>
         )}
@@ -1761,7 +1819,7 @@ export function UnitDetail() {
           adminMessage={unitAdminMessage ?? ""}
           calculationMessage={unitCalculationMessage ?? ""}
           adminLabel="Tanya Unit"
-          calculationLabel="Minta Hitungan"
+          calculationLabel={financingIneligible ? "Tanya Opsi Pembiayaan" : "Minta Hitungan"}
           buttonClassName="flex h-12 w-full items-center justify-center rounded-2xl border border-teal-tint-border bg-teal text-ink"
         />
       </div>

@@ -490,17 +490,22 @@ export function ShareSheet() {
     : isMixedMediaSelected
       ? "Share bertahap: video dulu"
       : "Bagikan Sekarang";
-  const isDpMinimShare = searchParams.get("sim") === "dpminim";
+  const financingEligible = unit?.pembiayaan.eligible === true;
+  const requestedDpMinimShare = searchParams.get("sim") === "dpminim";
   const shareTenor = positiveParamNumber(searchParams, "tenor") ?? 60;
   const shareTdp = positiveParamNumber(searchParams, "tdp") ?? unit?.tdp ?? 0;
   const shareCicilan = positiveParamNumber(searchParams, "cicilan") ?? unit?.cicilan ?? 0;
   const shareDp = positiveParamNumber(searchParams, "dp") ?? null;
   const shareDpPercent = positiveParamNumber(searchParams, "dp_pct") ?? null;
-  const shareCreditPrice = positiveParamNumber(searchParams, "harga_kredit") ?? unit?.harga_kredit ?? null;
+  const shareHasFinancing = financingEligible && shareTdp > 0 && shareCicilan > 0;
+  const isDpMinimShare = requestedDpMinimShare && shareHasFinancing;
+  const shareCreditPrice = financingEligible
+    ? positiveParamNumber(searchParams, "harga_kredit") ?? unit?.harga_kredit ?? null
+    : null;
   const sharePrice = positiveParamNumber(searchParams, "harga") ?? unit?.harga ?? 0;
   const captionPrice = shareCreditPrice ?? sharePrice ?? unit?.harga ?? 0;
   const shouldHidePriceInCaption = isDpMinimShare;
-  const packageTitle = isDpMinimShare ? "DP Minim" : "Kredit";
+  const packageTitle = shareHasFinancing ? (isDpMinimShare ? "DP Minim" : "Kredit") : "Unit";
   const paymentLabel = isDpMinimShare ? "TDP Konsumen" : "TDP";
   const paymentValue = isDpMinimShare && shareDp ? shareDp : shareTdp;
   const shareCommission =
@@ -508,7 +513,16 @@ export function ShareSheet() {
     (unit && sharePrice ? estimateBuilderCommission(unit.harga, sharePrice) : 0);
   const vehicleFacts = unit ? shareVehicleFacts(unit) : null;
   const autoCaption = unit
-    ? isDpMinimShare
+    ? !shareHasFinancing
+      ? [
+          unit.nama,
+          vehicleFacts?.lines,
+          vehicleFacts?.condition,
+          `Harga ${formatRupiah(captionPrice)}`,
+          `Unit ready di cabang ${titleCase(unit.lokasi || "Mobix")}, bisa cek langsung.`,
+          "Chat saya ya",
+        ].filter(Boolean).join("\n\n")
+      : isDpMinimShare
       ? [
           unit.nama,
           vehicleFacts?.lines,
@@ -845,8 +859,9 @@ export function ShareSheet() {
     if (!unit || captionSuggesting) return;
     setCaptionSuggesting(true);
 
-    const styleHint =
-      CAPTION_STYLE_HINTS[captionSuggestionIndex.current % CAPTION_STYLE_HINTS.length];
+    const styleHint = shareHasFinancing
+      ? CAPTION_STYLE_HINTS[captionSuggestionIndex.current % CAPTION_STYLE_HINTS.length]
+      : "Lead with the unit's strongest verified selling point and cash price.";
     const color = titleCase(unit.color || "");
     const branch = titleCase(unit.lokasi || "Mobix");
     const km = formatOdometer(unit.odometer);
@@ -854,12 +869,16 @@ export function ShareSheet() {
     const facts = shareVehicleFacts(unit);
     const tdp = formatJt(shareTdp);
     const installment = formatJt(shareCicilan);
-    const creditPackage = isDpMinimShare
-      ? `paket DP Minim ${formatJt(paymentValue)}, cicilan ${installment}/bln tenor ${shareTenor} bulan`
-      : `TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan`;
-    const packageWithPrice = shouldHidePriceInCaption
+    const creditPackage = !shareHasFinancing
+      ? `harga ${formatRupiah(captionPrice)}`
+      : isDpMinimShare
+        ? `paket DP Minim ${formatJt(paymentValue)}, cicilan ${installment}/bln tenor ${shareTenor} bulan`
+        : `TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan`;
+    const packageWithPrice = !shareHasFinancing
       ? creditPackage
-      : `harga kredit ${formatRupiah(captionPrice)}, ${creditPackage}`;
+      : shouldHidePriceInCaption
+        ? creditPackage
+        : `harga kredit ${formatRupiah(captionPrice)}, ${creditPackage}`;
     const category =
       unit.category && unit.category.length <= 4
         ? unit.category.toUpperCase()
@@ -867,7 +886,7 @@ export function ShareSheet() {
           ? titleCase(unit.category)
           : "mobil";
     const dpInfo =
-      shareDp && shareDpPercent && !shouldHidePriceInCaption
+      shareHasFinancing && shareDp && shareDpPercent && !shouldHidePriceInCaption
         ? ` DP ${formatRupiah(shareDp)} (${Math.round(shareDpPercent * 10) / 10}%).`
         : "";
     const colorInfo = color ? ` warna ${color}` : "";
@@ -904,8 +923,18 @@ export function ShareSheet() {
           ? [{ line: "BPKB tersedia" }]
           : []),
     ];
-    const requiredPackageFacts = isDpMinimShare
+    const requiredPackageFacts = !shareHasFinancing
       ? [
+          {
+            line: `Harga ${formatRupiah(captionPrice)}`,
+            matches: [
+              formatRupiah(captionPrice),
+              formatRupiah(captionPrice).replace(/^Rp\s*/i, ""),
+            ],
+          },
+        ]
+      : isDpMinimShare
+        ? [
           {
             line: `Paket DP Minim ${formatJt(paymentValue)}`,
             matches: [
@@ -919,7 +948,7 @@ export function ShareSheet() {
           },
           { line: `Tenor ${shareTenor} bulan`, matches: [`${shareTenor} bulan`] },
         ]
-      : [
+        : [
           {
             line: `Harga ${formatRupiah(captionPrice)}`,
             matches: [
@@ -936,7 +965,10 @@ export function ShareSheet() {
         ];
     const requiredCaptionSections: RequiredCaptionSection[] = [
       { heading: "Detail unit", facts: requiredDetailFacts },
-      { heading: "Paket pembiayaan", facts: requiredPackageFacts },
+      {
+        heading: shareHasFinancing ? "Paket pembiayaan" : "Harga",
+        facts: requiredPackageFacts,
+      },
       {
         heading: "Lokasi",
         facts: [
@@ -953,9 +985,7 @@ export function ShareSheet() {
       "pajak",
       "stnk",
       "harga",
-      "tdp",
-      "cicilan",
-      "tenor",
+      ...(shareHasFinancing ? ["tdp", "cicilan", "tenor"] : []),
       "transmisi",
       "matic",
       "manual",
@@ -965,9 +995,9 @@ export function ShareSheet() {
       branch,
       taxInfo,
       formatRupiah(captionPrice),
-      formatJt(shareTdp),
-      formatJt(shareCicilan),
-      `${shareTenor} bulan`,
+      ...(shareHasFinancing
+        ? [formatJt(shareTdp), formatJt(shareCicilan), `${shareTenor} bulan`]
+        : []),
     ].filter(Boolean);
 
     const variants = [
@@ -990,14 +1020,16 @@ export function ShareSheet() {
         transmisi: unit.transmisi,
         cabang: branch,
         harga_builder: sharePrice,
-        harga_kredit: isDpMinimShare ? undefined : captionPrice,
-        tdp: shareTdp,
-        cicilan: shareCicilan,
-        tenor: shareTenor,
-        dp: shareDp ?? undefined,
-        dp_pct: shareDpPercent ?? undefined,
+        harga_kredit: shareHasFinancing && !isDpMinimShare ? captionPrice : undefined,
+        tdp: shareHasFinancing ? shareTdp : undefined,
+        cicilan: shareHasFinancing ? shareCicilan : undefined,
+        tenor: shareHasFinancing ? shareTenor : undefined,
+        dp: shareHasFinancing ? shareDp ?? undefined : undefined,
+        dp_pct: shareHasFinancing ? shareDpPercent ?? undefined : undefined,
         caption_saat_ini: captionText || autoCaption,
-        style_hint: shouldHidePriceInCaption
+        style_hint: !shareHasFinancing
+          ? `${styleHint} Write only a short selling hook and CTA using verified non-numeric selling points. Do not invent financing, TDP, installment, tenor, or credit eligibility. The application will add the verified cash price and unit facts separately.`
+          : shouldHidePriceInCaption
           ? `${styleHint} Write only a short selling hook and CTA using verified non-numeric selling points. Do not repeat specifications, odometer, tax/STNK, transmission, ownership, pricing, financing, tenor, or branch; the application will add those facts separately. Do not claim accident-free, flood-free, or complete service history.`
           : `${styleHint} Write only a short selling hook and CTA using verified non-numeric selling points. Do not repeat specifications, odometer, tax/STNK, transmission, ownership, price, TDP, installment, tenor, or branch; the application will add those facts separately. Do not claim accident-free, flood-free, or complete service history.`,
       });
@@ -1172,7 +1204,8 @@ export function ShareSheet() {
           >
             {unit && (
               <div className="absolute bottom-3 left-3 rounded-lg bg-ink/85 px-3 py-1.5 text-[15px] font-bold text-surface">
-                Rp {formatJt(sharePrice || unit.harga)} · {paymentLabel} {formatJt(paymentValue)}
+                Rp {formatJt(sharePrice || unit.harga)}
+                {shareHasFinancing && <> · {paymentLabel} {formatJt(paymentValue)}</>}
               </div>
             )}
             <img
@@ -1199,10 +1232,16 @@ export function ShareSheet() {
               <>
                 <div className="text-[14px] font-bold">{unit.nama}</div>
                 <div className="mt-0.5 text-[12px] text-muted">
-                  {packageTitle} {formatRupiah(shareTdp)} · Cicilan {formatRupiah(shareCicilan)}/bln · {shareTenor} bln ·{" "}
-                  {titleCase(unit.lokasi || "Mobix")}
+                  {shareHasFinancing ? (
+                    <>
+                      {packageTitle} {formatRupiah(paymentValue)} · Cicilan {formatRupiah(shareCicilan)}/bln ·{" "}
+                      {shareTenor} bln · {titleCase(unit.lokasi || "Mobix")}
+                    </>
+                  ) : (
+                    <>Harga {formatRupiah(sharePrice || unit.harga)} · {titleCase(unit.lokasi || "Mobix")}</>
+                  )}
                 </div>
-                {(shareCreditPrice || shareDp) && (
+                {shareHasFinancing && (shareCreditPrice || shareDp) && (
                   <div className="mt-1 text-[11px] text-muted">
                     {!isDpMinimShare && shareCreditPrice && <>Harga kredit {formatRupiah(shareCreditPrice)}</>}
                     {!isDpMinimShare && shareCreditPrice && shareDp && " · "}

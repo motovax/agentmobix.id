@@ -1,5 +1,9 @@
 import { Link } from "wouter";
-import type { CardUnit } from "../lib/mobix";
+import {
+  compactFinancingLabel,
+  hasAvailableFinancing,
+  type CardUnit,
+} from "../lib/mobix";
 import { formatJt } from "../lib/format";
 import { Photo, Badge } from "./ui";
 import { Calculator, ShareArrow } from "./icons";
@@ -10,11 +14,16 @@ import { Calculator, ShareArrow } from "./icons";
  * also triggering card navigation.
  */
 export function UnitCard({ unit }: { unit: CardUnit }) {
+  const financingAvailable = hasAvailableFinancing(unit.pembiayaan);
   const shareParams = new URLSearchParams({
     u: unit.slug,
-    tenor: "60",
-    tdp: String(Math.round(unit.tdp)),
-    cicilan: String(Math.round(unit.cicilan)),
+    ...(financingAvailable
+      ? {
+          tenor: "60",
+          tdp: String(Math.round(unit.tdp)),
+          cicilan: String(Math.round(unit.cicilan)),
+        }
+      : {}),
   });
 
   return (
@@ -44,8 +53,14 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
             </div>
           )}
         </div>
-        <div className="mt-0.5 text-[11px] text-muted">
-          TDP {formatJt(unit.tdp)} · {formatJt(unit.cicilan)}/bln
+        <div
+          className={`mt-0.5 text-[11px] ${
+            financingAvailable ? "text-muted" : "font-semibold text-[#9A5A00]"
+          }`}
+        >
+          {financingAvailable
+            ? `TDP ${formatJt(unit.tdp)} · ${formatJt(unit.cicilan)}/bln`
+            : compactFinancingLabel(unit.pembiayaan)}
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
           {unit.posisi !== unit.branch && (
@@ -63,7 +78,9 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
           className="relative z-[2] mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-teal-tint-border bg-teal-tint px-2.5 py-2 text-[11px] font-bold text-teal-deep no-underline"
         >
           <Calculator size={13} />
-          Tanya Hitungan
+          {unit.pembiayaan.status === "ineligible"
+            ? "Tanya Opsi Pembiayaan"
+            : "Tanya Hitungan"}
         </Link>
         <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-[#EEF2F3] pt-2.5">
           <div>

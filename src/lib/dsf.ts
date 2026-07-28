@@ -61,11 +61,25 @@ export interface DsfSimulationRules {
   fixedDpPercent?: number;
   paymentType: "ADDB" | "ADDM";
   loanPackageName: string;
+  eligible: boolean;
 }
 
 function isCvCategory(category?: string) {
-  const normalized = (category ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
-  return normalized === "truck" || normalized === "truk" || normalized === "pickup" || normalized === "van";
+  const normalized = (category ?? "").trim().toLowerCase();
+  return [
+    "truk",
+    "truck",
+    "pickup",
+    "pick-up",
+    "box",
+    "niaga",
+    "tronton",
+    "bus",
+    "microbus",
+    "blind van",
+    "van",
+    "cv",
+  ].some((keyword) => normalized.includes(keyword));
 }
 
 /** Resolve the DSF package rules for the unit and selected tenor. */
@@ -78,7 +92,24 @@ export function getDsfSimulationRules(
       minDpPercent: 25,
       fixedDpPercent: 25,
       paymentType: "ADDB",
-      loanPackageName: "MOCIL PLUS",
+      loanPackageName: "Mocil Plus",
+      eligible: true,
+    };
+  }
+
+  const manufacturedYear = params.year ?? 0;
+  const vehicleAge = new Date().getFullYear() - manufacturedYear;
+  if (
+    manufacturedYear < 2013 ||
+    vehicleAge > 13
+  ) {
+    return {
+      vehicleType: "PC",
+      minDpPercent: 25,
+      fixedDpPercent: 25,
+      paymentType: "ADDB",
+      loanPackageName: "Non-DSF",
+      eligible: false,
     };
   }
 
@@ -87,27 +118,35 @@ export function getDsfSimulationRules(
       vehicleType: "PC",
       minDpPercent: 30,
       paymentType: "ADDM",
-      loanPackageName: "MOCIL 1 YR",
+      loanPackageName: "Mocil 1 YR",
+      eligible: true,
     };
   }
 
-  // 2012-2013 is an explicit exception to the age-based package rule.
-  if (params.year === 2012 || params.year === 2013) {
+  if (vehicleAge <= 10) {
     return {
       vehicleType: "PC",
       minDpPercent: 15,
       paymentType: "ADDB",
-      loanPackageName: "PAKET C",
+      loanPackageName: "Mocil SPC - PC",
+      eligible: true,
     };
   }
-
-  const manufacturedYear = params.year ?? 2020;
-  const vehicleAge = new Date().getFullYear() - manufacturedYear;
+  if (vehicleAge === 11 || vehicleAge === 12) {
+    return {
+      vehicleType: "PC",
+      minDpPercent: 20,
+      paymentType: "ADDB",
+      loanPackageName: vehicleAge === 11 ? "Mocil C11" : "Mocil C12",
+      eligible: true,
+    };
+  }
   return {
     vehicleType: "PC",
-    minDpPercent: 15,
+    minDpPercent: 25,
     paymentType: "ADDB",
-    loanPackageName: vehicleAge < 10 ? "PAKET C11" : "MOCIL SPC - PC",
+    loanPackageName: "Mocil C",
+    eligible: true,
   };
 }
 
@@ -124,6 +163,9 @@ function buildDsfSimulationPayload(params: DsfSimParams) {
     year = 2020,
   } = params;
   const rules = getDsfSimulationRules({ ...params, year });
+  if (!rules.eligible) {
+    throw new Error("Unit tidak eligible untuk simulasi pembiayaan DSF");
+  }
   const effectiveSimulationValue =
     simulationType === "DP"
       ? rules.fixedDpPercent ?? Math.max(simulationValue ?? dpPercent, rules.minDpPercent)

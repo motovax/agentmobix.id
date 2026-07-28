@@ -10,6 +10,8 @@ import {
   fetchCategories,
   prettyCategory,
   classifyQuery,
+  compactFinancingLabel,
+  hasAvailableFinancing,
   toCardUnit,
   type CardUnit,
 } from "../lib/mobix";
@@ -49,6 +51,7 @@ function appendUniqueUnits(current: CardUnit[], next: CardUnit[]) {
 }
 
 function RecCard({ unit }: { unit: CardUnit }) {
+  const financingAvailable = hasAvailableFinancing(unit.pembiayaan);
   return (
     <Link
       href={`/unit/${unit.slug}`}
@@ -66,7 +69,15 @@ function RecCard({ unit }: { unit: CardUnit }) {
         <div className="-tracking-[0.01em] text-[14px] font-extrabold text-teal-deep">
           Rp {formatJt(unit.price)}
         </div>
-        <div className="mt-0.5 text-[10px] text-muted">TDP {formatJt(unit.tdp)}</div>
+        <div
+          className={`mt-0.5 text-[10px] ${
+            financingAvailable ? "text-muted" : "font-semibold text-[#9A5A00]"
+          }`}
+        >
+          {financingAvailable
+            ? `TDP ${formatJt(unit.tdp)}`
+            : compactFinancingLabel(unit.pembiayaan)}
+        </div>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           <span className="rounded-lg bg-field px-1.5 py-1 text-[10px] font-semibold text-muted">
             {formatKm(unit.km)}

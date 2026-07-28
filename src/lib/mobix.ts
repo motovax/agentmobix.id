@@ -24,14 +24,34 @@ function withWidth(url: string, width: number) {
 
 /* ---- raw API shapes (from /openapi.json) ---- */
 
+export type FinancingStatus = "available" | "pending" | "ineligible" | "unavailable";
+
+export interface ProductFinancing {
+  status: FinancingStatus;
+  eligible: boolean;
+  provider: string;
+  reason_code:
+    | "vehicle_age_over_limit"
+    | "vehicle_year_invalid"
+    | "unit_price_unavailable"
+    | "provider_unavailable"
+    | null;
+  message: string | null;
+  vehicle_age_years: number | null;
+  max_vehicle_age_years: number | null;
+}
+
 export interface ProductListItem {
   id: string;
   nama: string;
   slug: string;
   merek: string;
   harga: number;
+  harga_kredit: number;
   tdp: number;
   cicilan: number;
+  dp: number;
+  pembiayaan: ProductFinancing;
   transmisi: string;
   jarakTempuh: string; // already formatted, e.g. "56746 KM"
   bahanBakar: string;
@@ -71,6 +91,8 @@ export interface ProductDetail {
   harga_kredit?: number;
   tdp: number;
   cicilan: number;
+  dp: number;
+  pembiayaan: ProductFinancing;
   lokasi: string;
   posisi: string;
   galeri: GalleryItem[];
@@ -745,6 +767,7 @@ export interface CardUnit {
   oldPrice: number | null;
   tdp: number;
   cicilan: number;
+  pembiayaan: ProductFinancing;
   komisi: number;
   km: number;
   year: number;
@@ -766,6 +789,7 @@ export function toCardUnit(item: ProductListItem): CardUnit {
     oldPrice: null,
     tdp: item.tdp,
     cicilan: item.cicilan,
+    pembiayaan: item.pembiayaan,
     komisi: estimateKomisi(item.harga),
     km: item.odometer,
     year: item.year,
@@ -774,4 +798,23 @@ export function toCardUnit(item: ProductListItem): CardUnit {
     thumbnail: mobixImage(item.thumbnail_depan?.trim() || item.thumbnail),
     komisiLabel: (item.aging ?? 0) > 60 ? "+Rp 2 juta" : "Mulai dari 2jt",
   };
+}
+
+export function hasAvailableFinancing(financing: ProductFinancing): boolean {
+  return financing.status === "available" && financing.eligible;
+}
+
+export function compactFinancingLabel(financing: ProductFinancing): string {
+  if (financing.status === "ineligible") {
+    if (
+      financing.reason_code === "vehicle_age_over_limit" &&
+      financing.max_vehicle_age_years !== null
+    ) {
+      return `Kredit DSF tidak tersedia · usia >${financing.max_vehicle_age_years} tahun`;
+    }
+    return "Kredit DSF tidak tersedia";
+  }
+  if (financing.status === "pending") return "Simulasi kredit sedang disiapkan";
+  if (financing.status === "unavailable") return "Simulasi kredit belum tersedia";
+  return "";
 }
