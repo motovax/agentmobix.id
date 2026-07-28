@@ -328,7 +328,14 @@ export function Beranda() {
                         {unit.title}
                       </div>
                       <div className="text-[11px] text-muted">
-                        Rp {formatJt(unit.price)} · {unit.year} · {unit.branch}
+                        Rp {formatJt(unit.price)} · {unit.year}
+                      </div>
+                      <div className="line-clamp-1 text-[10.5px] text-muted">
+                        Nopol{" "}
+                        <span className="font-semibold uppercase text-mid">
+                          {unit.plateNo || "belum tersedia"}
+                        </span>{" "}
+                        · {unit.branch}
                       </div>
                     </div>
                   </Link>
