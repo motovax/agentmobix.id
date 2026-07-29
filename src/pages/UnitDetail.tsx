@@ -980,7 +980,12 @@ export function UnitDetail() {
               ))}
             </Splide>
           ) : (
-            <Photo large className="aspect-[4/3]" alt={unit.nama} />
+            <Photo
+              large
+              className="aspect-[4/3]"
+              alt={unit.nama}
+              emptyLabel="Foto unit belum tersedia"
+            />
           )}
           <Link
             href={returnHref}

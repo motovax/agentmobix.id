@@ -34,7 +34,12 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
         aria-label={`Lihat detail ${unit.title}`}
         className="absolute inset-0 z-[1]"
       />
-      <Photo className="aspect-[4/3]" src={unit.thumbnail} alt={unit.title}>
+      <Photo
+        className="aspect-[4/3]"
+        src={unit.thumbnail}
+        alt={unit.title}
+        emptyLabel="Foto belum tersedia"
+      >
         <div className="absolute left-2 top-2">
           <Badge kind={unit.badge} />
         </div>

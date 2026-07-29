@@ -25,6 +25,7 @@ export function UnitRow({
         className="aspect-[4/3] w-[118px] flex-shrink-0 rounded-xl"
         src={unit.thumbnail}
         alt={unit.title}
+        emptyLabel="Foto belum tersedia"
       >
         <ThumbBadge kind={unit.badge} />
       </Photo>

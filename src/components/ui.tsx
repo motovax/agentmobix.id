@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { UnitBadge } from "../lib/mobix";
+import { Camera } from "./icons";
 
 /**
  * Hatched photo placeholder. The design renders car photos as a diagonal hatch;
@@ -15,6 +16,7 @@ export function Photo({
   children,
   contain = false,
   placeholderSrc,
+  emptyLabel,
 }: {
   className?: string;
   large?: boolean;
@@ -23,18 +25,35 @@ export function Photo({
   children?: ReactNode;
   contain?: boolean;
   placeholderSrc?: string;
+  emptyLabel?: string;
 }) {
   const usePlaceholder = Boolean(placeholderSrc && placeholderSrc !== src);
   const [highResReady, setHighResReady] = useState(!usePlaceholder);
+  const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
     setHighResReady(!usePlaceholder);
+    setImageFailed(false);
   }, [src, placeholderSrc]);
+
+  const showEmptyState = Boolean(emptyLabel && (!src || imageFailed));
 
   return (
     <div
       className={`relative ${large ? "bg-hatch-lg" : "bg-hatch"} ${className}`}
     >
+      {showEmptyState && emptyLabel && (
+        <div
+          role="img"
+          aria-label={alt ? `${alt}: ${emptyLabel}` : emptyLabel}
+          className={`absolute inset-0 flex flex-col items-center justify-center px-2 text-center text-muted ${
+            large ? "gap-2 text-[13px] font-semibold" : "gap-1 text-[10px] font-bold"
+          }`}
+        >
+          <Camera size={large ? 32 : 22} className="opacity-70" />
+          <span>{emptyLabel}</span>
+        </div>
+      )}
       {usePlaceholder && placeholderSrc && (
         <img
           src={placeholderSrc}
@@ -55,6 +74,7 @@ export function Photo({
           onLoad={() => setHighResReady(true)}
           onError={(e) => {
             if (usePlaceholder) setHighResReady(false);
+            else setImageFailed(true);
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
         />

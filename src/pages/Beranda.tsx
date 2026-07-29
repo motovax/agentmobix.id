@@ -59,7 +59,12 @@ function RecCard({ unit }: { unit: CardUnit }) {
       href={`/unit/${unit.slug}`}
       className="block overflow-hidden rounded-[18px] border border-line bg-surface text-inherit no-underline"
     >
-      <Photo className="h-[104px]" src={unit.thumbnail} alt={unit.title}>
+      <Photo
+        className="h-[104px]"
+        src={unit.thumbnail}
+        alt={unit.title}
+        emptyLabel="Foto belum tersedia"
+      >
         <span className="absolute right-2 top-2 rounded-full bg-ink/75 px-2 py-1 text-[10px] font-bold text-surface">
           {unit.year}
         </span>
