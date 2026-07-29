@@ -45,4 +45,29 @@ describe("status pembiayaan unit", () => {
     expect(rules.eligible).toBe(true);
     expect(rules.vehicleType).toBe("CV");
   });
+
+  test("menggunakan nama paket DSF kanonis untuk B1820CLT usia 11 tahun", () => {
+    const currentYear = new Date().getFullYear();
+    const rules = getDsfSimulationRules({
+      category: "SUV",
+      year: currentYear - 11,
+      tenor: 60,
+    });
+
+    expect(rules.eligible).toBe(true);
+    expect(rules.loanPackageName).toBe("PAKET C11");
+    expect(rules.minDpPercent).toBe(20);
+  });
+
+  test("menggunakan nama paket DSF kanonis untuk unit usia 12 dan 13 tahun", () => {
+    const currentYear = new Date().getFullYear();
+    expect(
+      getDsfSimulationRules({ category: "MPV", year: currentYear - 12, tenor: 60 })
+        .loanPackageName,
+    ).toBe("PAKET C12");
+    expect(
+      getDsfSimulationRules({ category: "LCGC", year: currentYear - 13, tenor: 60 })
+        .loanPackageName,
+    ).toBe("PAKET C");
+  });
 });

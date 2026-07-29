@@ -138,7 +138,7 @@ export function getDsfSimulationRules(
       vehicleType: "PC",
       minDpPercent: 20,
       paymentType: "ADDB",
-      loanPackageName: vehicleAge === 11 ? "Mocil C11" : "Mocil C12",
+      loanPackageName: vehicleAge === 11 ? "PAKET C11" : "PAKET C12",
       eligible: true,
     };
   }
@@ -146,7 +146,7 @@ export function getDsfSimulationRules(
     vehicleType: "PC",
     minDpPercent: 25,
     paymentType: "ADDB",
-    loanPackageName: "Mocil C",
+    loanPackageName: "PAKET C",
     eligible: true,
   };
 }
