@@ -121,6 +121,7 @@ export function Beranda() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [recItems, setRecItems] = useState<CardUnit[]>([]);
   const [recTotal, setRecTotal] = useState(0);
+  const [inventoryTotal, setInventoryTotal] = useState<number | null>(null);
   const [recNextPage, setRecNextPage] = useState(1);
   const [recTotalPages, setRecTotalPages] = useState<number | null>(null);
   const [recLoading, setRecLoading] = useState(false);
@@ -182,6 +183,9 @@ export function Beranda() {
         replace ? nextItems : appendUniqueUnits(current, nextItems),
       );
       setRecTotal(result.total);
+      if (!isSearchActive && activeCategory === null) {
+        setInventoryTotal(result.total);
+      }
       setRecTotalPages(result.totalPages);
       setRecNextPage(page + 1);
       setLoadedRequestKey(currentRequestKey);
@@ -278,7 +282,9 @@ export function Beranda() {
             Hari Ini?
           </h1>
           <p className="m-0 mb-3.5 text-[12px] text-white/65">
-            2.400+ unit ready · inspeksi 175 titik · garansi mesin
+            {inventoryTotal === null
+              ? "Stok aktif langsung dari IMS · inspeksi 175 titik · garansi mesin"
+              : `${inventoryTotal} unit aktif · inspeksi 175 titik · garansi mesin`}
           </p>
           <form
             onSubmit={(event) => {

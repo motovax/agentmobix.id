@@ -1,7 +1,7 @@
 # Mobix Agent Landing App (`agenmobix.id`)
 
-Mobile-first React app for the Mobix agent program. Agents can browse ready-to-sell
-used cars, view commission estimates and installment packages, share units, chat
+Mobile-first React app for the Mobix agent program. Agents can browse active
+used-car inventory, view commission estimates and installment packages, share units, chat
 with AI Mobix, and register as an agent.
 
 ## Stack

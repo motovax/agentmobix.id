@@ -519,7 +519,7 @@ export function ShareSheet() {
           vehicleFacts?.lines,
           vehicleFacts?.condition,
           `Harga ${formatRupiah(captionPrice)}`,
-          `Unit ready di cabang ${titleCase(unit.lokasi || "Mobix")}, bisa cek langsung.`,
+          `Unit tercatat di cabang ${titleCase(unit.lokasi || "Mobix")}, cek ketersediaannya terlebih dahulu.`,
           "Chat saya ya",
         ].filter(Boolean).join("\n\n")
       : isDpMinimShare
@@ -528,7 +528,7 @@ export function ShareSheet() {
           vehicleFacts?.lines,
           vehicleFacts?.condition,
           `Paket DP Minim ${formatJt(paymentValue)}\nCicilan ${formatJt(shareCicilan)}/bln • Tenor ${shareTenor} bulan`,
-          `Unit ready di cabang ${titleCase(unit.lokasi || "Mobix")}, bisa cek langsung.`,
+          `Unit tercatat di cabang ${titleCase(unit.lokasi || "Mobix")}, cek ketersediaannya terlebih dahulu.`,
           "Chat saya ya",
         ].filter(Boolean).join("\n\n")
       : [
@@ -536,7 +536,7 @@ export function ShareSheet() {
           vehicleFacts?.lines,
           vehicleFacts?.condition,
           `Harga ${formatRupiah(captionPrice)}\nTDP ${formatJt(shareTdp)} • Cicilan ${formatJt(shareCicilan)}/bln • Tenor ${shareTenor} bulan`,
-          `Unit ready di cabang ${titleCase(unit.lokasi || "Mobix")}, bisa cek langsung.`,
+          `Unit tercatat di cabang ${titleCase(unit.lokasi || "Mobix")}, cek ketersediaannya terlebih dahulu.`,
           "Chat saya ya",
         ].filter(Boolean).join("\n\n")
     : "";
@@ -973,8 +973,8 @@ export function ShareSheet() {
         heading: "Lokasi",
         facts: [
           {
-            line: `Unit ready di cabang ${branch}`,
-            matches: [`cabang ${branch}`, `ready di ${branch}`, branch],
+            line: `Unit tercatat di cabang ${branch}`,
+            matches: [`cabang ${branch}`, branch],
           },
         ],
       },
@@ -1001,11 +1001,11 @@ export function ShareSheet() {
     ].filter(Boolean);
 
     const variants = [
-      `${unit.nama}${colorInfo}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}\n\nReady di ${branch}. Chat saya untuk cek unit.`,
+      `${unit.nama}${colorInfo}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}\n\nUnit tercatat di ${branch}. Chat saya untuk cek ketersediaannya.`,
       `Mau ${category} yang paketnya jelas?\n\n${unit.nama}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}\n\nMinat? Langsung chat saya.`,
       `${unit.nama}\n\n${specs}${conditionInfo ? `\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}\n\nCek unitnya di ${branch}.`,
       `${unit.nama}${colorInfo}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\nPaketnya sudah jelas: ${packageWithPrice}.\n\nChat saya kalau mau cek.`,
-      `${unit.nama}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\nReady di ${branch}.\n${readablePackage}.${dpInfo}\n\nMau saya bantu cek unit?`,
+      `${unit.nama}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\nUnit tercatat di ${branch}.\n${readablePackage}.${dpInfo}\n\nMau saya bantu cek ketersediaannya?`,
       `Cari ${category} praktis dan menarik?\n\n${unit.nama}${colorInfo}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}.`,
     ];
 

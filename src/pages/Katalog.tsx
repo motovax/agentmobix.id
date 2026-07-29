@@ -394,7 +394,7 @@ export function Katalog() {
         </div>
         <div className="mt-2 flex items-center justify-between px-0.5">
           <span className="text-[12px] text-muted">
-            {loading ? "Memuat stok…" : `${total} unit ready · langsung dari cabang`}
+            {loading ? "Memuat stok…" : `${total} unit aktif · langsung dari cabang`}
           </span>
           <span className="text-[12px] font-semibold text-teal-deep">Stok live</span>
         </div>

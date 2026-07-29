@@ -102,6 +102,8 @@ export interface ProductDetail {
   spesifikasi: { label: string; value: string }[];
   harga_sejenis: ProductListItem[];
   plate_no: string;
+  branch?: string;
+  position?: string;
   type: string;
   year: number;
   color: string;
@@ -602,7 +604,27 @@ export async function fetchUnitDetail(slug: string): Promise<ProductDetail> {
   });
   const data = Array.isArray(env.data) ? env.data[0] : env.data;
   if (!data) throw new Error("Unit tidak ditemukan");
-  return data;
+  return {
+    ...data,
+    ...normalizeProductDetailLocation(data),
+  };
+}
+
+/**
+ * Detail API uses `branch`/`position`, while older payloads use
+ * `lokasi`/`posisi`. Keep both contracts readable so the actual IMS position
+ * is not silently replaced by the branch in the detail UI.
+ */
+export function normalizeProductDetailLocation(detail: {
+  lokasi?: string | null;
+  posisi?: string | null;
+  branch?: string | null;
+  position?: string | null;
+}): Pick<ProductDetail, "lokasi" | "posisi"> {
+  const lokasi = detail.lokasi?.trim() || detail.branch?.trim() || "";
+  const posisi =
+    detail.posisi?.trim() || detail.position?.trim() || lokasi;
+  return { lokasi, posisi };
 }
 
 /** Resolve an image path/url to a loadable src (absolute in prod, proxied in dev). */
