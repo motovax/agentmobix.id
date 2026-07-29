@@ -15,7 +15,11 @@ import {
   toCardUnit,
   type CardUnit,
 } from "../lib/mobix";
-import { buildCatalogSearchParams } from "../lib/catalogSearch";
+import {
+  buildCatalogHref,
+  buildCatalogSearchParams,
+  buildUnitDetailHref,
+} from "../lib/catalogSearch";
 import { useAsync } from "../lib/useAsync";
 
 const LIMIT = 12;
@@ -263,6 +267,21 @@ export function Katalog() {
     return buildCatalogSearchParams(debounced, filters);
   }
 
+  const catalogHref = buildCatalogHref({
+    query,
+    kategori: activeCat,
+    filters,
+  });
+
+  // Keep the active catalog state in the current history entry. This lets both
+  // the in-app back button and the browser back action restore the same search.
+  useEffect(() => {
+    const currentHref = `${window.location.pathname}${window.location.search}`;
+    if (currentHref !== catalogHref) {
+      window.history.replaceState(window.history.state, "", catalogHref);
+    }
+  }, [catalogHref]);
+
   // initial / filter-changed load (page 1)
   useEffect(() => {
     let alive = true;
@@ -404,7 +423,13 @@ export function Katalog() {
 
         {!loading &&
           !error &&
-          items.map((u) => <UnitRow key={u.id} unit={u} />)}
+          items.map((u) => (
+            <UnitRow
+              key={u.id}
+              unit={u}
+              detailHref={buildUnitDetailHref(u.slug, catalogHref)}
+            />
+          ))}
 
         {!loading && !error && items.length > 0 && (
           <>

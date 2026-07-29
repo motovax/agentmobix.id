@@ -8,11 +8,17 @@ import { formatJt, formatKm } from "../lib/format";
 import { Photo, ThumbBadge } from "./ui";
 
 /** Catalog list row — whole row links to the unit detail. */
-export function UnitRow({ unit }: { unit: CardUnit }) {
+export function UnitRow({
+  unit,
+  detailHref,
+}: {
+  unit: CardUnit;
+  detailHref?: string;
+}) {
   const financingAvailable = hasAvailableFinancing(unit.pembiayaan);
   return (
     <Link
-      href={`/unit/${unit.slug}`}
+      href={detailHref ?? `/unit/${unit.slug}`}
       className="flex gap-3 rounded-2xl border border-line bg-surface p-2.5 text-inherit no-underline"
     >
       <Photo

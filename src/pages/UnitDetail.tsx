@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent } from "react";
 import { Splide, SplideSlide } from "@splidejs/react-splide";
 import "@splidejs/react-splide/css/core";
-import { Link, useParams } from "wouter";
+import { Link, useParams, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
 import { ContactActionMenu, waHref } from "../components/FloatingContactCta";
@@ -43,6 +43,10 @@ import {
   MAX_BUILDER_PRICE_DROP,
   minBuilderPrice,
 } from "../lib/commission";
+import {
+  buildUnitDetailHref,
+  getCatalogReturnHref,
+} from "../lib/catalogSearch";
 
 const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
 const MIN_DP_PERCENT = 15;
@@ -129,6 +133,7 @@ function maskBpkbValue(value: string) {
 
 export function UnitDetail() {
   const { slug } = useParams<{ slug: string }>();
+  const returnHref = getCatalogReturnHref(useSearch());
   const { data: unit, loading, error } = useAsync(
     () => fetchUnitDetail(slug),
     [slug],
@@ -840,7 +845,7 @@ export function UnitDetail() {
   if (loading) {
     return (
       <AppShell bg="bg-surface">
-        <AppBar title="Memuat unit…" />
+        <AppBar title="Memuat unit…" back={returnHref} />
         <div className="space-y-4 p-4">
           <Skeleton className="aspect-[4/3] w-full" />
           <Skeleton className="h-6 w-3/4" />
@@ -858,7 +863,7 @@ export function UnitDetail() {
   if (error || !unit) {
     return (
       <AppShell bg="bg-surface">
-        <AppBar title="Unit tidak ditemukan" back="/katalog" />
+        <AppBar title="Unit tidak ditemukan" back={returnHref} />
         <div className="flex flex-col items-center gap-3 px-6 py-20 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-danger-bg text-danger">
             <Close size={20} />
@@ -870,7 +875,7 @@ export function UnitDetail() {
             {error ?? "Mungkin sudah terjual atau tautannya berubah."}
           </div>
           <Link
-            href="/katalog"
+            href={returnHref}
             className="mt-2 rounded-[14px] bg-ink px-5 py-3 text-[14px] font-bold text-surface no-underline"
           >
             Lihat katalog
@@ -978,7 +983,7 @@ export function UnitDetail() {
             <Photo large className="aspect-[4/3]" alt={unit.nama} />
           )}
           <Link
-            href="/katalog"
+            href={returnHref}
             aria-label="Kembali"
             className="absolute left-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
           >
@@ -1784,7 +1789,11 @@ export function UnitDetail() {
             </div>
             <div className="flex flex-col gap-2.5">
               {similar.map((u) => (
-                <UnitRow key={u.id} unit={u} />
+                <UnitRow
+                  key={u.id}
+                  unit={u}
+                  detailHref={buildUnitDetailHref(u.slug, returnHref)}
+                />
               ))}
             </div>
           </div>

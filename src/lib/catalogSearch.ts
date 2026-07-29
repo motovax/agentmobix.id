@@ -7,6 +7,12 @@ export interface CatalogSearchFilters {
   lokasi?: string;
 }
 
+export interface CatalogUrlState {
+  query: string;
+  kategori: string;
+  filters?: CatalogSearchFilters;
+}
+
 type CatalogSearchParams = Pick<
   ListRequest,
   | "judul"
@@ -61,4 +67,41 @@ export function buildCatalogSearchParams(
     harga_awal: filters.priceMin,
     harga_akhir: filters.priceMax,
   };
+}
+
+export function buildCatalogHref({
+  query,
+  kategori,
+  filters = {},
+}: CatalogUrlState): string {
+  const params = new URLSearchParams();
+  const normalizedQuery = query.trim();
+
+  if (normalizedQuery) params.set("q", normalizedQuery);
+  if (kategori) params.set("kategori", kategori);
+  if (filters.priceMin !== undefined) {
+    params.set("harga_min", String(filters.priceMin));
+  }
+  if (filters.priceMax !== undefined) {
+    params.set("harga_max", String(filters.priceMax));
+  }
+  if (filters.transmisi) params.set("transmisi", filters.transmisi);
+  if (filters.lokasi) params.set("lokasi", filters.lokasi);
+
+  const search = params.toString();
+  return search ? `/katalog?${search}` : "/katalog";
+}
+
+export function buildUnitDetailHref(
+  slug: string,
+  catalogHref: string,
+): string {
+  const params = new URLSearchParams({ kembali: catalogHref });
+  return `/unit/${encodeURIComponent(slug)}?${params.toString()}`;
+}
+
+export function getCatalogReturnHref(search: string): string {
+  const href = new URLSearchParams(search).get("kembali");
+  if (href === "/katalog" || href?.startsWith("/katalog?")) return href;
+  return "/katalog";
 }
