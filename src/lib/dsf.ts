@@ -17,6 +17,7 @@ export interface DsfSimResult {
   disclaimer: string[];
   netDisbursement: number;
   refundSupplier: number;
+  allInToSupplier: number;
 }
 
 export type DsfSimMethod = "DP" | "TDP" | "Installment";
@@ -235,6 +236,8 @@ export async function simulateKreditWithSignal(
   try {
     const d = await fetchDsfAllParams(params, signal);
     if (!d) return null;
+    const netDisbursement = d.netDisbursement ?? d.refund?.netDisbursement ?? 0;
+    const refundSupplier = d.refund?.refundSupplier ?? 0;
     return {
       hargaKredit: d.harga_kredit || null,
       installmentRounded: d.installmentRounded,
@@ -247,54 +250,46 @@ export async function simulateKreditWithSignal(
       rateEffectiveTwoDigitPercent: d.rateEffectiveTwoDigitPercent,
       adminFee: d.adminFee,
       disclaimer: d.disclaimer ?? [],
-      netDisbursement: d.netDisbursement ?? d.refund?.netDisbursement ?? 0,
-      refundSupplier: d.refund?.refundSupplier ?? 0,
+      netDisbursement,
+      refundSupplier,
+      allInToSupplier:
+        d.refund?.allInToSupplier ??
+        (netDisbursement > 0
+          ? netDisbursement + Math.max(0, refundSupplier)
+          : 0),
     };
   } catch {
     return null;
   }
 }
 
-/**
- * Reverse calculation ala paket leasing: cari OTR kredit (markup di atas
- * harga cash) yang menghasilkan cair all-in (cair murni + refund) mendekati
- * target. All-in DSF ~linear terhadap unit price, jadi iterasi proporsional
- * konvergen cepat (2-3 call).
- */
-export async function findAllParamsForAllIn(
-  params: DsfSimParams,
-  targetAllIn: number,
-  signal?: AbortSignal,
-): Promise<DsfSimResult | null> {
-  const cashPrice = params.unitPrice;
-  if (!cashPrice || !targetAllIn) return null;
+export interface DsfDpMinimSummary {
+  tdp: number;
+  installment: number;
+  allIn: number;
+}
 
-  const clampPrice = (value: number) =>
-    Math.min(
-      Math.max(Math.round(value / 1000) * 1000, 1000),
-      cashPrice * 4,
-    );
-
-  let price = cashPrice;
-  let best: DsfSimResult | null = null;
-
-  for (let i = 0; i < 6; i += 1) {
-    const result = await simulateKreditWithSignal(
-      { ...params, unitPrice: price },
-      signal,
-    );
-    const allIn =
-      result && result.netDisbursement > 0
-        ? result.netDisbursement + Math.max(0, result.refundSupplier)
-        : 0;
-    if (!result || allIn <= 0) return best;
-    best = { ...result, hargaKredit: price };
-    if (Math.abs(allIn - targetAllIn) <= 200000) return best;
-    const next = clampPrice((price * targetAllIn) / allIn);
-    if (next === price) return best;
-    price = next;
+/** Nilai DP Minim yang ditampilkan langsung dari respons simulasi DSF. */
+export function getDsfDpMinimSummary(
+  result: DsfSimResult | null,
+): DsfDpMinimSummary | null {
+  if (
+    !result ||
+    !Number.isFinite(result.totalDownPaymentRounded) ||
+    result.totalDownPaymentRounded <= 0 ||
+    !Number.isFinite(result.installmentRounded) ||
+    result.installmentRounded <= 0 ||
+    !Number.isFinite(result.allInToSupplier) ||
+    result.allInToSupplier <= 0
+  ) {
+    return null;
   }
-  return best;
+
+  return {
+    tdp: result.totalDownPaymentRounded,
+    installment: result.installmentRounded,
+    allIn: result.allInToSupplier,
+  };
 }
 
 export interface DsfCreditPriceResult {

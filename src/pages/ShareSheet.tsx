@@ -506,7 +506,7 @@ export function ShareSheet() {
   const captionPrice = shareCreditPrice ?? sharePrice ?? unit?.harga ?? 0;
   const shouldHidePriceInCaption = isDpMinimShare;
   const packageTitle = shareHasFinancing ? (isDpMinimShare ? "DP Minim" : "Kredit") : "Unit";
-  const paymentLabel = isDpMinimShare ? "TDP Konsumen" : "TDP";
+  const paymentLabel = "TDP";
   const paymentValue = isDpMinimShare && shareDp ? shareDp : shareTdp;
   const shareCommission =
     positiveParamNumber(searchParams, "komisi") ??
@@ -1247,8 +1247,10 @@ export function ShareSheet() {
                     {!isDpMinimShare && shareCreditPrice && shareDp && " · "}
                     {shareDp && (
                       <>
-                        {isDpMinimShare ? "TDP Konsumen" : "DP"} {formatRupiah(shareDp)}
-                        {shareDpPercent && ` (${Math.round(shareDpPercent * 10) / 10}%)`}
+                        {isDpMinimShare ? "TDP" : "DP"} {formatRupiah(shareDp)}
+                        {!isDpMinimShare &&
+                          shareDpPercent &&
+                          ` (${Math.round(shareDpPercent * 10) / 10}%)`}
                       </>
                     )}
                   </div>
