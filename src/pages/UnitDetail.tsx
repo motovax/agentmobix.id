@@ -1013,7 +1013,7 @@ export function UnitDetail() {
             </button>
           )}
           <span className="absolute bottom-3.5 left-3.5 rounded-lg bg-teal px-2.5 py-1 text-[16px] font-bold text-ink">
-            {badge ?? "Tersedia"} · {unit.plate_no}
+            {badge ?? "Stok aktif"} · {unit.plate_no}
           </span>
           {mediaItems.length > 0 && (
             <div className="absolute bottom-3.5 right-3.5 rounded-lg bg-ink/80 px-2.5 py-[3px] text-[11px] font-semibold text-surface">
