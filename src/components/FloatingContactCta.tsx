@@ -16,12 +16,14 @@ export function waHref(message: string) {
 export function ContactActionMenu({
   adminMessage = DEFAULT_ADMIN_MESSAGE,
   calculationMessage = DEFAULT_CALCULATION_MESSAGE,
+  calculationHref,
   adminLabel = "Tanya Admin",
   calculationLabel = "Minta Hitungan",
   buttonClassName = "flex h-14 w-14 items-center justify-center rounded-full border border-teal-tint-border bg-teal text-ink shadow-nav",
 }: {
   adminMessage?: string;
   calculationMessage?: string;
+  calculationHref?: string;
   adminLabel?: string;
   calculationLabel?: string;
   buttonClassName?: string;
@@ -65,7 +67,7 @@ export function ContactActionMenu({
             {adminLabel}
           </a>
           <a
-            href={waHref(calculationMessage)}
+            href={calculationHref ?? waHref(calculationMessage)}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => setOpen(false)}

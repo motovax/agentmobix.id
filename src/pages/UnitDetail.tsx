@@ -5,7 +5,7 @@ import "@splidejs/react-splide/css/core";
 import { Link, useParams, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
-import { ContactActionMenu, waHref } from "../components/FloatingContactCta";
+import { ContactActionMenu } from "../components/FloatingContactCta";
 import { Photo, Skeleton } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
 import { ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
@@ -49,6 +49,7 @@ import {
   buildUnitDetailHref,
   getCatalogReturnHref,
 } from "../lib/catalogSearch";
+import { buildJasmineWhatsAppHref } from "../lib/jasmine";
 
 const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
 const MIN_DP_PERCENT = 15;
@@ -295,9 +296,12 @@ export function UnitDetail() {
     : undefined;
   const unitCalculationMessage = unit
     ? salesContactRequired
-      ? `Halo Admin, saya mau menanyakan opsi pembiayaan lain untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Pembiayaan DSF tidak tersedia untuk unit ini.`
+      ? `Halo Jasmine, saya mau menanyakan opsi pembiayaan lain untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Pembiayaan DSF tidak tersedia untuk unit ini.`
       : `Halo Admin, saya mau minta hitungan leasing untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}.\n1. DP minim\n2. Cicilan ringan\n3. Cair All in`
     : undefined;
+  const jasmineCalculationHref = buildJasmineWhatsAppHref(
+    unitCalculationMessage ?? "",
+  );
   function formatDpValue(value: number) {
     return currencyFormatter.format(Math.max(0, Math.round(value || 0)));
   }
@@ -1082,10 +1086,8 @@ export function UnitDetail() {
                 </div>
               )}
               {salesContactRequired ? (
-                <div className="mt-1 space-y-0.5 text-[12px] font-semibold text-[#9A5A00]">
-                  <div>Harga Kredit : {financingValueLabel(unit.pembiayaan, "")}</div>
-                  <div>TDP : {financingValueLabel(unit.pembiayaan, "")}</div>
-                  <div>Cicilan : {financingValueLabel(unit.pembiayaan, "")}</div>
+                <div className="mt-1 text-[12px] font-semibold text-[#9A5A00]">
+                  Harga Kredit : Tanya Sales
                 </div>
               ) : simTab === "dpminim" ? (
                 <div className="mt-1 text-[12px] font-semibold text-teal-deep">
@@ -1196,7 +1198,7 @@ export function UnitDetail() {
                 ))}
               </div>
               <a
-                href={waHref(unitCalculationMessage ?? "")}
+                href={jasmineCalculationHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-3 inline-flex w-full items-center justify-center rounded-[12px] bg-ink px-4 py-3 text-[13px] font-extrabold text-surface no-underline"
@@ -1740,6 +1742,7 @@ export function UnitDetail() {
         <ContactActionMenu
           adminMessage={unitAdminMessage ?? ""}
           calculationMessage={unitCalculationMessage ?? ""}
+          calculationHref={salesContactRequired ? jasmineCalculationHref : undefined}
           adminLabel="Tanya Unit"
           calculationLabel={salesContactRequired ? "Tanya Opsi Pembiayaan" : "Minta Hitungan"}
           buttonClassName="flex h-12 w-full items-center justify-center rounded-2xl border border-teal-tint-border bg-teal text-ink"
