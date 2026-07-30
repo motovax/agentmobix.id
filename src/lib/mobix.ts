@@ -826,33 +826,18 @@ export function hasAvailableFinancing(financing: ProductFinancing): boolean {
 
 export const SALES_CONTACT_LABEL = "Hubungi Sales";
 
-/**
- * Mobix can mark financing as unavailable in both list and detail payloads.
- * The DSF wording is also handled defensively because older payloads returned
- * the message directly instead of the structured financing object.
- */
-export function isDsfFinancingUnavailable(
-  financing: ProductFinancing | string | null | undefined,
+/** The list/detail API explicitly directs financing values to Sales. */
+export function requiresSalesContact(
+  financing: ProductFinancing | null | undefined,
 ): boolean {
-  if (typeof financing === "string") {
-    return /(?:pembiayaan|kredit)\s+dsf\s+tidak\s+tersedia/i.test(financing);
-  }
-  if (!financing) return false;
-  if (financing.status === "ineligible" || financing.status === "unavailable") {
-    return true;
-  }
-  if (!financing.eligible && financing.status !== "pending") return true;
-  return /(?:pembiayaan|kredit)\s+dsf\s+tidak\s+tersedia/i.test(
-    financing.message ?? "",
-  );
+  return financing?.eligible === false;
 }
 
 export function financingValueLabel(
-  financing: ProductFinancing | string | null | undefined,
+  financing: ProductFinancing | null | undefined,
   availableValue: string,
-  dsfUnavailable = false,
 ): string {
-  return dsfUnavailable || isDsfFinancingUnavailable(financing)
+  return requiresSalesContact(financing)
     ? SALES_CONTACT_LABEL
     : availableValue;
 }

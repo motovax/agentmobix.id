@@ -3,7 +3,7 @@ import {
   compactFinancingLabel,
   financingValueLabel,
   hasAvailableFinancing,
-  isDsfFinancingUnavailable,
+  requiresSalesContact,
   type CardUnit,
 } from "../lib/mobix";
 import { formatJt, formatKm } from "../lib/format";
@@ -18,7 +18,7 @@ export function UnitRow({
   detailHref?: string;
 }) {
   const financingAvailable = hasAvailableFinancing(unit.pembiayaan);
-  const financingUnavailable = isDsfFinancingUnavailable(unit.pembiayaan);
+  const salesContactRequired = requiresSalesContact(unit.pembiayaan);
   return (
     <Link
       href={detailHref ?? `/unit/${unit.slug}`}
@@ -58,7 +58,7 @@ export function UnitRow({
             financingAvailable ? "text-muted" : "font-semibold text-[#9A5A00]"
           }`}
         >
-          {financingUnavailable ? (
+          {salesContactRequired ? (
             <>
               <div>
                 Harga kredit {financingValueLabel(unit.pembiayaan, "")}

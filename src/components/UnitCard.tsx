@@ -3,7 +3,7 @@ import {
   compactFinancingLabel,
   financingValueLabel,
   hasAvailableFinancing,
-  isDsfFinancingUnavailable,
+  requiresSalesContact,
   type CardUnit,
 } from "../lib/mobix";
 import { formatJt } from "../lib/format";
@@ -17,7 +17,7 @@ import { Calculator, ShareArrow } from "./icons";
  */
 export function UnitCard({ unit }: { unit: CardUnit }) {
   const financingAvailable = hasAvailableFinancing(unit.pembiayaan);
-  const financingUnavailable = isDsfFinancingUnavailable(unit.pembiayaan);
+  const salesContactRequired = requiresSalesContact(unit.pembiayaan);
   const shareParams = new URLSearchParams({
     u: unit.slug,
     ...(financingAvailable
@@ -66,7 +66,7 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
             financingAvailable ? "text-muted" : "font-semibold text-[#9A5A00]"
           }`}
         >
-          {financingUnavailable ? (
+          {salesContactRequired ? (
             <>
               <div>
                 Harga kredit {financingValueLabel(unit.pembiayaan, "")}
@@ -98,7 +98,7 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
           className="relative z-[2] mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-teal-tint-border bg-teal-tint px-2.5 py-2 text-[11px] font-bold text-teal-deep no-underline"
         >
           <Calculator size={13} />
-          {financingUnavailable
+          {salesContactRequired
             ? "Tanya Opsi Pembiayaan"
             : "Tanya Hitungan"}
         </Link>

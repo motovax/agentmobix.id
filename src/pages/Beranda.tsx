@@ -13,7 +13,7 @@ import {
   compactFinancingLabel,
   financingValueLabel,
   hasAvailableFinancing,
-  isDsfFinancingUnavailable,
+  requiresSalesContact,
   toCardUnit,
   type CardUnit,
 } from "../lib/mobix";
@@ -56,7 +56,7 @@ function appendUniqueUnits(current: CardUnit[], next: CardUnit[]) {
 
 function RecCard({ unit }: { unit: CardUnit }) {
   const financingAvailable = hasAvailableFinancing(unit.pembiayaan);
-  const financingUnavailable = isDsfFinancingUnavailable(unit.pembiayaan);
+  const salesContactRequired = requiresSalesContact(unit.pembiayaan);
   return (
     <Link
       href={`/unit/${unit.slug}`}
@@ -84,7 +84,7 @@ function RecCard({ unit }: { unit: CardUnit }) {
             financingAvailable ? "text-muted" : "font-semibold text-[#9A5A00]"
           }`}
         >
-          {financingUnavailable ? (
+          {salesContactRequired ? (
             <>
               <div>
                 Harga kredit {financingValueLabel(unit.pembiayaan, "")}
