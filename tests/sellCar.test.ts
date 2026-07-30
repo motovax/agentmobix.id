@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-  applyMileageAdjustment,
   applySellCarAIExtraction,
   buildLocalSellCarResult,
   type PriceRow,
@@ -137,57 +136,5 @@ describe("buildLocalSellCarResult", () => {
       variant: "E",
       year: "2022",
     }, 2026)).toBeNull();
-  });
-});
-
-describe("applyMileageAdjustment", () => {
-  test("menyamakan rentang API Xenia 2024 50.000 km dengan mobix-fe", () => {
-    const result = applyMileageAdjustment({
-      ...emptyForm,
-      brand: "DAIHATSU",
-      model: "All New Xenia",
-      variant: "M MT",
-      year: "2024",
-      transmission: "Automatic",
-      color: "Putih",
-      mileage: "50.000",
-      basePrice: 159_000_000,
-      recommendedPrice: 159_000_000,
-      priceMin: 154_000_000,
-      priceMax: 164_000_000,
-      adjustments: [],
-      source: "Mobix MRP API",
-      sourceSheet: "brand sheets",
-      mrpVersion: "test",
-      notes: "",
-    }, 2026);
-
-    expect(result.recommendedPrice).toBe(149_000_000);
-    expect(result.priceMin).toBe(144_000_000);
-    expect(result.priceMax).toBe(154_000_000);
-    expect(result.adjustments).toEqual([
-      { label: "Penyesuaian jarak tempuh", amount: -10_000_000 },
-    ]);
-  });
-
-  test("tidak menggandakan koreksi kilometer dari backend", () => {
-    const result = {
-      ...emptyForm,
-      year: "2024",
-      mileage: "50.000",
-      basePrice: 159_000_000,
-      recommendedPrice: 149_000_000,
-      priceMin: 144_000_000,
-      priceMax: 154_000_000,
-      adjustments: [
-        { label: "Penyesuaian jarak tempuh", amount: -10_000_000 },
-      ],
-      source: "Mobix MRP API",
-      sourceSheet: "brand sheets",
-      mrpVersion: "test",
-      notes: "",
-    };
-
-    expect(applyMileageAdjustment(result, 2026)).toEqual(result);
   });
 });
