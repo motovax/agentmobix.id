@@ -299,6 +299,46 @@ export function getYears(rows: PriceRow[], brand: string, model: string, variant
     .map((row) => row.year))].sort((a, b) => b - a);
 }
 
+function getMileageAdjustment(
+  form: SellCarFormData,
+  currentYear = new Date().getFullYear(),
+): PriceAdjustment | null {
+  const year = Number(form.year);
+  const actualMileage = Number(form.mileage.replace(/\D/g, ""));
+  if (!year || actualMileage <= 0) return null;
+
+  const age = Math.max(1, currentYear - year);
+  const standardMileage = age * 15_000;
+  const excessMileage = actualMileage - standardMileage;
+  if (excessMileage <= 0) return null;
+
+  const amount = Math.floor(excessMileage / 10_000) * -5_000_000;
+  return amount === 0
+    ? null
+    : { label: "Penyesuaian jarak tempuh", amount };
+}
+
+export function applyMileageAdjustment(
+  result: SellCarResult,
+  currentYear = new Date().getFullYear(),
+): SellCarResult {
+  const alreadyApplied = result.adjustments.some((adjustment) =>
+    /jarak tempuh|kilometer/i.test(adjustment.label)
+  );
+  if (alreadyApplied) return result;
+
+  const adjustment = getMileageAdjustment(result, currentYear);
+  if (!adjustment) return result;
+
+  return {
+    ...result,
+    recommendedPrice: Math.max(0, result.recommendedPrice + adjustment.amount),
+    priceMin: Math.max(0, result.priceMin + adjustment.amount),
+    priceMax: Math.max(0, result.priceMax + adjustment.amount),
+    adjustments: [...result.adjustments, adjustment],
+  };
+}
+
 export function buildLocalSellCarResult(
   data: SellCarData,
   form: SellCarFormData,
@@ -322,16 +362,8 @@ export function buildLocalSellCarResult(
   const baseMax = Math.max(...prices);
   const adjustments: PriceAdjustment[] = [];
 
-  const actualMileage = Number(form.mileage.replace(/\D/g, ""));
-  if (form.year && actualMileage > 0) {
-    const age = Math.max(1, currentYear - year);
-    const standardMileage = age * 15_000;
-    const excessMileage = actualMileage - standardMileage;
-    if (excessMileage > 0) {
-      const amount = Math.floor(excessMileage / 10_000) * -5_000_000;
-      if (amount !== 0) adjustments.push({ label: "Penyesuaian jarak tempuh", amount });
-    }
-  }
+  const mileageAdjustment = getMileageAdjustment(form, currentYear);
+  if (mileageAdjustment) adjustments.push(mileageAdjustment);
 
   if (form.transmission.toLowerCase().includes("manual")) {
     adjustments.push({ label: "Penyesuaian transmisi manual", amount: -10_000_000 });
@@ -386,7 +418,7 @@ export async function fetchSellCarQuote(form: SellCarFormData): Promise<SellCarR
     const payload = await response.json() as MRPQuoteResponse | APIEnvelope<MRPQuoteResponse>;
     const quote = unwrapAPIData(payload);
     if (quote.found) {
-      return {
+      return applyMileageAdjustment({
         ...form,
         basePrice: quote.base_price,
         recommendedPrice: quote.recommended_price,
@@ -397,7 +429,7 @@ export async function fetchSellCarQuote(form: SellCarFormData): Promise<SellCarR
         sourceSheet: "brand sheets",
         mrpVersion: quote.mrp_version || "",
         notes: quote.notes || "",
-      };
+      });
     }
     apiError = new Error("Data harga mobil belum tersedia di MRP. Silakan pilih kombinasi lain.");
   } catch (cause) {
