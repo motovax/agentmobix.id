@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { getDsfSimulationRules } from "../src/lib/dsf";
 import {
   compactFinancingLabel,
+  financingValueLabel,
   hasAvailableFinancing,
+  isDsfFinancingUnavailable,
   type ProductFinancing,
 } from "../src/lib/mobix";
 
@@ -16,12 +18,52 @@ const oldPassengerFinancing: ProductFinancing = {
   max_vehicle_age_years: 13,
 };
 
+const availableFinancing: ProductFinancing = {
+  ...oldPassengerFinancing,
+  status: "available",
+  eligible: true,
+  reason_code: null,
+  message: null,
+};
+
 describe("status pembiayaan unit", () => {
   test("menampilkan alasan ringkas untuk unit yang melewati batas usia", () => {
     expect(hasAvailableFinancing(oldPassengerFinancing)).toBe(false);
+    expect(isDsfFinancingUnavailable(oldPassengerFinancing)).toBe(true);
     expect(compactFinancingLabel(oldPassengerFinancing)).toBe(
       "Kredit DSF tidak tersedia · usia >13 tahun",
     );
+  });
+
+  test("mengganti seluruh nilai pembiayaan dengan Hubungi Sales", () => {
+    for (const value of ["Rp 150jt", "Rp 30jt", "Rp 4jt/bulan"]) {
+      expect(financingValueLabel(oldPassengerFinancing, value)).toBe(
+        "Hubungi Sales",
+      );
+    }
+  });
+
+  test("mengenali respons lama yang berisi pesan langsung", () => {
+    expect(
+      isDsfFinancingUnavailable("Pembiayaan Dsf tidak tersedia"),
+    ).toBe(true);
+  });
+
+  test("mengganti nilai ketika respons simulasi DSF tidak tersedia", () => {
+    expect(
+      financingValueLabel(availableFinancing, "Rp 150jt", true),
+    ).toBe("Hubungi Sales");
+  });
+
+  test("tidak mengganti nilai ketika pembiayaan masih disiapkan", () => {
+    const pending: ProductFinancing = {
+      ...oldPassengerFinancing,
+      status: "pending",
+      reason_code: null,
+      message: "Simulasi sedang disiapkan.",
+    };
+    expect(isDsfFinancingUnavailable(pending)).toBe(false);
+    expect(financingValueLabel(pending, "Rp 150jt")).toBe("Rp 150jt");
   });
 
   test("tidak mengirim unit penumpang lama ke simulasi DSF", () => {

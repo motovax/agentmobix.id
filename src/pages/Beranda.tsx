@@ -11,7 +11,9 @@ import {
   fetchCategories,
   prettyCategory,
   compactFinancingLabel,
+  financingValueLabel,
   hasAvailableFinancing,
+  isDsfFinancingUnavailable,
   toCardUnit,
   type CardUnit,
 } from "../lib/mobix";
@@ -54,6 +56,7 @@ function appendUniqueUnits(current: CardUnit[], next: CardUnit[]) {
 
 function RecCard({ unit }: { unit: CardUnit }) {
   const financingAvailable = hasAvailableFinancing(unit.pembiayaan);
+  const financingUnavailable = isDsfFinancingUnavailable(unit.pembiayaan);
   return (
     <Link
       href={`/unit/${unit.slug}`}
@@ -77,13 +80,25 @@ function RecCard({ unit }: { unit: CardUnit }) {
           Rp {formatJt(unit.price)}
         </div>
         <div
-          className={`mt-0.5 text-[10px] ${
+          className={`mt-0.5 text-[10px] leading-[1.45] ${
             financingAvailable ? "text-muted" : "font-semibold text-[#9A5A00]"
           }`}
         >
-          {financingAvailable
-            ? `TDP ${formatJt(unit.tdp)}`
-            : compactFinancingLabel(unit.pembiayaan)}
+          {financingUnavailable ? (
+            <>
+              <div>
+                Harga kredit {financingValueLabel(unit.pembiayaan, "")}
+              </div>
+              <div>
+                TDP {financingValueLabel(unit.pembiayaan, formatJt(unit.tdp))} · Cicilan{" "}
+                {financingValueLabel(unit.pembiayaan, `${formatJt(unit.cicilan)}/bln`)}
+              </div>
+            </>
+          ) : financingAvailable ? (
+            `TDP ${formatJt(unit.tdp)}`
+          ) : (
+            compactFinancingLabel(unit.pembiayaan)
+          )}
         </div>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           <span className="rounded-lg bg-field px-1.5 py-1 text-[10px] font-semibold text-muted">

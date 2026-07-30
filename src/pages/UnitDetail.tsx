@@ -15,6 +15,8 @@ import {
   mobixMedia,
   MOBIX_HERO_WIDTH,
   MOBIX_THUMBNAIL_WIDTH,
+  financingValueLabel,
+  isDsfFinancingUnavailable,
   titleCase,
   toCardUnit,
   deriveBadge,
@@ -162,7 +164,7 @@ export function UnitDetail() {
   const originalPrice = unit?.harga ?? 0;
   const price = builderPrice > 0 ? builderPrice : originalPrice;
   const financingEligible = unit?.pembiayaan.eligible === true;
-  const financingIneligible = unit?.pembiayaan.status === "ineligible";
+  const financingUnavailable = isDsfFinancingUnavailable(unit?.pembiayaan);
   const dsfRules = getDsfSimulationRules({
     category: unit?.category,
     year: unit?.year,
@@ -281,7 +283,7 @@ export function UnitDetail() {
         cicilan: String(Math.round(displayMonthly)),
         tdp: String(Math.round(shareTdp)),
       }).toString()}`
-    : financingIneligible && unit
+    : financingUnavailable && unit
       ? `/share?${new URLSearchParams({
           u: unit.slug,
           harga: String(Math.round(price)),
@@ -292,8 +294,8 @@ export function UnitDetail() {
     ? `Halo AI Mobix! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
     : undefined;
   const unitCalculationMessage = unit
-    ? financingIneligible
-      ? `Halo Admin, saya mau menanyakan opsi pembiayaan lain untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Unit ini tidak eligible pembiayaan DSF karena usia kendaraan.`
+    ? financingUnavailable
+      ? `Halo Admin, saya mau menanyakan opsi pembiayaan lain untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Pembiayaan DSF tidak tersedia untuk unit ini.`
       : `Halo Admin, saya mau minta hitungan leasing untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}.\n1. DP minim\n2. Cicilan ringan\n3. Cair All in`
     : undefined;
   function formatDpValue(value: number) {
@@ -1079,9 +1081,13 @@ export function UnitDetail() {
                   Harga asli {formatRupiah(originalPrice)}
                 </div>
               )}
-              {financingIneligible ? (
-                <div className="mt-1 text-[12px] font-semibold text-[#9A5A00]">
-                  Pembiayaan DSF tidak tersedia
+              {financingUnavailable || simError ? (
+                <div className="mt-1 space-y-0.5 text-[12px] font-semibold text-[#9A5A00]">
+                  <div>
+                    Harga Kredit : {financingValueLabel(unit.pembiayaan, "", simError)}
+                  </div>
+                  <div>TDP : {financingValueLabel(unit.pembiayaan, "", simError)}</div>
+                  <div>Cicilan : {financingValueLabel(unit.pembiayaan, "", simError)}</div>
                 </div>
               ) : simTab === "dpminim" ? (
                 <div className="mt-1 text-[12px] font-semibold text-teal-deep">
@@ -1092,8 +1098,10 @@ export function UnitDetail() {
                   Harga Kredit : Menghitung...
                 </div>
               ) : smartCreditPriceError || hasCreditPriceIssue ? (
-                <div className="mt-1 text-[12px] font-semibold text-danger">
-                  Harga Kredit : Maaf, ada kendala sistem
+                <div className="mt-1 space-y-0.5 text-[12px] font-semibold text-[#9A5A00]">
+                  <div>Harga Kredit : {financingValueLabel(unit.pembiayaan, "", true)}</div>
+                  <div>TDP : {financingValueLabel(unit.pembiayaan, "", true)}</div>
+                  <div>Cicilan : {financingValueLabel(unit.pembiayaan, "", true)}</div>
                 </div>
               ) : creditPriceForDisplay ? (
                 <div className="mt-1 text-[12px] font-semibold text-teal-deep">
@@ -1169,7 +1177,7 @@ export function UnitDetail() {
         </div>
 
         {/* CALCULATOR */}
-        {financingIneligible ? (
+        {financingUnavailable ? (
           <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4">
             <div className="rounded-[18px] border border-[#E8C98B] bg-[#FFF8E8] p-4">
               <div className="inline-flex rounded-full bg-[#F7DFAC] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#7A4700]">
@@ -1179,8 +1187,18 @@ export function UnitDetail() {
                 Simulasi kredit DSF tidak tersedia
               </div>
               <p className="m-0 mt-1.5 text-[12px] leading-[1.6] text-mid">
-                {unit.pembiayaan.message}
+                {unit.pembiayaan.message || "Pembiayaan DSF tidak tersedia untuk unit ini."}
               </p>
+              <div className="mt-3 space-y-2 rounded-[12px] bg-white/70 p-3 text-[12px]">
+                {["Harga Kredit", "TDP", "Cicilan"].map((label) => (
+                  <div key={label} className="flex items-center justify-between gap-3">
+                    <span className="font-semibold text-mid">{label}</span>
+                    <span className="font-extrabold text-[#7A4700]">
+                      {financingValueLabel(unit.pembiayaan, "")}
+                    </span>
+                  </div>
+                ))}
+              </div>
               <a
                 href={waHref(unitCalculationMessage ?? "")}
                 target="_blank"
@@ -1509,11 +1527,15 @@ export function UnitDetail() {
                 </div>
               ) : simError ? (
                 <div className="mt-2.5 border-t border-line pt-2.5">
-                  <div className="text-[13px] font-extrabold text-ink">
-                    Maaf, ada kendala sistem
-                  </div>
-                  <div className="mt-1 text-[11px] leading-[1.5] text-muted">
-                    Hasil simulasi belum tersedia dari DSF. Coba hitung ulang.
+                  <div className="space-y-2 text-[12px]">
+                    {["Harga Kredit", "TDP", "Cicilan"].map((label) => (
+                      <div key={label} className="flex items-center justify-between gap-3">
+                        <span className="font-semibold text-mid">{label}</span>
+                        <span className="font-extrabold text-[#9A5A00]">
+                          {financingValueLabel(unit.pembiayaan, "", true)}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                   <button
                     type="button"
@@ -1727,7 +1749,7 @@ export function UnitDetail() {
           adminMessage={unitAdminMessage ?? ""}
           calculationMessage={unitCalculationMessage ?? ""}
           adminLabel="Tanya Unit"
-          calculationLabel={financingIneligible ? "Tanya Opsi Pembiayaan" : "Minta Hitungan"}
+          calculationLabel={financingUnavailable ? "Tanya Opsi Pembiayaan" : "Minta Hitungan"}
           buttonClassName="flex h-12 w-full items-center justify-center rounded-2xl border border-teal-tint-border bg-teal text-ink"
         />
       </div>

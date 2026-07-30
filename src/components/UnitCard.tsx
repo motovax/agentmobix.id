@@ -1,7 +1,9 @@
 import { Link } from "wouter";
 import {
   compactFinancingLabel,
+  financingValueLabel,
   hasAvailableFinancing,
+  isDsfFinancingUnavailable,
   type CardUnit,
 } from "../lib/mobix";
 import { formatJt } from "../lib/format";
@@ -15,6 +17,7 @@ import { Calculator, ShareArrow } from "./icons";
  */
 export function UnitCard({ unit }: { unit: CardUnit }) {
   const financingAvailable = hasAvailableFinancing(unit.pembiayaan);
+  const financingUnavailable = isDsfFinancingUnavailable(unit.pembiayaan);
   const shareParams = new URLSearchParams({
     u: unit.slug,
     ...(financingAvailable
@@ -59,13 +62,25 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
           )}
         </div>
         <div
-          className={`mt-0.5 text-[11px] ${
+          className={`mt-0.5 text-[11px] leading-[1.45] ${
             financingAvailable ? "text-muted" : "font-semibold text-[#9A5A00]"
           }`}
         >
-          {financingAvailable
-            ? `TDP ${formatJt(unit.tdp)} · ${formatJt(unit.cicilan)}/bln`
-            : compactFinancingLabel(unit.pembiayaan)}
+          {financingUnavailable ? (
+            <>
+              <div>
+                Harga kredit {financingValueLabel(unit.pembiayaan, "")}
+              </div>
+              <div>
+                TDP {financingValueLabel(unit.pembiayaan, formatJt(unit.tdp))} · Cicilan{" "}
+                {financingValueLabel(unit.pembiayaan, `${formatJt(unit.cicilan)}/bln`)}
+              </div>
+            </>
+          ) : financingAvailable ? (
+            `TDP ${formatJt(unit.tdp)} · ${formatJt(unit.cicilan)}/bln`
+          ) : (
+            compactFinancingLabel(unit.pembiayaan)
+          )}
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
           {unit.posisi !== unit.branch && (
@@ -83,7 +98,7 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
           className="relative z-[2] mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-teal-tint-border bg-teal-tint px-2.5 py-2 text-[11px] font-bold text-teal-deep no-underline"
         >
           <Calculator size={13} />
-          {unit.pembiayaan.status === "ineligible"
+          {financingUnavailable
             ? "Tanya Opsi Pembiayaan"
             : "Tanya Hitungan"}
         </Link>
