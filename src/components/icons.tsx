@@ -134,6 +134,17 @@ export function Camera({ size = 22, className, strokeWidth = 1.5 }: IconProps) {
   );
 }
 
+/** Image / gallery picker icon. */
+export function Image({ size = 18, className, strokeWidth = 1.5 }: IconProps) {
+  return (
+    <svg {...base(size)} viewBox="0 0 18 18" className={className}>
+      <rect x="2.5" y="3.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth={strokeWidth} />
+      <circle cx="6.5" cy="7.2" r="1.3" stroke="currentColor" strokeWidth={1.3} />
+      <path d="M3.5 12.5l3.2-2.6 2.2 1.7 2.4-2.1 3.2 3" stroke="currentColor" strokeWidth={1.4} strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function MapPin({ size = 20, className, strokeWidth = 1.6 }: IconProps) {
   return (
     <svg {...base(size)} viewBox="0 0 22 22" className={className}>

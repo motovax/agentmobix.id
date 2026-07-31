@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { AppBar } from "../components/AppBar";
 import { AppShell } from "../components/AppShell";
-import { Camera, Check, ChevronDown, Sparkles } from "../components/icons";
+import { Camera, Check, ChevronDown, Image, Sparkles } from "../components/icons";
 import {
   applySellCarAIExtraction,
   fetchSellCarAIExtraction,
@@ -48,15 +48,25 @@ const MONTHS = [
 
 type AIPhotoSelection = { file: File; previewUrl: string };
 
+/** MIME + extension list so mobile gallery and desktop file pickers stay open. */
+const AI_PHOTO_ACCEPT =
+  "image/*,image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif,.bmp,.gif";
+
 const AI_PHOTO_INPUTS: Array<{
   kind: SellCarAIPhotoKind;
   label: string;
   hint: string;
 }> = [
-  { kind: "vehicle", label: "Foto kendaraan", hint: "Tampak luar, terang, dan seluruh mobil terlihat" },
-  { kind: "stnk", label: "Foto STNK", hint: "Pastikan data kendaraan dan masa berlaku terbaca" },
-  { kind: "odometer", label: "Foto KM mobil", hint: "Foto panel odometer dari arah depan" },
+  { kind: "vehicle", label: "Foto kendaraan", hint: "Dari galeri, file, atau kamera — tampak luar dan terang" },
+  { kind: "stnk", label: "Foto STNK", hint: "Dari galeri, file, atau kamera — data & masa berlaku terbaca" },
+  { kind: "odometer", label: "Foto KM mobil", hint: "Dari galeri, file, atau kamera — panel odometer jelas" },
 ];
+
+function isLikelyImageFile(file: File): boolean {
+  if (file.type.startsWith("image/")) return true;
+  // Beberapa device (Android/iOS) mengirim type kosong dari galeri.
+  return /\.(jpe?g|png|webp|heic|heif|bmp|gif)$/i.test(file.name);
+}
 
 const AI_REVIEW_LABELS: Record<string, string> = {
   brand: "merek",
@@ -227,55 +237,103 @@ function AIPhotoField({
   selection,
   disabled,
   onSelect,
+  onInvalid,
 }: {
   item: (typeof AI_PHOTO_INPUTS)[number];
   selection?: AIPhotoSelection;
   disabled: boolean;
   onSelect: (file: File) => void;
+  onInvalid: (message: string) => void;
 }) {
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!isLikelyImageFile(file)) {
+      onInvalid("Pilih file gambar (JPG, PNG, WEBP, HEIC, dll).");
+      return;
+    }
+    onSelect(file);
+  }
+
   return (
-    <label
-      className={`flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition ${
+    <div
+      className={`rounded-[14px] border px-3 py-2.5 transition ${
         selection
           ? "border-teal-tint-border bg-surface"
           : "border-dashed border-teal-tint-border bg-surface/70"
-      } ${disabled ? "pointer-events-none opacity-60" : "hover:border-teal-deep"}`}
+      } ${disabled ? "opacity-60" : ""}`}
     >
+      {/* Tanpa capture → galeri / file lokal. capture=environment → kamera belakang. */}
       <input
+        ref={galleryInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+        accept={AI_PHOTO_ACCEPT}
+        className="sr-only"
+        tabIndex={-1}
+        disabled={disabled}
+        onChange={handleFileChange}
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept={AI_PHOTO_ACCEPT}
         capture="environment"
         className="sr-only"
+        tabIndex={-1}
         disabled={disabled}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) onSelect(file);
-          event.target.value = "";
-        }}
+        onChange={handleFileChange}
       />
-      {selection ? (
-        <img
-          src={selection.previewUrl}
-          alt=""
-          className="h-11 w-11 flex-shrink-0 rounded-[10px] bg-field object-cover"
-        />
-      ) : (
-        <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[12px] bg-field text-teal-deep">
-          <Camera size={19} />
+
+      <div className="flex items-center gap-3">
+        {selection ? (
+          <img
+            src={selection.previewUrl}
+            alt=""
+            className="h-11 w-11 flex-shrink-0 rounded-[10px] bg-field object-cover"
+          />
+        ) : (
+          <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[12px] bg-field text-teal-deep">
+            <Image size={19} />
+          </span>
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block text-[12px] font-bold text-mid">{item.label}</span>
+          <span className="mt-0.5 block text-[10px] leading-[1.35] text-muted">
+            {selection ? selection.file.name : item.hint}
+          </span>
         </span>
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="block text-[12px] font-bold text-mid">{item.label}</span>
-        <span className="mt-0.5 block text-[10px] leading-[1.35] text-muted">
-          {selection ? selection.file.name : item.hint}
-        </span>
-      </span>
-      {selection && (
-        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-teal-tint text-teal-deep">
-          <Check size={13} />
-        </span>
-      )}
-    </label>
+        {selection && (
+          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-teal-tint text-teal-deep">
+            <Check size={13} />
+          </span>
+        )}
+      </div>
+
+      <div className="mt-2.5 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => galleryInputRef.current?.click()}
+          className="flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-line bg-surface text-[11px] font-bold text-ink transition hover:border-teal-deep hover:text-teal-deep disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Image size={14} />
+          Galeri / file
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => cameraInputRef.current?.click()}
+          className="flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-line bg-surface text-[11px] font-bold text-ink transition hover:border-teal-deep hover:text-teal-deep disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Camera size={14} />
+          Kamera
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -345,6 +403,10 @@ export function JualMobil() {
   function selectAIPhoto(kind: SellCarAIPhotoKind, file: File) {
     if (kind === "stnk" && !stnkConsent) {
       setAIError("Setujui pemrosesan foto STNK sebelum mengunggah foto.");
+      return;
+    }
+    if (!isLikelyImageFile(file)) {
+      setAIError("Pilih file gambar dari galeri atau perangkat (JPG, PNG, WEBP, HEIC, dll).");
       return;
     }
     if (file.size > 12 * 1024 * 1024) {
@@ -560,7 +622,7 @@ export function JualMobil() {
                     AIFalcon bantu hitungkan harga
                   </h2>
                   <p className="m-0 mt-1.5 text-[12px] leading-[1.5] text-muted">
-                    Unggah tiga foto. AIFalcon akan membaca data kendaraan, lalu Anda tetap dapat memeriksa dan mengubah hasilnya.
+                    Unggah tiga foto dari galeri, file di perangkat, atau kamera. AIFalcon akan membaca data kendaraan, lalu Anda tetap dapat memeriksa dan mengubah hasilnya.
                   </p>
                 </div>
               </div>
@@ -611,6 +673,7 @@ export function JualMobil() {
                     selection={aiPhotos[item.kind]}
                     disabled={aiAnalyzing || (item.kind === "stnk" && !stnkConsent)}
                     onSelect={(file) => selectAIPhoto(item.kind, file)}
+                    onInvalid={setAIError}
                   />
                 ))}
               </div>
