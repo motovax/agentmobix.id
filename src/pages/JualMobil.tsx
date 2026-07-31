@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { AppBar } from "../components/AppBar";
 import { AppShell } from "../components/AppShell";
-import { Camera, Check, ChevronDown, Sparkles } from "../components/icons";
+import { Camera, Check, ChevronDown, Image, Sparkles } from "../components/icons";
 import {
   applySellCarAIExtraction,
   fetchSellCarAIExtraction,
@@ -48,7 +48,6 @@ const MONTHS = [
 
 type AIPhotoSelection = { file: File; previewUrl: string };
 
-/** Tanpa attribute capture: HP bisa pilih galeri/kamera, PC/laptop ambil file lokal. */
 const AI_PHOTO_ACCEPT =
   "image/*,image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif";
 
@@ -66,6 +65,29 @@ function isLikelyImageFile(file: File): boolean {
   if (file.type.startsWith("image/")) return true;
   // Beberapa device (Android/iOS) mengirim type kosong dari galeri.
   return /\.(jpe?g|png|webp|heic|heif|bmp|gif)$/i.test(file.name);
+}
+
+/** Deteksi smartphone: pilihan Kamera/Galeri hanya di HP, bukan desktop/laptop. */
+function useIsSmartphone(): boolean {
+  const [isPhone, setIsPhone] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 768px) and (pointer: coarse)").matches
+      || /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
+  });
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 768px) and (pointer: coarse)");
+    const update = () => {
+      setIsPhone(
+        media.matches || /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent),
+      );
+    };
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return isPhone;
 }
 
 const AI_REVIEW_LABELS: Record<string, string> = {
@@ -243,26 +265,33 @@ function AIPhotoField({
   disabled: boolean;
   onSelect: (file: File) => void;
 }) {
-  return (
-    <label
-      className={`flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition ${
-        selection
-          ? "border-teal-tint-border bg-surface"
-          : "border-dashed border-teal-tint-border bg-surface/70"
-      } ${disabled ? "pointer-events-none opacity-60" : "hover:border-teal-deep"}`}
-    >
-      {/* Tanpa capture: OS menampilkan galeri/file (+ kamera di HP); di PC/laptop = file lokal. */}
-      <input
-        type="file"
-        accept={AI_PHOTO_ACCEPT}
-        className="sr-only"
-        disabled={disabled}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) onSelect(file);
-          event.target.value = "";
-        }}
-      />
+  const isPhone = useIsSmartphone();
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    setSheetOpen(false);
+    if (file) onSelect(file);
+  }
+
+  function openSource(source: "gallery" | "camera") {
+    // Klik input sinkron di dalam handler agar iOS/Android tetap anggap user gesture.
+    if (source === "camera") cameraInputRef.current?.click();
+    else galleryInputRef.current?.click();
+    setSheetOpen(false);
+  }
+
+  const shellClass = `flex min-h-16 w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition ${
+    selection
+      ? "border-teal-tint-border bg-surface"
+      : "border-dashed border-teal-tint-border bg-surface/70"
+  } ${disabled ? "pointer-events-none opacity-60" : "cursor-pointer hover:border-teal-deep"}`;
+
+  const preview = (
+    <>
       {selection ? (
         <img
           src={selection.previewUrl}
@@ -285,7 +314,110 @@ function AIPhotoField({
           <Check size={13} />
         </span>
       )}
-    </label>
+    </>
+  );
+
+  // Desktop/laptop: 1 klik → file lokal (tanpa sheet, tanpa capture).
+  if (!isPhone) {
+    return (
+      <label className={shellClass}>
+        <input
+          type="file"
+          accept={AI_PHOTO_ACCEPT}
+          className="sr-only"
+          disabled={disabled}
+          onChange={handleFileChange}
+        />
+        {preview}
+      </label>
+    );
+  }
+
+  // Smartphone: 1 ketuk → pilih Kamera atau Galeri (input terpisah; browser HP tidak selalu gabung keduanya).
+  return (
+    <>
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept={AI_PHOTO_ACCEPT}
+        className="sr-only"
+        tabIndex={-1}
+        disabled={disabled}
+        onChange={handleFileChange}
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept={AI_PHOTO_ACCEPT}
+        capture="environment"
+        className="sr-only"
+        tabIndex={-1}
+        disabled={disabled}
+        onChange={handleFileChange}
+      />
+
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setSheetOpen(true)}
+        className={shellClass}
+        aria-haspopup="dialog"
+        aria-expanded={sheetOpen}
+      >
+        {preview}
+      </button>
+
+      {sheetOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-3 sm:items-center"
+          role="presentation"
+          onClick={() => setSheetOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-label={`Pilih sumber ${item.label}`}
+            className="w-full max-w-sm overflow-hidden rounded-[18px] border border-line bg-surface shadow-[0_16px_40px_-12px_rgba(14,27,30,0.45)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-line px-4 py-3">
+              <div className="text-[13px] font-extrabold text-ink">{item.label}</div>
+              <p className="m-0 mt-0.5 text-[11px] leading-[1.4] text-muted">
+                Pilih kamera atau galeri perangkat
+              </p>
+            </div>
+            <div className="grid gap-0 p-2">
+              <button
+                type="button"
+                onClick={() => openSource("camera")}
+                className="flex h-12 items-center gap-3 rounded-[12px] px-3 text-left text-[13px] font-bold text-ink transition hover:bg-teal-tint"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-field text-teal-deep">
+                  <Camera size={18} />
+                </span>
+                Ambil dari kamera
+              </button>
+              <button
+                type="button"
+                onClick={() => openSource("gallery")}
+                className="flex h-12 items-center gap-3 rounded-[12px] px-3 text-left text-[13px] font-bold text-ink transition hover:bg-teal-tint"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-field text-teal-deep">
+                  <Image size={18} />
+                </span>
+                Pilih dari galeri
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSheetOpen(false)}
+              className="flex h-11 w-full items-center justify-center border-t border-line text-[12px] font-bold text-muted transition hover:bg-field"
+            >
+              Batal
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
