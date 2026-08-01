@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   applySellCarAIExtraction,
   buildLocalSellCarResult,
+  normalizeStnkExpiryForQuote,
   type PriceRow,
   type SellCarAIExtraction,
   type SellCarData,
@@ -136,5 +137,14 @@ describe("buildLocalSellCarResult", () => {
       variant: "E",
       year: "2022",
     }, 2026)).toBeNull();
+  });
+});
+
+describe("normalizeStnkExpiryForQuote", () => {
+  test("keeps ISO month/day formats and maps MM/YYYY", () => {
+    expect(normalizeStnkExpiryForQuote("2023-04-26")).toBe("2023-04-26");
+    expect(normalizeStnkExpiryForQuote("2023-04")).toBe("2023-04");
+    expect(normalizeStnkExpiryForQuote("04/2023")).toBe("2023-04");
+    expect(normalizeStnkExpiryForQuote("")).toBe("");
   });
 });

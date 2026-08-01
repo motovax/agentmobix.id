@@ -103,6 +103,15 @@ export function JualMobilHasil() {
             <Detail label="Warna" value={result.color} />
             <Detail label="Masa Berlaku STNK" value={formatStnk(result.stnk)} />
             <Detail label="Plat" value={result.plate} />
+            {typeof result.annualTax === "number" && result.annualTax > 0 ? (
+              <Detail label="Estimasi Pajak / Tahun" value={formatRupiah(result.annualTax)} />
+            ) : null}
+            {typeof result.taxYearsDead === "number" && result.taxYearsDead > 0 ? (
+              <Detail label="Pajak Mati" value={`${result.taxYearsDead} tahun`} />
+            ) : null}
+            {typeof result.taxDeductionTotal === "number" && result.taxDeductionTotal > 0 ? (
+              <Detail label="Potongan Pajak" value={formatRupiah(result.taxDeductionTotal)} />
+            ) : null}
           </div>
 
           <div className="mt-7">

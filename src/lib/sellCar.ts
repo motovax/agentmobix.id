@@ -77,6 +77,14 @@ export type SellCarResult = SellCarFormData & {
   sourceSheet: string;
   mrpVersion: string;
   notes: string;
+  /** Estimated or overridden annual vehicle tax (IDR). */
+  annualTax?: number;
+  /** manual | notes | estimate */
+  annualTaxSource?: string;
+  /** How many annual tax periods are overdue. */
+  taxYearsDead?: number;
+  /** Absolute IDR deducted for dead tax. */
+  taxDeductionTotal?: number;
 };
 
 type MRPOptionsResponse = {
@@ -96,10 +104,27 @@ type MRPQuoteResponse = {
   recommended_price: number;
   price_min: number;
   price_max: number;
-  adjustments?: PriceAdjustment[];
+  adjustments?: PriceAdjustment[] | null;
   notes?: string;
   mrp_version?: string;
+  annual_tax?: number;
+  annual_tax_source?: string;
+  tax_years_dead?: number;
+  tax_deduction_total?: number;
 };
+
+/** Normalize STNK form value (YYYY-MM / YYYY-MM-DD / MM/YYYY) for MRP quote. */
+export function normalizeStnkExpiryForQuote(raw: string): string {
+  const value = raw.trim();
+  if (!value) return "";
+  if (/^\d{4}-\d{2}(-\d{2})?$/.test(value)) return value;
+  const mY = value.match(/^(\d{1,2})[\/\-](\d{4})$/);
+  if (mY) {
+    const month = mY[1].padStart(2, "0");
+    return `${mY[2]}-${month}`;
+  }
+  return value;
+}
 
 const MOBIX_FALLBACK_ROWS: PriceRow[] = [
   {
@@ -369,6 +394,7 @@ export function buildLocalSellCarResult(
 export async function fetchSellCarQuote(form: SellCarFormData): Promise<SellCarResult> {
   let apiError: Error | null = null;
   try {
+    const stnkExpiry = normalizeStnkExpiryForQuote(form.stnk);
     const response = await mrpFetch("/api/mrp/quote", {
       method: "POST",
       body: JSON.stringify({
@@ -378,6 +404,8 @@ export async function fetchSellCarQuote(form: SellCarFormData): Promise<SellCarR
         year: Number(form.year),
         transmission: form.transmission,
         color: form.color,
+        // Backend reduces recommended_price when tax is overdue.
+        ...(stnkExpiry ? { stnk_expiry: stnkExpiry } : {}),
       }),
     });
     if (!response.ok) {
@@ -397,6 +425,10 @@ export async function fetchSellCarQuote(form: SellCarFormData): Promise<SellCarR
         sourceSheet: "brand sheets",
         mrpVersion: quote.mrp_version || "",
         notes: quote.notes || "",
+        annualTax: quote.annual_tax ?? 0,
+        annualTaxSource: quote.annual_tax_source || "",
+        taxYearsDead: quote.tax_years_dead ?? 0,
+        taxDeductionTotal: quote.tax_deduction_total ?? 0,
       };
     }
     apiError = new Error("Data harga mobil belum tersedia di MRP. Silakan pilih kombinasi lain.");
