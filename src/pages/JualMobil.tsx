@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import { AppBar } from "../components/AppBar";
 import { AppShell } from "../components/AppShell";
@@ -170,15 +171,20 @@ function MonthYearPicker({
   const initialYear = Number(value.slice(0, 4)) || new Date().getFullYear();
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(initialYear);
-  const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    function closeOnOutsideClick(event: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) setOpen(false);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
     }
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open]);
 
   function selectMonth(month: number) {
@@ -193,7 +199,7 @@ function MonthYearPicker({
     : placeholder;
 
   return (
-    <div ref={pickerRef} className="relative">
+    <div className="relative">
       <button
         type="button"
         onClick={() => {
@@ -210,46 +216,75 @@ function MonthYearPicker({
         <ChevronDown className={`text-muted transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {open && (
-        <div role="dialog" aria-label="Pilih bulan dan tahun" className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 rounded-[16px] border border-line bg-surface p-3 shadow-[0_12px_30px_-14px_rgba(14,27,30,0.4)]">
-          <div className="mb-2 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setViewYear((year) => year - 1)}
-              aria-label="Tahun sebelumnya"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[22px] leading-none text-ink transition hover:bg-field"
+      {/* Portal + fixed overlay: lepas dari overflow-hidden AppShell agar tidak terpotong */}
+      {open &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[10000] flex items-end justify-center bg-black/40 p-3 sm:items-center"
+            role="presentation"
+            onClick={() => setOpen(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Pilih bulan dan tahun"
+              className="w-full max-w-sm rounded-[18px] border border-line bg-surface p-4 shadow-[0_16px_40px_-12px_rgba(14,27,30,0.45)]"
+              onClick={(event) => event.stopPropagation()}
             >
-              ‹
-            </button>
-            <div className="text-[14px] font-extrabold text-ink">{viewYear}</div>
-            <button
-              type="button"
-              onClick={() => setViewYear((year) => year + 1)}
-              aria-label="Tahun berikutnya"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[22px] leading-none text-ink transition hover:bg-field"
-            >
-              ›
-            </button>
-          </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            {MONTHS.map((month, index) => {
-              const active = selectedYear === viewYear && selectedMonth === index;
-              return (
+              <div className="mb-3 flex items-center justify-between border-b border-line pb-3">
+                <div>
+                  <div className="text-[13px] font-extrabold text-ink">Masa Berlaku STNK</div>
+                  <p className="m-0 mt-0.5 text-[11px] leading-[1.4] text-muted">Pilih bulan dan tahun</p>
+                </div>
                 <button
-                  key={month}
                   type="button"
-                  onClick={() => selectMonth(index)}
-                  className={`rounded-[10px] px-1.5 py-2 text-[11px] font-semibold transition ${
-                    active ? "bg-teal-deep text-white" : "text-mid hover:bg-teal-tint"
-                  }`}
+                  onClick={() => setOpen(false)}
+                  aria-label="Tutup"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] leading-none text-muted transition hover:bg-field hover:text-ink"
                 >
-                  {month.slice(0, 3)}
+                  ×
                 </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+              </div>
+              <div className="mb-3 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setViewYear((year) => year - 1)}
+                  aria-label="Tahun sebelumnya"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none text-ink transition hover:bg-field"
+                >
+                  ‹
+                </button>
+                <div className="text-[16px] font-extrabold text-ink">{viewYear}</div>
+                <button
+                  type="button"
+                  onClick={() => setViewYear((year) => year + 1)}
+                  aria-label="Tahun berikutnya"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none text-ink transition hover:bg-field"
+                >
+                  ›
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {MONTHS.map((month, index) => {
+                  const active = selectedYear === viewYear && selectedMonth === index;
+                  return (
+                    <button
+                      key={month}
+                      type="button"
+                      onClick={() => selectMonth(index)}
+                      className={`rounded-[12px] px-2 py-2.5 text-[12px] font-semibold transition ${
+                        active ? "bg-teal-deep text-white" : "bg-field text-mid hover:bg-teal-tint"
+                      }`}
+                    >
+                      {month}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
