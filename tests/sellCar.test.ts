@@ -17,6 +17,7 @@ const emptyForm: SellCarFormData = {
   transmission: "",
   color: "",
   mileage: "",
+  ownershipType: "",
   plate: "",
   stnk: "",
 };
@@ -68,6 +69,7 @@ describe("applySellCarAIExtraction", () => {
       transmission: "Manual",
       color: "Hitam",
       mileage: "48123",
+      ownershipType: "",
       plate: "B - DKI Jakarta",
       stnk: "2027-08",
     });
@@ -99,14 +101,16 @@ describe("buildLocalSellCarResult", () => {
       transmission: "Manual",
       color: "Biru",
       mileage: "95.000",
+      ownershipType: "Perorangan",
     }, 2026);
 
     expect(result?.basePrice).toBe(100_000_000);
-    expect(result?.recommendedPrice).toBe(60_000_000);
-    expect(result?.priceMin).toBe(55_000_000);
-    expect(result?.priceMax).toBe(65_000_000);
+    expect(result?.recommendedPrice).toBe(55_000_000);
+    expect(result?.priceMin).toBe(50_000_000);
+    expect(result?.priceMax).toBe(60_000_000);
     expect(result?.adjustments).toEqual([
       { label: "Penyesuaian jarak tempuh", amount: -15_000_000 },
+      { label: "Penyesuaian atas nama perorangan", amount: -5_000_000 },
       { label: "Penyesuaian transmisi manual", amount: -10_000_000 },
       { label: "Penyesuaian warna Biru", amount: -15_000_000 },
     ]);

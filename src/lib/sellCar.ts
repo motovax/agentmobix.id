@@ -25,6 +25,7 @@ export type SellCarFormData = {
   transmission: string;
   color: string;
   mileage: string;
+  ownershipType: string;
   plate: string;
   stnk: string;
 };
@@ -358,6 +359,12 @@ export function buildLocalSellCarResult(
     }
   }
 
+  if (form.ownershipType === "Perorangan") {
+    adjustments.push({ label: "Penyesuaian atas nama perorangan", amount: -5_000_000 });
+  } else if (form.ownershipType === "Perusahaan") {
+    adjustments.push({ label: "Penyesuaian atas nama perusahaan (PT)", amount: -10_000_000 });
+  }
+
   if (form.transmission.toLowerCase().includes("manual")) {
     adjustments.push({ label: "Penyesuaian transmisi manual", amount: -10_000_000 });
   }
@@ -404,6 +411,8 @@ export async function fetchSellCarQuote(form: SellCarFormData): Promise<SellCarR
         year: Number(form.year),
         transmission: form.transmission,
         color: form.color,
+        odometer: Number(form.mileage.replace(/\D/g, "")),
+        ownership_type: form.ownershipType.toLowerCase(),
         // Backend reduces recommended_price when tax is overdue.
         ...(stnkExpiry ? { stnk_expiry: stnkExpiry } : {}),
       }),
@@ -452,6 +461,7 @@ export function getWhatsAppUrl(result: SellCarResult): string {
     `Transmisi: ${result.transmission}`,
     `Warna: ${result.color}`,
     `Jarak tempuh: ${result.mileage || "-"} km`,
+    `Atas nama: ${result.ownershipType || "-"}`,
     `Plat: ${result.plate}`,
     `Masa berlaku STNK: ${result.stnk || "-"}`,
     `Rekomendasi harga: Rp ${new Intl.NumberFormat("id-ID").format(result.recommendedPrice)}`,

@@ -26,6 +26,7 @@ const INITIAL_FORM: SellCarFormData = {
   transmission: "",
   color: "",
   mileage: "",
+  ownershipType: "",
   plate: "",
   stnk: "",
 };
@@ -135,12 +136,14 @@ function SelectField({
   onChange,
   placeholder,
   disabled = false,
+  required = false,
   children,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   disabled?: boolean;
+  required?: boolean;
   children?: React.ReactNode;
 }) {
   return (
@@ -149,6 +152,7 @@ function SelectField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
+        required={required}
         className="h-11 w-full appearance-none rounded-[12px] border border-line bg-surface px-3.5 pr-9 text-[13px] text-ink outline-none transition focus:border-teal-deep disabled:bg-field disabled:text-placeholder"
       >
         <option value="">{placeholder}</option>
@@ -692,15 +696,28 @@ export function JualMobil() {
                 </SelectField>
               </Field>
 
-              <Field label="Jarak Tempuh (KM)" hint="Contoh: 50.000">
+              <Field label="Jarak Tempuh (KM)" required hint="KM standar adalah 15.000 per tahun kendaraan.">
                 <input
                   type="text"
                   inputMode="numeric"
                   value={formatThousands(form.mileage)}
                   onChange={(event) => update("mileage", event.target.value.replace(/\D/g, ""))}
                   placeholder="Contoh: 50.000"
+                  required
                   className="h-11 w-full rounded-[12px] border border-line bg-surface px-3.5 text-[13px] text-ink outline-none transition placeholder:text-placeholder focus:border-teal-deep"
                 />
+              </Field>
+
+              <Field label="Atas Nama" required hint="Pilih jenis kepemilikan yang tercantum pada dokumen kendaraan.">
+                <SelectField
+                  value={form.ownershipType}
+                  onChange={(value) => update("ownershipType", value)}
+                  placeholder="Pilih jenis kepemilikan"
+                  required
+                >
+                  <option value="Perorangan">Perorangan</option>
+                  <option value="Perusahaan">Perusahaan (PT)</option>
+                </SelectField>
               </Field>
 
               <Field label="Plat" required hint="Bisa dicek melalui kode provinsi pada plat kendaraan.">
