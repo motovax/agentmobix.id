@@ -68,6 +68,15 @@ export type PriceAdjustment = {
   amount: number;
 };
 
+export function ownershipTypeForQuote(value: string): string {
+  switch (value) {
+    case "Perorangan": return "perorangan";
+    case "Perusahaan": return "perusahaan";
+    case "Perusahaan (Rental)": return "perusahaan_rental";
+    default: return "";
+  }
+}
+
 export type SellCarResult = SellCarFormData & {
   basePrice: number;
   recommendedPrice: number;
@@ -359,10 +368,10 @@ export function buildLocalSellCarResult(
     }
   }
 
-  if (form.ownershipType === "Perorangan") {
-    adjustments.push({ label: "Penyesuaian atas nama perorangan", amount: -5_000_000 });
-  } else if (form.ownershipType === "Perusahaan") {
-    adjustments.push({ label: "Penyesuaian atas nama perusahaan (PT)", amount: -10_000_000 });
+  if (form.ownershipType === "Perusahaan") {
+    adjustments.push({ label: "Penyesuaian kendaraan operasional perusahaan", amount: -5_000_000 });
+  } else if (form.ownershipType === "Perusahaan (Rental)") {
+    adjustments.push({ label: "Penyesuaian kendaraan rental perusahaan", amount: -10_000_000 });
   }
 
   if (form.transmission.toLowerCase().includes("manual")) {
@@ -412,7 +421,7 @@ export async function fetchSellCarQuote(form: SellCarFormData): Promise<SellCarR
         transmission: form.transmission,
         color: form.color,
         odometer: Number(form.mileage.replace(/\D/g, "")),
-        ownership_type: form.ownershipType.toLowerCase(),
+        ownership_type: ownershipTypeForQuote(form.ownershipType),
         // Backend reduces recommended_price when tax is overdue.
         ...(stnkExpiry ? { stnk_expiry: stnkExpiry } : {}),
       }),

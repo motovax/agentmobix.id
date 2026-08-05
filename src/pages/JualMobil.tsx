@@ -716,7 +716,8 @@ export function JualMobil() {
                   required
                 >
                   <option value="Perorangan">Perorangan</option>
-                  <option value="Perusahaan">Perusahaan (PT)</option>
+                  <option value="Perusahaan">Perusahaan</option>
+                  <option value="Perusahaan (Rental)">Perusahaan (Rental)</option>
                 </SelectField>
               </Field>
 
