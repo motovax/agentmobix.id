@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildAgenMobixUnitLink,
+  buildWhatsAppShareText,
   ensureRequiredCaptionFacts,
   formatCaptionReadability,
   removeCaptionParagraphsContaining,
@@ -39,6 +40,26 @@ describe("buildAgenMobixUnitLink", () => {
 
   test("falls back to the absolute AgenMobix homepage", () => {
     expect(buildAgenMobixUnitLink()).toBe("https://agenmobix.id");
+  });
+});
+
+describe("buildWhatsAppShareText", () => {
+  test("appends selected photo URLs for WhatsApp link previews", () => {
+    expect(buildWhatsAppShareText("Toyota Calya siap dipinang", [
+      "https://mobix.motovax.com/photo-1.jpg?w=2560",
+    ])).toBe([
+      "Toyota Calya siap dipinang",
+      "Foto unit:",
+      "https://mobix.motovax.com/photo-1.jpg?w=2560",
+    ].join("\n\n"));
+  });
+
+  test("removes duplicate and empty photo URLs", () => {
+    expect(buildWhatsAppShareText("Caption", ["", " https://example.com/a.jpg ", "https://example.com/a.jpg"])).toBe([
+      "Caption",
+      "Foto unit:",
+      "https://example.com/a.jpg",
+    ].join("\n\n"));
   });
 });
 

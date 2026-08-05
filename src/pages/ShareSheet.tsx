@@ -39,6 +39,7 @@ import { formatJt, formatOdometer, formatRupiah } from "../lib/format";
 import { estimateBuilderCommission } from "../lib/commission";
 import {
   buildAgenMobixUnitLink,
+  buildWhatsAppShareText,
   ensureRequiredCaptionFacts,
   formatCaptionReadability,
   removeCaptionParagraphsContaining,
@@ -1123,7 +1124,15 @@ export function ShareSheet({ embedded = false }: any = {}) {
   }
 
   function shareVia(channel: "wa" | "tg" | "x") {
-    const encoded = encodeURIComponent(captionText);
+    const imageUrls = channel === "wa"
+      ? selectedImageMedia.map((media) =>
+          aiBackgroundUrls[media.id] ?? mobixImage(media.item.url, MOBIX_SHARE_WIDTH),
+        ).filter((url): url is string => Boolean(url))
+      : [];
+    const shareText = channel === "wa"
+      ? buildWhatsAppShareText(captionText, imageUrls)
+      : captionText;
+    const encoded = encodeURIComponent(shareText);
     const urls: Record<string, string> = {
       wa: `https://wa.me/?text=${encoded}`,
       tg: `https://t.me/share/url?url=${encoded}`,
