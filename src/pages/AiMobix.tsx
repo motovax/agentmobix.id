@@ -3,6 +3,8 @@ import { Link } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { ChevronLeft, Plus, Send } from "../components/icons";
 import { Photo } from "../components/ui";
+import { classifyQuery, fetchUnits, type ProductListItem } from "../lib/mobix";
+import { formatJt } from "../lib/format";
 
 type Message =
   | { id: number; kind: "in"; html: string }
@@ -48,9 +50,41 @@ const CHIPS = [
   "↩ Estafet lead",
 ];
 
+function escapeHtml(value: string) {
+  return value.replace(/[&<>\"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;",
+  })[character] ?? character);
+}
+
+function isInventoryRequest(text: string) {
+  return /inventory|stok|unit|cari|avanza|brio|xenia|sigra|mobil|matic|manual/i.test(text);
+}
+
+function inventoryRequest(text: string) {
+  const query = text.replace(/^(cari|tampilkan|carikan|cek)\s+/i, "").trim();
+  if (!query || /^(inventory|stok|unit)$/i.test(query)) return { page: 1, limit: 5 };
+  const classification = classifyQuery(query);
+  return { [classification.param]: classification.value, page: 1, limit: 5 };
+}
+
+function inventoryReply(items: ProductListItem[], total: number) {
+  if (!items.length) return "Aku belum menemukan unit yang cocok di inventory Motovax. Coba sebutkan merek, model, atau nomor polisi.";
+  const rows = items.map((item) => {
+    const title = escapeHtml(item.nama);
+    const branch = escapeHtml(item.cabang || "Lokasi belum tersedia");
+    return `<a href="/unit/${encodeURIComponent(item.slug)}" class="font-bold text-teal-deep no-underline">${title}</a><br/><span class="text-muted">Rp ${formatJt(item.harga)} · ${item.year} · ${branch}</span>`;
+  });
+  return `<strong>${total} unit ditemukan di inventory Motovax.</strong><br/>${rows.join("<br/><br/>")}<br/><br/><span class="text-muted">Buka salah satu unit untuk melihat detail lengkapnya.</span>`;
+}
+
 export function AiMobix() {
   const [messages, setMessages] = useState<Message[]>(SEED);
   const [draft, setDraft] = useState("");
+  const [isSearchingInventory, setIsSearchingInventory] = useState(false);
   const nextId = useRef(100);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -58,12 +92,26 @@ export function AiMobix() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages]);
 
-  function send(text: string) {
+  async function send(text: string) {
     const value = text.trim();
-    if (!value) return;
+    if (!value || isSearchingInventory) return;
     const outId = nextId.current++;
     setMessages((m) => [...m, { id: outId, kind: "out", html: value }]);
     setDraft("");
+
+    if (isInventoryRequest(value)) {
+      setIsSearchingInventory(true);
+      try {
+        const result = await fetchUnits(inventoryRequest(value));
+        setMessages((m) => [...m, { id: nextId.current++, kind: "in", html: inventoryReply(result.items, result.total) }]);
+      } catch {
+        setMessages((m) => [...m, { id: nextId.current++, kind: "in", html: "Inventory sedang tidak dapat diakses. Coba lagi beberapa saat atau buka katalog untuk melihat stok terbaru." }]);
+      } finally {
+        setIsSearchingInventory(false);
+      }
+      return;
+    }
+
     const inId = nextId.current++;
     window.setTimeout(() => {
       setMessages((m) => [
@@ -162,6 +210,11 @@ export function AiMobix() {
             </div>
           );
         })}
+        {isSearchingInventory && (
+          <div className="max-w-[86%] self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] text-muted">
+            Talon AI sedang mengecek inventory Motovax…
+          </div>
+        )}
       </div>
 
       {/* quick actions + input */}
@@ -202,7 +255,8 @@ export function AiMobix() {
           <button
             type="submit"
             aria-label="Kirim"
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-ink text-surface"
+            disabled={isSearchingInventory}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-ink text-surface disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Send />
           </button>
