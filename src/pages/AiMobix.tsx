@@ -2,44 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { ChevronLeft, Plus, Send } from "../components/icons";
-import { Photo } from "../components/ui";
 import { classifyQuery, fetchUnits, type ProductListItem } from "../lib/mobix";
 import { formatJt } from "../lib/format";
 
 type Message =
   | { id: number; kind: "in"; html: string }
-  | { id: number; kind: "out"; html: string }
-  | { id: number; kind: "photos"; caption: string }
-  | { id: number; kind: "relay"; lead: string };
+  | { id: number; kind: "out"; html: string };
 
 const SEED: Message[] = [
   {
     id: 1,
     kind: "in",
-    html: "Halo 👋 Aku Talon AI, asisten jualanmu. Aku bisa bantu mencari unit di inventory Motovax, membuat caption, menghitung paket cicilan, atau menyambungkan calon pembeli ke PIC cabang. Mau mulai dari mana?",
+    html: "Halo 👋 Aku Talon AI, asisten jualanmu. Aku bisa bantu mencari unit di inventory Motovax, membuat caption, atau menghitung paket cicilan. Silakan tanyakan apa saja.",
   },
-  {
-    id: 2,
-    kind: "out",
-    html: "Tolong fotoin Avanza A-10428 dari sisi kanan & dashboard ya",
-  },
-  {
-    id: 3,
-    kind: "in",
-    html: "Siap! Aku teruskan ke tim cabang BSD. Perkiraan foto siap sekitar <strong>20 menit</strong>. Nanti aku kabari di sini.",
-  },
-  {
-    id: 4,
-    kind: "photos",
-    caption:
-      "2 foto baru sudah dilampirkan ke kartu unit. Mau aku buatkan caption juga?",
-  },
-  {
-    id: 5,
-    kind: "out",
-    html: "Boleh. Terus estafetin ke PIC cabang dong, calon mau survei besok",
-  },
-  { id: 6, kind: "relay", lead: "Bu Sinta · Cabang BSD" },
 ];
 
 const CHIPS = [
@@ -175,40 +150,6 @@ export function AiMobix() {
               />
             );
           }
-          if (m.kind === "photos") {
-            return (
-              <div
-                key={m.id}
-                className="max-w-[86%] self-start overflow-hidden rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface"
-              >
-                <div className="grid grid-cols-2 gap-[3px] p-[3px]">
-                  <Photo className="aspect-square rounded-[10px]" />
-                  <Photo className="aspect-square rounded-[10px]" />
-                </div>
-                <div className="px-3.5 pb-3 pt-2 text-[12px] text-muted">
-                  {m.caption}
-                </div>
-              </div>
-            );
-          }
-          // relay card
-          return (
-            <div
-              key={m.id}
-              className="max-w-[86%] self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] leading-[1.5] text-ink"
-            >
-              Sudah aku teruskan ke <strong>Bu Sinta (PIC BSD)</strong> ✓
-              <div className="mt-2.5 flex items-center gap-2.5 rounded-xl bg-field p-2.5">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-teal to-teal-deep text-[12px] font-extrabold text-ink">
-                  SN
-                </span>
-                <div className="flex-1">
-                  <div className="text-[12px] font-bold">{m.lead}</div>
-                  <div className="text-[11px] text-muted">Sedang mengetik balasan…</div>
-                </div>
-              </div>
-            </div>
-          );
         })}
         {isSearchingInventory && (
           <div className="max-w-[86%] self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] text-muted">
