@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Link } from "wouter";
 import { AppShell } from "../components/AppShell";
-import { ChevronLeft, Plus, Send } from "../components/icons";
+import { Camera, Calculator, Chat, ChevronLeft, Plus, Search, Send, VideoCamera } from "../components/icons";
 import { classifyQuery, fetchUnits, type ProductListItem } from "../lib/mobix";
 import { formatJt } from "../lib/format";
 
@@ -17,12 +17,18 @@ const SEED: Message[] = [
   },
 ];
 
-const CHIPS = [
-  "🔎 Cari inventory",
-  "📸 Minta foto",
-  "🎥 Video keliling",
-  "🧮 Hitung paket",
-  "↩ Estafet lead",
+type QuickAction = {
+  label: string;
+  prompt: string;
+  Icon: ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
+};
+
+const QUICK_ACTIONS: QuickAction[] = [
+  { label: "Cari unit", prompt: "Cari unit: ", Icon: Search },
+  { label: "Minta foto", prompt: "Minta foto unit: ", Icon: Camera },
+  { label: "Minta video", prompt: "Minta video unit: ", Icon: VideoCamera },
+  { label: "Hitung cicilan", prompt: "Hitung cicilan unit: ", Icon: Calculator },
+  { label: "Estafet lead", prompt: "Estafet lead: ", Icon: Chat },
 ];
 
 function escapeHtml(value: string) {
@@ -40,7 +46,7 @@ function isInventoryRequest(text: string) {
 }
 
 function inventoryRequest(text: string) {
-  const query = text.replace(/^(cari|tampilkan|carikan|cek)\s+/i, "").trim();
+  const query = text.replace(/^(cari\s+(unit|inventory)|tampilkan|carikan|cek)\s*[:\-]?\s*/i, "").trim();
   if (!query || /^(inventory|stok|unit)$/i.test(query)) return { page: 1, limit: 5 };
   const classification = classifyQuery(query);
   return { [classification.param]: classification.value, page: 1, limit: 5 };
@@ -62,6 +68,7 @@ export function AiMobix() {
   const [isSearchingInventory, setIsSearchingInventory] = useState(false);
   const nextId = useRef(100);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -160,16 +167,24 @@ export function AiMobix() {
 
       {/* quick actions + input */}
       <div className="border-t border-[#EEF2F3] bg-surface px-3 pb-3 pt-2.5">
-        <div className="scroll-x mb-2.5 flex gap-[7px] overflow-x-auto">
-          {CHIPS.map((chip) => (
+        <div className="scroll-x mb-1.5 flex gap-2 overflow-x-auto pb-0.5">
+          {QUICK_ACTIONS.map(({ label, prompt, Icon }) => (
             <button
-              key={chip}
-              onClick={() => setDraft(chip.replace(/^[^\s]+\s/, ""))}
-              className="whitespace-nowrap rounded-full border border-line bg-surface-2 px-3 py-[7px] text-[12px] font-semibold text-mid"
+              key={label}
+              type="button"
+              onClick={() => {
+                setDraft(prompt);
+                window.requestAnimationFrame(() => inputRef.current?.focus());
+              }}
+              className="flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-line bg-surface-2 px-3 py-2 text-[12px] font-bold text-mid transition-colors hover:border-teal-tint-border hover:bg-teal-tint hover:text-teal-deep"
             >
-              {chip}
+              <Icon size={16} className="text-teal-deep" strokeWidth={1.7} />
+              {label}
             </button>
           ))}
+        </div>
+        <div className="mb-2 text-[10.5px] text-muted">
+          Pilih bantuan, lalu lengkapi detail unit setelah tanda “:”.
         </div>
         <form
           onSubmit={(e) => {
@@ -187,6 +202,7 @@ export function AiMobix() {
           </button>
           <div className="flex flex-1 items-center rounded-full border border-line bg-surface-2 px-4 py-2.5">
             <input
+              ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="Tulis pesan untuk Talon AI…"
