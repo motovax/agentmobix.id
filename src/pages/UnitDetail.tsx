@@ -50,6 +50,7 @@ import {
   getCatalogReturnHref,
 } from "../lib/catalogSearch";
 import { buildJasmineWhatsAppHref } from "../lib/jasmine";
+import { ShareSheet } from "./ShareSheet";
 
 const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
 const MIN_DP_PERCENT = 15;
@@ -128,7 +129,10 @@ function maskBpkbValue(value: string) {
 
 export function UnitDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const returnHref = getCatalogReturnHref(useSearch());
+  const search = useSearch();
+  const searchParams = new URLSearchParams(search);
+  const returnHref = getCatalogReturnHref(search);
+  const sharePanelOpen = searchParams.get("share") === "1";
   const { data: unit, loading, error } = useAsync(
     () => fetchUnitDetail(slug),
     [slug],
@@ -270,7 +274,8 @@ export function UnitDetail() {
   const currencyFormatter = new Intl.NumberFormat("id-ID");
   const shareTenor = simTab === "dpminim" ? dpMinimInstallmentCount(tenor) : tenor;
   const shareHref = canShareSimulation
-    ? `/share?${new URLSearchParams({
+    ? `/unit/${encodeURIComponent(unit?.slug ?? slug ?? "")}?${new URLSearchParams({
+        share: "1",
         u: unit?.slug ?? slug ?? "",
         sim: simTab,
         harga: String(Math.round(price)),
@@ -285,7 +290,8 @@ export function UnitDetail() {
         tdp: String(Math.round(shareTdp)),
       }).toString()}`
     : salesContactRequired && unit
-      ? `/share?${new URLSearchParams({
+      ? `/unit/${encodeURIComponent(unit.slug)}?${new URLSearchParams({
+          share: "1",
           u: unit.slug,
           harga: String(Math.round(price)),
           komisi: String(Math.round(estimatedCommission)),
@@ -1748,6 +1754,7 @@ export function UnitDetail() {
           buttonClassName="flex h-12 w-full items-center justify-center rounded-2xl border border-teal-tint-border bg-teal text-ink"
         />
       </div>
+      {sharePanelOpen && <ShareSheet embedded />}
     </AppShell>
   );
 }

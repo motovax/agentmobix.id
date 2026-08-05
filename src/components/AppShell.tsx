@@ -11,13 +11,15 @@ export function AppShell({
   bg = "bg-surface-2",
   /** when true the frame is a fixed-height column (for chat-style screens) */
   flexColumn = false,
+  overlay = false,
 }: {
   children: ReactNode;
   bg?: string;
   flexColumn?: boolean;
+  overlay?: boolean;
 }) {
   return (
-    <div className="flex min-h-screen justify-center bg-app-bg sm:py-6">
+    <div className={["flex min-h-screen justify-center bg-app-bg sm:py-6", overlay ? "fixed inset-0 z-50 overflow-y-auto" : ""].join(" ")}>
       <div
         className={[
           "relative w-full overflow-hidden shadow-frame sm:max-w-[412px] sm:rounded-frame",

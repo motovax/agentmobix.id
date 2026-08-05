@@ -412,7 +412,7 @@ const CAPTION_STYLE_HINTS = [
   "Energetic social caption, concise, persuasive, and not exaggerated.",
 ];
 
-export function ShareSheet() {
+export function ShareSheet({ embedded = false }: any = {}) {
   const search = useSearch();
   const searchParams = new URLSearchParams(search);
   const slug = searchParams.get("u") ?? "";
@@ -1175,7 +1175,7 @@ export function ShareSheet() {
   const showAiOriginalToggle = activeMedia?.kind === "image" && activeHasAiBackground;
 
   return (
-    <AppShell>
+    <AppShell overlay={embedded}>
       {/* sheet */}
       <div className="min-h-[560px] px-4 pb-24 pt-[18px]">
         {/* shareable preview */}
