@@ -125,7 +125,7 @@ export function AiMobix() {
   return (
     <AppShell bg="bg-surface-2" flexColumn>
       {/* header */}
-      <div className="flex items-center gap-3 border-b border-[#EEF2F3] bg-surface px-3.5 pb-3.5 pt-3">
+      <div className="flex flex-shrink-0 items-center gap-3 border-b border-[#EEF2F3] bg-surface px-3.5 pb-3.5 pt-3">
         <Link
           href="/"
           aria-label="Kembali"
@@ -148,7 +148,7 @@ export function AiMobix() {
       {/* messages */}
       <div
         ref={listRef}
-        className="flex flex-1 flex-col gap-2.5 overflow-y-auto bg-surface-2 px-3.5 py-4"
+        className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto bg-surface-2 px-3.5 py-4"
       >
         <div className="mb-0.5 text-center text-[11px] text-placeholder">
           Hari ini · 19.18
@@ -158,7 +158,7 @@ export function AiMobix() {
             return (
               <div
                 key={m.id}
-                className="max-w-[86%] self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] leading-[1.5] text-ink"
+                className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] leading-[1.5] text-ink"
                 dangerouslySetInnerHTML={{ __html: m.html }}
               />
             );
@@ -167,21 +167,21 @@ export function AiMobix() {
             return (
               <div
                 key={m.id}
-                className="max-w-[82%] self-end rounded-[16px_16px_5px_16px] bg-ink px-3.5 py-3 text-[13px] leading-[1.5] text-surface"
+                className="max-w-[82%] break-words self-end rounded-[16px_16px_5px_16px] bg-ink px-3.5 py-3 text-[13px] leading-[1.5] text-surface"
                 dangerouslySetInnerHTML={{ __html: m.html }}
               />
             );
           }
         })}
         {isSearchingInventory && (
-          <div className="max-w-[86%] self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] text-muted">
+          <div className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] text-muted">
             Talon AI sedang mengecek inventory Motovax…
           </div>
         )}
       </div>
 
       {/* quick actions + input */}
-      <div className="border-t border-[#EEF2F3] bg-surface px-3 pb-3 pt-2.5">
+      <div className="flex-shrink-0 border-t border-[#EEF2F3] bg-surface px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2.5">
         <div className="scroll-x mb-1.5 flex gap-2 overflow-x-auto pb-0.5">
           {QUICK_ACTIONS.map(({ label, prompt, Icon }) => (
             <button

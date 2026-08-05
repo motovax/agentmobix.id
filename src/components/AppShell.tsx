@@ -23,12 +23,14 @@ export function AppShell({
   if (bare) return <>{children}</>;
 
   return (
-    <div className={["flex min-h-screen justify-center bg-app-bg sm:py-6", overlay ? "fixed inset-0 z-50 overflow-y-auto" : ""].join(" ")}>
+    <div className={["flex min-h-[100svh] min-h-[100dvh] justify-center bg-app-bg sm:py-6", overlay ? "fixed inset-0 z-50 overflow-y-auto" : ""].join(" ")}>
       <div
         className={[
           "relative w-full overflow-hidden shadow-frame sm:max-w-[412px] sm:rounded-frame",
           bg,
-          flexColumn ? "flex min-h-screen flex-col sm:min-h-0 sm:h-[872px]" : "min-h-screen sm:min-h-0",
+          flexColumn
+            ? "flex h-[100svh] h-[100dvh] min-h-0 flex-col sm:h-[872px]"
+            : "min-h-[100svh] min-h-[100dvh] sm:min-h-0",
         ].join(" ")}
       >
         {children}
