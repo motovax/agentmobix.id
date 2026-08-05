@@ -4,7 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { BottomNav } from "../components/BottomNav";
 import { FloatingContactCta } from "../components/FloatingContactCta";
 import { UnitRow } from "../components/UnitRow";
-import { Search } from "../components/icons";
+import { Chat, Search } from "../components/icons";
 import { Photo, Skeleton, SkeletonRow } from "../components/ui";
 import {
   fetchUnits,
@@ -390,6 +390,27 @@ export function Beranda() {
             ))}
           </div>
         </header>
+
+        {/* TALON AI */}
+        <section className="mx-[18px] mt-4 rounded-[20px] border border-teal-tint-border bg-teal-tint p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[13px] bg-ink text-teal">
+              <Chat size={21} strokeWidth={1.7} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[15px] font-extrabold text-ink">Butuh bantuan jualan?</div>
+              <p className="m-0 mt-1 text-[11.5px] leading-[1.45] text-mid">
+                Tanya Talon AI untuk mencari unit di inventory dan mendapatkan insight sesuai aturan sales.
+              </p>
+              <Link
+                href="/ai"
+                className="mt-3 inline-flex items-center rounded-xl bg-ink px-3.5 py-2.5 text-[12px] font-extrabold text-teal no-underline"
+              >
+                Buka Talon AI <span className="ml-1.5" aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </div>
+        </section>
 
         {/* CARI PER MEREK */}
         {!query.trim() && (

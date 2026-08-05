@@ -14,7 +14,7 @@ const SEED: Message[] = [
   {
     id: 1,
     kind: "in",
-    html: "Halo Rizky 👋 Aku bantu kamu jualan. Bisa minta foto unit, bikin caption, hitung paket cicilan, atau sambungkan calon pembeli ke PIC cabang. Mau mulai dari mana?",
+    html: "Halo 👋 Aku Talon AI, asisten jualanmu. Aku bisa bantu mencari unit di inventory Motovax, membuat caption, menghitung paket cicilan, atau menyambungkan calon pembeli ke PIC cabang. Mau mulai dari mana?",
   },
   {
     id: 2,
@@ -41,6 +41,7 @@ const SEED: Message[] = [
 ];
 
 const CHIPS = [
+  "🔎 Cari inventory",
   "📸 Minta foto",
   "🎥 Video keliling",
   "🧮 Hitung paket",
@@ -88,10 +89,10 @@ export function AiMobix() {
           <ChevronLeft />
         </Link>
         <div className="flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-[13px] bg-ink text-[17px] font-extrabold text-teal">
-          M
+          T
         </div>
         <div className="flex-1">
-          <div className="-tracking-[0.01em] text-[15px] font-extrabold">AI Mobix</div>
+          <div className="-tracking-[0.01em] text-[15px] font-extrabold">Talon AI</div>
           <div className="flex items-center gap-1.5 text-[11px] text-teal-deep">
             <span className="h-1.5 w-1.5 rounded-full bg-teal" />
             Aktif · biasanya balas &lt; 30 detik
@@ -194,7 +195,7 @@ export function AiMobix() {
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Tulis pesan untuk AI Mobix…"
+              placeholder="Tulis pesan untuk Talon AI…"
               className="min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-placeholder"
             />
           </div>
