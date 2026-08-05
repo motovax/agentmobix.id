@@ -1,7 +1,9 @@
 import { Link } from "wouter";
 import {
   compactFinancingLabel,
+  financingValueLabel,
   hasAvailableFinancing,
+  requiresSalesContact,
   type CardUnit,
 } from "../lib/mobix";
 import { formatJt, formatKm } from "../lib/format";
@@ -16,6 +18,7 @@ export function UnitRow({
   detailHref?: string;
 }) {
   const financingAvailable = hasAvailableFinancing(unit.pembiayaan);
+  const salesContactRequired = requiresSalesContact(unit.pembiayaan);
   return (
     <Link
       href={detailHref ?? `/unit/${unit.slug}`}
@@ -51,13 +54,26 @@ export function UnitRow({
           )}
         </div>
         <div
-          className={`mt-px text-[11px] ${
+          className={`mt-px text-[11px] leading-[1.45] ${
             financingAvailable ? "text-muted" : "font-semibold text-[#9A5A00]"
           }`}
         >
-          {financingAvailable
-            ? `TDP ${formatJt(unit.tdp)} · ${formatJt(unit.cicilan)}/bln · ${formatKm(unit.km)}`
-            : `${compactFinancingLabel(unit.pembiayaan)} · ${formatKm(unit.km)}`}
+          {salesContactRequired ? (
+            <>
+              <div>
+                Harga kredit {financingValueLabel(unit.pembiayaan, "")}
+              </div>
+              <div>
+                TDP {financingValueLabel(unit.pembiayaan, formatJt(unit.tdp))} · Cicilan{" "}
+                {financingValueLabel(unit.pembiayaan, `${formatJt(unit.cicilan)}/bln`)} ·{" "}
+                {formatKm(unit.km)}
+              </div>
+            </>
+          ) : financingAvailable ? (
+            `TDP ${formatJt(unit.tdp)} · ${formatJt(unit.cicilan)}/bln · ${formatKm(unit.km)}`
+          ) : (
+            `${compactFinancingLabel(unit.pembiayaan)} · ${formatKm(unit.km)}`
+          )}
         </div>
         <div className="mt-1.5">
           <div className="text-[10px] text-muted">Komisi</div>

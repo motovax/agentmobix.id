@@ -824,6 +824,24 @@ export function hasAvailableFinancing(financing: ProductFinancing): boolean {
   return financing.status === "available" && financing.eligible;
 }
 
+export const SALES_CONTACT_LABEL = "Hubungi Sales";
+
+/** The list/detail API explicitly directs financing values to Sales. */
+export function requiresSalesContact(
+  financing: ProductFinancing | null | undefined,
+): boolean {
+  return financing?.eligible === false;
+}
+
+export function financingValueLabel(
+  financing: ProductFinancing | null | undefined,
+  availableValue: string,
+): string {
+  return requiresSalesContact(financing)
+    ? SALES_CONTACT_LABEL
+    : availableValue;
+}
+
 export function compactFinancingLabel(financing: ProductFinancing): string {
   if (financing.status === "ineligible") {
     if (

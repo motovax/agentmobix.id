@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
   applySellCarAIExtraction,
+  buildLocalSellCarResult,
+  normalizeStnkExpiryForQuote,
+  ownershipTypeForQuote,
   type PriceRow,
   type SellCarAIExtraction,
+  type SellCarData,
   type SellCarFormData,
 } from "../src/lib/sellCar";
 
@@ -14,6 +18,7 @@ const emptyForm: SellCarFormData = {
   transmission: "",
   color: "",
   mileage: "",
+  ownershipType: "",
   plate: "",
   stnk: "",
 };
@@ -21,6 +26,15 @@ const emptyForm: SellCarFormData = {
 const rows: PriceRow[] = [
   { brand: "TOYOTA", model: "AVANZA", variant: "1.3 E MT", year: 2022, price: 0, notes: "" },
 ];
+
+const localData: SellCarData = {
+  source: "test",
+  sourceSheet: "test",
+  mrpVersion: "test",
+  rows: [
+    { brand: "TOYOTA", model: "AVANZA", variant: "1.3 E MT", year: 2022, price: 100_000_000, notes: "" },
+  ],
+};
 
 function extraction(overrides: Partial<SellCarAIExtraction["extracted"]> = {}): SellCarAIExtraction {
   return {
@@ -56,6 +70,7 @@ describe("applySellCarAIExtraction", () => {
       transmission: "Manual",
       color: "Hitam",
       mileage: "48123",
+      ownershipType: "",
       plate: "B - DKI Jakarta",
       stnk: "2027-08",
     });
@@ -73,5 +88,97 @@ describe("applySellCarAIExtraction", () => {
   test("maps unsupported plate regions to Lainnya", () => {
     const got = applySellCarAIExtraction(emptyForm, extraction({ plate_region: "N" }), rows);
     expect(got.plate).toBe("Lainnya");
+  });
+});
+
+describe("buildLocalSellCarResult", () => {
+  test("mengikuti rule fallback mobix-fe untuk KM, transmisi, warna, dan rentang harga", () => {
+    const result = buildLocalSellCarResult(localData, {
+      ...emptyForm,
+      brand: "TOYOTA",
+      model: "AVANZA",
+      variant: "1.3 E MT",
+      year: "2022",
+      transmission: "Manual",
+      color: "Biru",
+      mileage: "95.000",
+      ownershipType: "Perorangan",
+    }, 2026);
+
+    expect(result?.basePrice).toBe(100_000_000);
+    expect(result?.recommendedPrice).toBe(60_000_000);
+    expect(result?.priceMin).toBe(55_000_000);
+    expect(result?.priceMax).toBe(65_000_000);
+    expect(result?.adjustments).toEqual([
+      { label: "Penyesuaian jarak tempuh", amount: -15_000_000 },
+      { label: "Penyesuaian transmisi manual", amount: -10_000_000 },
+      { label: "Penyesuaian warna Biru", amount: -15_000_000 },
+    ]);
+  });
+
+  test("tidak memotong harga untuk kelebihan KM yang belum mencapai 10.000", () => {
+    const result = buildLocalSellCarResult(localData, {
+      ...emptyForm,
+      brand: "TOYOTA",
+      model: "AVANZA",
+      variant: "1.3 E MT",
+      year: "2022",
+      transmission: "Automatic",
+      color: "Hitam",
+      mileage: "69.999",
+    }, 2026);
+
+    expect(result?.recommendedPrice).toBe(100_000_000);
+    expect(result?.priceMin).toBe(95_000_000);
+    expect(result?.priceMax).toBe(105_000_000);
+  });
+
+  test("mengembalikan null saat kombinasi kendaraan tidak ada di matrix lokal", () => {
+    expect(buildLocalSellCarResult(localData, {
+      ...emptyForm,
+      brand: "HONDA",
+      model: "BRIO",
+      variant: "E",
+      year: "2022",
+    }, 2026)).toBeNull();
+  });
+});
+
+describe("ownershipTypeForQuote", () => {
+  test("maps the three UI ownership labels to API values", () => {
+    expect(ownershipTypeForQuote("Perorangan")).toBe("perorangan");
+    expect(ownershipTypeForQuote("Perusahaan")).toBe("perusahaan");
+    expect(ownershipTypeForQuote("Perusahaan (Rental)")).toBe("perusahaan_rental");
+  });
+
+  test("applies company and rental deductions in the local result", () => {
+    const company = buildLocalSellCarResult(localData, {
+      ...emptyForm,
+      brand: "TOYOTA",
+      model: "AVANZA",
+      variant: "1.3 E MT",
+      year: "2022",
+      ownershipType: "Perusahaan",
+    }, 2026);
+    const rental = buildLocalSellCarResult(localData, {
+      ...emptyForm,
+      brand: "TOYOTA",
+      model: "AVANZA",
+      variant: "1.3 E MT",
+      year: "2022",
+      ownershipType: "Perusahaan (Rental)",
+    }, 2026);
+
+    expect(company?.recommendedPrice).toBe(95_000_000);
+    expect(rental?.recommendedPrice).toBe(90_000_000);
+  });
+});
+
+describe("normalizeStnkExpiryForQuote", () => {
+  test("keeps ISO month/day formats and maps MM/YYYY", () => {
+    expect(normalizeStnkExpiryForQuote("2023-04-26")).toBe("2023-04-26");
+    expect(normalizeStnkExpiryForQuote("2023-04")).toBe("2023-04");
+    expect(normalizeStnkExpiryForQuote("04/2023")).toBe("2023-04");
+    expect(normalizeStnkExpiryForQuote("")).toBe("");
   });
 });

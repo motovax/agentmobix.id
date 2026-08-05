@@ -5,7 +5,7 @@ import "@splidejs/react-splide/css/core";
 import { Link, useParams, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
-import { ContactActionMenu, waHref } from "../components/FloatingContactCta";
+import { ContactActionMenu } from "../components/FloatingContactCta";
 import { Photo, Skeleton } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
 import { ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
@@ -15,6 +15,8 @@ import {
   mobixMedia,
   MOBIX_HERO_WIDTH,
   MOBIX_THUMBNAIL_WIDTH,
+  financingValueLabel,
+  requiresSalesContact,
   titleCase,
   toCardUnit,
   deriveBadge,
@@ -47,6 +49,7 @@ import {
   buildUnitDetailHref,
   getCatalogReturnHref,
 } from "../lib/catalogSearch";
+import { buildJasmineWhatsAppHref } from "../lib/jasmine";
 
 const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
 const MIN_DP_PERCENT = 15;
@@ -162,7 +165,7 @@ export function UnitDetail() {
   const originalPrice = unit?.harga ?? 0;
   const price = builderPrice > 0 ? builderPrice : originalPrice;
   const financingEligible = unit?.pembiayaan.eligible === true;
-  const financingIneligible = unit?.pembiayaan.status === "ineligible";
+  const salesContactRequired = requiresSalesContact(unit?.pembiayaan);
   const dsfRules = getDsfSimulationRules({
     category: unit?.category,
     year: unit?.year,
@@ -281,7 +284,7 @@ export function UnitDetail() {
         cicilan: String(Math.round(displayMonthly)),
         tdp: String(Math.round(shareTdp)),
       }).toString()}`
-    : financingIneligible && unit
+    : salesContactRequired && unit
       ? `/share?${new URLSearchParams({
           u: unit.slug,
           harga: String(Math.round(price)),
@@ -292,10 +295,13 @@ export function UnitDetail() {
     ? `Halo AI Mobix! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
     : undefined;
   const unitCalculationMessage = unit
-    ? financingIneligible
-      ? `Halo Admin, saya mau menanyakan opsi pembiayaan lain untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Unit ini tidak eligible pembiayaan DSF karena usia kendaraan.`
+    ? salesContactRequired
+      ? `Halo Jasmine, saya mau menanyakan opsi pembiayaan lain untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Pembiayaan DSF tidak tersedia untuk unit ini.`
       : `Halo Admin, saya mau minta hitungan leasing untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}.\n1. DP minim\n2. Cicilan ringan\n3. Cair All in`
     : undefined;
+  const jasmineCalculationHref = buildJasmineWhatsAppHref(
+    unitCalculationMessage ?? "",
+  );
   function formatDpValue(value: number) {
     return currencyFormatter.format(Math.max(0, Math.round(value || 0)));
   }
@@ -1079,9 +1085,9 @@ export function UnitDetail() {
                   Harga asli {formatRupiah(originalPrice)}
                 </div>
               )}
-              {financingIneligible ? (
+              {salesContactRequired ? (
                 <div className="mt-1 text-[12px] font-semibold text-[#9A5A00]">
-                  Pembiayaan DSF tidak tersedia
+                  Harga Kredit : Tanya Sales
                 </div>
               ) : simTab === "dpminim" ? (
                 <div className="mt-1 text-[12px] font-semibold text-teal-deep">
@@ -1169,7 +1175,7 @@ export function UnitDetail() {
         </div>
 
         {/* CALCULATOR */}
-        {financingIneligible ? (
+        {salesContactRequired ? (
           <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4">
             <div className="rounded-[18px] border border-[#E8C98B] bg-[#FFF8E8] p-4">
               <div className="inline-flex rounded-full bg-[#F7DFAC] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#7A4700]">
@@ -1179,10 +1185,20 @@ export function UnitDetail() {
                 Simulasi kredit DSF tidak tersedia
               </div>
               <p className="m-0 mt-1.5 text-[12px] leading-[1.6] text-mid">
-                {unit.pembiayaan.message}
+                {unit.pembiayaan.message || "Pembiayaan DSF tidak tersedia untuk unit ini."}
               </p>
+              <div className="mt-3 space-y-2 rounded-[12px] bg-white/70 p-3 text-[12px]">
+                {["Harga Kredit", "TDP", "Cicilan"].map((label) => (
+                  <div key={label} className="flex items-center justify-between gap-3">
+                    <span className="font-semibold text-mid">{label}</span>
+                    <span className="font-extrabold text-[#7A4700]">
+                      {financingValueLabel(unit.pembiayaan, "")}
+                    </span>
+                  </div>
+                ))}
+              </div>
               <a
-                href={waHref(unitCalculationMessage ?? "")}
+                href={jasmineCalculationHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-3 inline-flex w-full items-center justify-center rounded-[12px] bg-ink px-4 py-3 text-[13px] font-extrabold text-surface no-underline"
@@ -1726,8 +1742,9 @@ export function UnitDetail() {
         <ContactActionMenu
           adminMessage={unitAdminMessage ?? ""}
           calculationMessage={unitCalculationMessage ?? ""}
+          calculationHref={salesContactRequired ? jasmineCalculationHref : undefined}
           adminLabel="Tanya Unit"
-          calculationLabel={financingIneligible ? "Tanya Opsi Pembiayaan" : "Minta Hitungan"}
+          calculationLabel={salesContactRequired ? "Tanya Opsi Pembiayaan" : "Minta Hitungan"}
           buttonClassName="flex h-12 w-full items-center justify-center rounded-2xl border border-teal-tint-border bg-teal text-ink"
         />
       </div>

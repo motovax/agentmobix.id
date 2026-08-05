@@ -51,8 +51,17 @@ export function JualMobilHasil() {
           <h1 className="m-0 text-[22px] font-extrabold tracking-[-0.02em] text-ink">Prediksi Harga Mobil Kamu</h1>
           <div className="mt-5 text-center">
             <div className="text-[12px] text-muted">Rekomendasi Harga</div>
-            <div className="mt-1 whitespace-nowrap text-[clamp(14px,5vw,21px)] font-extrabold leading-tight text-teal-deep">
-              {formatRupiah(lowerPrice)} - {formatRupiah(upperPrice)}
+            <div className="mt-2 grid min-w-0 grid-cols-1 items-center justify-center gap-1 text-[clamp(16px,4.25vw,18px)] font-extrabold leading-snug text-teal-deep tabular-nums sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-2">
+              <span className="min-w-0 [overflow-wrap:anywhere] sm:text-right">
+                {formatRupiah(lowerPrice)}
+              </span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted sm:text-[16px] sm:normal-case sm:tracking-normal sm:text-teal-deep">
+                <span className="sm:hidden">sampai</span>
+                <span className="hidden sm:inline">–</span>
+              </span>
+              <span className="min-w-0 [overflow-wrap:anywhere] sm:text-left">
+                {formatRupiah(upperPrice)}
+              </span>
             </div>
           </div>
 
@@ -91,9 +100,16 @@ export function JualMobilHasil() {
             <Detail label="Tahun Keluaran" value={result.year} />
             <Detail label="Transmisi" value={result.transmission} />
             <Detail label="Jarak Tempuh" value={result.mileage ? `${Number(result.mileage).toLocaleString("id-ID")} km` : "-"} />
+            <Detail label="Atas Nama" value={result.ownershipType} />
             <Detail label="Warna" value={result.color} />
             <Detail label="Masa Berlaku STNK" value={formatStnk(result.stnk)} />
             <Detail label="Plat" value={result.plate} />
+            {typeof result.taxYearsDead === "number" && result.taxYearsDead > 0 ? (
+              <Detail label="Pajak Mati" value={`${result.taxYearsDead} tahun`} />
+            ) : null}
+            {typeof result.taxDeductionTotal === "number" && result.taxDeductionTotal > 0 ? (
+              <Detail label="Potongan Pajak" value={formatRupiah(result.taxDeductionTotal)} />
+            ) : null}
           </div>
 
           <div className="mt-7">

@@ -25,6 +25,7 @@ export type SellCarFormData = {
   transmission: string;
   color: string;
   mileage: string;
+  ownershipType: string;
   plate: string;
   stnk: string;
 };
@@ -67,6 +68,15 @@ export type PriceAdjustment = {
   amount: number;
 };
 
+export function ownershipTypeForQuote(value: string): string {
+  switch (value) {
+    case "Perorangan": return "perorangan";
+    case "Perusahaan": return "perusahaan";
+    case "Perusahaan (Rental)": return "perusahaan_rental";
+    default: return "";
+  }
+}
+
 export type SellCarResult = SellCarFormData & {
   basePrice: number;
   recommendedPrice: number;
@@ -77,11 +87,25 @@ export type SellCarResult = SellCarFormData & {
   sourceSheet: string;
   mrpVersion: string;
   notes: string;
+  /** Estimated or overridden annual vehicle tax (IDR). */
+  annualTax?: number;
+  /** manual | notes | estimate */
+  annualTaxSource?: string;
+  /** How many annual tax periods are overdue. */
+  taxYearsDead?: number;
+  /** Absolute IDR deducted for dead tax. */
+  taxDeductionTotal?: number;
 };
 
 type MRPOptionsResponse = {
   mrp_version?: string;
   options?: Array<{ brand: string; model: string; variant: string; year: number }>;
+};
+
+type APIEnvelope<T> = {
+  data?: T;
+  message?: string;
+  error?: string;
 };
 
 type MRPQuoteResponse = {
@@ -90,10 +114,38 @@ type MRPQuoteResponse = {
   recommended_price: number;
   price_min: number;
   price_max: number;
-  adjustments?: PriceAdjustment[];
+  adjustments?: PriceAdjustment[] | null;
   notes?: string;
   mrp_version?: string;
+  annual_tax?: number;
+  annual_tax_source?: string;
+  tax_years_dead?: number;
+  tax_deduction_total?: number;
 };
+
+/** Normalize STNK form value (YYYY-MM / YYYY-MM-DD / MM/YYYY) for MRP quote. */
+export function normalizeStnkExpiryForQuote(raw: string): string {
+  const value = raw.trim();
+  if (!value) return "";
+  if (/^\d{4}-\d{2}(-\d{2})?$/.test(value)) return value;
+  const mY = value.match(/^(\d{1,2})[\/\-](\d{4})$/);
+  if (mY) {
+    const month = mY[1].padStart(2, "0");
+    return `${mY[2]}-${month}`;
+  }
+  return value;
+}
+
+const MOBIX_FALLBACK_ROWS: PriceRow[] = [
+  {
+    brand: "MITSUBISHI",
+    model: "Xpander",
+    variant: "GLX",
+    year: 2021,
+    price: 147_000_000,
+    notes: "",
+  },
+];
 
 async function mrpFetch(path: string, init: RequestInit = {}): Promise<Response> {
   if (!API_KEY) throw new Error("API key MRP belum dikonfigurasi.");
@@ -141,16 +193,61 @@ async function readAPIError(response: Response, fallback: string): Promise<strin
   }
 }
 
-export async function fetchSellCarData(): Promise<SellCarData> {
-  const response = await mrpFetch("/api/mrp/options");
-  if (!response.ok) throw new Error(await readAPIError(response, "Gagal memuat pilihan MRP"));
-  const data = await response.json() as MRPOptionsResponse;
+function unwrapAPIData<T>(payload: T | APIEnvelope<T>): T {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
+    (payload as APIEnvelope<T>).data !== undefined
+  ) {
+    return (payload as APIEnvelope<T>).data as T;
+  }
+  return payload as T;
+}
+
+function alignLocalRows(rows: PriceRow[]): PriceRow[] {
+  const result = [...rows];
+  for (const fallbackRow of MOBIX_FALLBACK_ROWS) {
+    const exists = result.some((row) =>
+      row.brand === fallbackRow.brand &&
+      row.model === fallbackRow.model &&
+      row.variant === fallbackRow.variant &&
+      row.year === fallbackRow.year
+    );
+    if (!exists) result.push(fallbackRow);
+  }
+  return result;
+}
+
+async function fetchLocalSellCarData(): Promise<SellCarData> {
+  const response = await fetch("/sell-car-price-matrix.json");
+  if (!response.ok) throw new Error("Gagal memuat matrix harga lokal");
+  const data = await response.json() as Omit<SellCarData, "mrpVersion"> & { mrpVersion?: string };
   return {
-    source: "Mobix MRP API",
-    sourceSheet: "brand sheets",
-    mrpVersion: data.mrp_version || "",
-    rows: (data.options || []).map((option) => ({ ...option, price: 0, notes: "" })),
+    ...data,
+    rows: alignLocalRows(data.rows || []),
+    mrpVersion: data.mrpVersion || "mobix-local-fallback",
   };
+}
+
+export async function fetchSellCarData(): Promise<SellCarData> {
+  try {
+    const response = await mrpFetch("/api/mrp/options");
+    if (!response.ok) throw new Error(await readAPIError(response, "Gagal memuat pilihan MRP"));
+    const payload = await response.json() as MRPOptionsResponse | APIEnvelope<MRPOptionsResponse>;
+    const data = unwrapAPIData(payload);
+    if (Array.isArray(data.options) && data.options.length > 0) {
+      return {
+        source: "Mobix MRP API",
+        sourceSheet: "brand sheets",
+        mrpVersion: data.mrp_version || "",
+        rows: data.options.map((option) => ({ ...option, price: 0, notes: "" })),
+      };
+    }
+  } catch {
+    // Sama seperti mobix-fe: gunakan matrix lokal saat MRP API tidak tersedia.
+  }
+  return fetchLocalSellCarData();
 }
 
 export async function fetchSellCarAIExtraction(
@@ -237,36 +334,129 @@ export function getYears(rows: PriceRow[], brand: string, model: string, variant
     .map((row) => row.year))].sort((a, b) => b - a);
 }
 
-export async function fetchSellCarQuote(form: SellCarFormData): Promise<SellCarResult> {
-  const response = await mrpFetch("/api/mrp/quote", {
-    method: "POST",
-    body: JSON.stringify({
-      brand: form.brand,
-      model: form.model,
-      variant: form.variant,
-      year: Number(form.year),
-      transmission: form.transmission,
-      color: form.color,
-    }),
-  });
-  if (!response.ok) {
-    if (response.status === 404) throw new Error("Data harga mobil belum tersedia di MRP. Silakan pilih kombinasi lain.");
-    throw new Error(await readAPIError(response, "Gagal menghitung harga mobil"));
+export function buildLocalSellCarResult(
+  data: SellCarData,
+  form: SellCarFormData,
+  currentYear = new Date().getFullYear(),
+): SellCarResult | null {
+  const normalizedBrand = form.brand.trim().toLowerCase();
+  const normalizedModel = form.model.trim().toLowerCase();
+  const normalizedVariant = form.variant.trim().toLowerCase();
+  const year = Number(form.year);
+  const matches = data.rows.filter((row) =>
+    row.brand.trim().toLowerCase() === normalizedBrand &&
+    row.model.trim().toLowerCase() === normalizedModel &&
+    row.variant.trim().toLowerCase() === normalizedVariant &&
+    row.year === year &&
+    row.price > 0
+  );
+  if (matches.length === 0) return null;
+
+  const prices = matches.map((row) => row.price);
+  const baseMin = Math.min(...prices);
+  const baseMax = Math.max(...prices);
+  const adjustments: PriceAdjustment[] = [];
+
+  const actualMileage = Number(form.mileage.replace(/\D/g, ""));
+  if (form.year && actualMileage > 0) {
+    const age = Math.max(1, currentYear - year);
+    const standardMileage = age * 15_000;
+    const excessMileage = actualMileage - standardMileage;
+    if (excessMileage > 0) {
+      const amount = Math.floor(excessMileage / 10_000) * -5_000_000;
+      if (amount !== 0) adjustments.push({ label: "Penyesuaian jarak tempuh", amount });
+    }
   }
-  const quote = await response.json() as MRPQuoteResponse;
-  if (!quote.found) throw new Error("Data harga mobil belum tersedia di MRP. Silakan pilih kombinasi lain.");
+
+  if (form.ownershipType === "Perusahaan") {
+    adjustments.push({ label: "Penyesuaian kendaraan operasional perusahaan", amount: -5_000_000 });
+  } else if (form.ownershipType === "Perusahaan (Rental)") {
+    adjustments.push({ label: "Penyesuaian kendaraan rental perusahaan", amount: -10_000_000 });
+  }
+
+  if (form.transmission.toLowerCase().includes("manual")) {
+    adjustments.push({ label: "Penyesuaian transmisi manual", amount: -10_000_000 });
+  }
+
+  const normalizedColor = form.color.trim().toLowerCase();
+  const colorDeductions: Record<string, number> = {
+    merah: -10_000_000,
+    hijau: -15_000_000,
+    biru: -15_000_000,
+    oranye: -5_000_000,
+  };
+  const colorAdjustment = colorDeductions[normalizedColor] || 0;
+  if (colorAdjustment !== 0) {
+    adjustments.push({ label: `Penyesuaian warna ${form.color}`, amount: colorAdjustment });
+  }
+
+  const totalAdjustment = adjustments.reduce((total, adjustment) => total + adjustment.amount, 0);
+  const recommendedPrice = Math.max(0, Math.round((baseMin + baseMax) / 2) + totalAdjustment);
+
   return {
     ...form,
-    basePrice: quote.base_price,
-    recommendedPrice: quote.recommended_price,
-    priceMin: quote.price_min,
-    priceMax: quote.price_max,
-    adjustments: quote.adjustments || [],
-    source: "Mobix MRP API",
-    sourceSheet: "brand sheets",
-    mrpVersion: quote.mrp_version || "",
-    notes: quote.notes || "",
+    basePrice: Math.round((baseMin + baseMax) / 2),
+    recommendedPrice,
+    priceMin: Math.max(0, baseMin + totalAdjustment - 5_000_000),
+    priceMax: Math.max(0, baseMax + totalAdjustment + 5_000_000),
+    adjustments,
+    source: data.source,
+    sourceSheet: data.sourceSheet,
+    mrpVersion: data.mrpVersion || "mobix-local-fallback",
+    notes: matches.map((row) => row.notes).find(Boolean) || "",
   };
+}
+
+export async function fetchSellCarQuote(form: SellCarFormData): Promise<SellCarResult> {
+  let apiError: Error | null = null;
+  try {
+    const stnkExpiry = normalizeStnkExpiryForQuote(form.stnk);
+    const response = await mrpFetch("/api/mrp/quote", {
+      method: "POST",
+      body: JSON.stringify({
+        brand: form.brand,
+        model: form.model,
+        variant: form.variant,
+        year: Number(form.year),
+        transmission: form.transmission,
+        color: form.color,
+        odometer: Number(form.mileage.replace(/\D/g, "")),
+        ownership_type: ownershipTypeForQuote(form.ownershipType),
+        // Backend reduces recommended_price when tax is overdue.
+        ...(stnkExpiry ? { stnk_expiry: stnkExpiry } : {}),
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(await readAPIError(response, "Gagal menghitung harga mobil"));
+    }
+    const payload = await response.json() as MRPQuoteResponse | APIEnvelope<MRPQuoteResponse>;
+    const quote = unwrapAPIData(payload);
+    if (quote.found) {
+      return {
+        ...form,
+        basePrice: quote.base_price,
+        recommendedPrice: quote.recommended_price,
+        priceMin: quote.price_min,
+        priceMax: quote.price_max,
+        adjustments: quote.adjustments || [],
+        source: "Mobix MRP API",
+        sourceSheet: "brand sheets",
+        mrpVersion: quote.mrp_version || "",
+        notes: quote.notes || "",
+        annualTax: quote.annual_tax ?? 0,
+        annualTaxSource: quote.annual_tax_source || "",
+        taxYearsDead: quote.tax_years_dead ?? 0,
+        taxDeductionTotal: quote.tax_deduction_total ?? 0,
+      };
+    }
+    apiError = new Error("Data harga mobil belum tersedia di MRP. Silakan pilih kombinasi lain.");
+  } catch (cause) {
+    apiError = cause instanceof Error ? cause : new Error("Gagal menghitung harga mobil");
+  }
+
+  const localResult = buildLocalSellCarResult(await fetchLocalSellCarData(), form);
+  if (localResult) return localResult;
+  throw apiError;
 }
 
 export function getWhatsAppUrl(result: SellCarResult): string {
@@ -280,6 +470,7 @@ export function getWhatsAppUrl(result: SellCarResult): string {
     `Transmisi: ${result.transmission}`,
     `Warna: ${result.color}`,
     `Jarak tempuh: ${result.mileage || "-"} km`,
+    `Atas nama: ${result.ownershipType || "-"}`,
     `Plat: ${result.plate}`,
     `Masa berlaku STNK: ${result.stnk || "-"}`,
     `Rekomendasi harga: Rp ${new Intl.NumberFormat("id-ID").format(result.recommendedPrice)}`,

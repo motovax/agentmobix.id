@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import { AppBar } from "../components/AppBar";
 import { AppShell } from "../components/AppShell";
-import { Camera, Check, ChevronDown, Sparkles } from "../components/icons";
+import { Camera, Check, ChevronDown, Image, Sparkles } from "../components/icons";
 import {
   applySellCarAIExtraction,
   fetchSellCarAIExtraction,
@@ -25,6 +26,7 @@ const INITIAL_FORM: SellCarFormData = {
   transmission: "",
   color: "",
   mileage: "",
+  ownershipType: "",
   plate: "",
   stnk: "",
 };
@@ -48,6 +50,9 @@ const MONTHS = [
 
 type AIPhotoSelection = { file: File; previewUrl: string };
 
+const AI_PHOTO_ACCEPT =
+  "image/*,image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif";
+
 const AI_PHOTO_INPUTS: Array<{
   kind: SellCarAIPhotoKind;
   label: string;
@@ -57,6 +62,35 @@ const AI_PHOTO_INPUTS: Array<{
   { kind: "stnk", label: "Foto STNK", hint: "Pastikan data kendaraan dan masa berlaku terbaca" },
   { kind: "odometer", label: "Foto KM mobil", hint: "Foto panel odometer dari arah depan" },
 ];
+
+function isLikelyImageFile(file: File): boolean {
+  if (file.type.startsWith("image/")) return true;
+  // Beberapa device (Android/iOS) mengirim type kosong dari galeri.
+  return /\.(jpe?g|png|webp|heic|heif|bmp|gif)$/i.test(file.name);
+}
+
+/** Deteksi smartphone: pilihan Kamera/Galeri hanya di HP, bukan desktop/laptop. */
+function useIsSmartphone(): boolean {
+  const [isPhone, setIsPhone] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 768px) and (pointer: coarse)").matches
+      || /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
+  });
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 768px) and (pointer: coarse)");
+    const update = () => {
+      setIsPhone(
+        media.matches || /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent),
+      );
+    };
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return isPhone;
+}
 
 const AI_REVIEW_LABELS: Record<string, string> = {
   brand: "merek",
@@ -102,12 +136,14 @@ function SelectField({
   onChange,
   placeholder,
   disabled = false,
+  required = false,
   children,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   disabled?: boolean;
+  required?: boolean;
   children?: React.ReactNode;
 }) {
   return (
@@ -116,6 +152,7 @@ function SelectField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
+        required={required}
         className="h-11 w-full appearance-none rounded-[12px] border border-line bg-surface px-3.5 pr-9 text-[13px] text-ink outline-none transition focus:border-teal-deep disabled:bg-field disabled:text-placeholder"
       >
         <option value="">{placeholder}</option>
@@ -138,15 +175,20 @@ function MonthYearPicker({
   const initialYear = Number(value.slice(0, 4)) || new Date().getFullYear();
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(initialYear);
-  const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    function closeOnOutsideClick(event: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) setOpen(false);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
     }
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open]);
 
   function selectMonth(month: number) {
@@ -161,7 +203,7 @@ function MonthYearPicker({
     : placeholder;
 
   return (
-    <div ref={pickerRef} className="relative">
+    <div className="relative">
       <button
         type="button"
         onClick={() => {
@@ -178,46 +220,75 @@ function MonthYearPicker({
         <ChevronDown className={`text-muted transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {open && (
-        <div role="dialog" aria-label="Pilih bulan dan tahun" className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 rounded-[16px] border border-line bg-surface p-3 shadow-[0_12px_30px_-14px_rgba(14,27,30,0.4)]">
-          <div className="mb-2 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setViewYear((year) => year - 1)}
-              aria-label="Tahun sebelumnya"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[22px] leading-none text-ink transition hover:bg-field"
+      {/* Portal + fixed overlay: lepas dari overflow-hidden AppShell agar tidak terpotong */}
+      {open &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[10000] flex items-end justify-center bg-black/40 p-3 sm:items-center"
+            role="presentation"
+            onClick={() => setOpen(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Pilih bulan dan tahun"
+              className="w-full max-w-sm rounded-[18px] border border-line bg-surface p-4 shadow-[0_16px_40px_-12px_rgba(14,27,30,0.45)]"
+              onClick={(event) => event.stopPropagation()}
             >
-              ‹
-            </button>
-            <div className="text-[14px] font-extrabold text-ink">{viewYear}</div>
-            <button
-              type="button"
-              onClick={() => setViewYear((year) => year + 1)}
-              aria-label="Tahun berikutnya"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[22px] leading-none text-ink transition hover:bg-field"
-            >
-              ›
-            </button>
-          </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            {MONTHS.map((month, index) => {
-              const active = selectedYear === viewYear && selectedMonth === index;
-              return (
+              <div className="mb-3 flex items-center justify-between border-b border-line pb-3">
+                <div>
+                  <div className="text-[13px] font-extrabold text-ink">Masa Berlaku STNK</div>
+                  <p className="m-0 mt-0.5 text-[11px] leading-[1.4] text-muted">Pilih bulan dan tahun</p>
+                </div>
                 <button
-                  key={month}
                   type="button"
-                  onClick={() => selectMonth(index)}
-                  className={`rounded-[10px] px-1.5 py-2 text-[11px] font-semibold transition ${
-                    active ? "bg-teal-deep text-white" : "text-mid hover:bg-teal-tint"
-                  }`}
+                  onClick={() => setOpen(false)}
+                  aria-label="Tutup"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] leading-none text-muted transition hover:bg-field hover:text-ink"
                 >
-                  {month.slice(0, 3)}
+                  ×
                 </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+              </div>
+              <div className="mb-3 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setViewYear((year) => year - 1)}
+                  aria-label="Tahun sebelumnya"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none text-ink transition hover:bg-field"
+                >
+                  ‹
+                </button>
+                <div className="text-[16px] font-extrabold text-ink">{viewYear}</div>
+                <button
+                  type="button"
+                  onClick={() => setViewYear((year) => year + 1)}
+                  aria-label="Tahun berikutnya"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none text-ink transition hover:bg-field"
+                >
+                  ›
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {MONTHS.map((month, index) => {
+                  const active = selectedYear === viewYear && selectedMonth === index;
+                  return (
+                    <button
+                      key={month}
+                      type="button"
+                      onClick={() => selectMonth(index)}
+                      className={`rounded-[12px] px-2 py-2.5 text-[12px] font-semibold transition ${
+                        active ? "bg-teal-deep text-white" : "bg-field text-mid hover:bg-teal-tint"
+                      }`}
+                    >
+                      {month}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -233,26 +304,33 @@ function AIPhotoField({
   disabled: boolean;
   onSelect: (file: File) => void;
 }) {
-  return (
-    <label
-      className={`flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition ${
-        selection
-          ? "border-teal-tint-border bg-surface"
-          : "border-dashed border-teal-tint-border bg-surface/70"
-      } ${disabled ? "pointer-events-none opacity-60" : "hover:border-teal-deep"}`}
-    >
-      <input
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-        capture="environment"
-        className="sr-only"
-        disabled={disabled}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) onSelect(file);
-          event.target.value = "";
-        }}
-      />
+  const isPhone = useIsSmartphone();
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    setSheetOpen(false);
+    if (file) onSelect(file);
+  }
+
+  function openSource(source: "gallery" | "camera") {
+    // Klik input sinkron di dalam handler agar iOS/Android tetap anggap user gesture.
+    if (source === "camera") cameraInputRef.current?.click();
+    else galleryInputRef.current?.click();
+    setSheetOpen(false);
+  }
+
+  const shellClass = `flex min-h-16 w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition ${
+    selection
+      ? "border-teal-tint-border bg-surface"
+      : "border-dashed border-teal-tint-border bg-surface/70"
+  } ${disabled ? "pointer-events-none opacity-60" : "cursor-pointer hover:border-teal-deep"}`;
+
+  const preview = (
+    <>
       {selection ? (
         <img
           src={selection.previewUrl}
@@ -275,7 +353,110 @@ function AIPhotoField({
           <Check size={13} />
         </span>
       )}
-    </label>
+    </>
+  );
+
+  // Desktop/laptop: 1 klik → file lokal (tanpa sheet, tanpa capture).
+  if (!isPhone) {
+    return (
+      <label className={shellClass}>
+        <input
+          type="file"
+          accept={AI_PHOTO_ACCEPT}
+          className="sr-only"
+          disabled={disabled}
+          onChange={handleFileChange}
+        />
+        {preview}
+      </label>
+    );
+  }
+
+  // Smartphone: 1 ketuk → pilih Kamera atau Galeri (input terpisah; browser HP tidak selalu gabung keduanya).
+  return (
+    <>
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept={AI_PHOTO_ACCEPT}
+        className="sr-only"
+        tabIndex={-1}
+        disabled={disabled}
+        onChange={handleFileChange}
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept={AI_PHOTO_ACCEPT}
+        capture="environment"
+        className="sr-only"
+        tabIndex={-1}
+        disabled={disabled}
+        onChange={handleFileChange}
+      />
+
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setSheetOpen(true)}
+        className={shellClass}
+        aria-haspopup="dialog"
+        aria-expanded={sheetOpen}
+      >
+        {preview}
+      </button>
+
+      {sheetOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-3 sm:items-center"
+          role="presentation"
+          onClick={() => setSheetOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-label={`Pilih sumber ${item.label}`}
+            className="w-full max-w-sm overflow-hidden rounded-[18px] border border-line bg-surface shadow-[0_16px_40px_-12px_rgba(14,27,30,0.45)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-line px-4 py-3">
+              <div className="text-[13px] font-extrabold text-ink">{item.label}</div>
+              <p className="m-0 mt-0.5 text-[11px] leading-[1.4] text-muted">
+                Pilih kamera atau galeri perangkat
+              </p>
+            </div>
+            <div className="grid gap-0 p-2">
+              <button
+                type="button"
+                onClick={() => openSource("camera")}
+                className="flex h-12 items-center gap-3 rounded-[12px] px-3 text-left text-[13px] font-bold text-ink transition hover:bg-teal-tint"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-field text-teal-deep">
+                  <Camera size={18} />
+                </span>
+                Ambil dari kamera
+              </button>
+              <button
+                type="button"
+                onClick={() => openSource("gallery")}
+                className="flex h-12 items-center gap-3 rounded-[12px] px-3 text-left text-[13px] font-bold text-ink transition hover:bg-teal-tint"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-field text-teal-deep">
+                  <Image size={18} />
+                </span>
+                Pilih dari galeri
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSheetOpen(false)}
+              className="flex h-11 w-full items-center justify-center border-t border-line text-[12px] font-bold text-muted transition hover:bg-field"
+            >
+              Batal
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -345,6 +526,10 @@ export function JualMobil() {
   function selectAIPhoto(kind: SellCarAIPhotoKind, file: File) {
     if (kind === "stnk" && !stnkConsent) {
       setAIError("Setujui pemrosesan foto STNK sebelum mengunggah foto.");
+      return;
+    }
+    if (!isLikelyImageFile(file)) {
+      setAIError("Pilih file gambar dari galeri atau perangkat (JPG, PNG, WEBP, HEIC, dll).");
       return;
     }
     if (file.size > 12 * 1024 * 1024) {
@@ -511,15 +696,29 @@ export function JualMobil() {
                 </SelectField>
               </Field>
 
-              <Field label="Jarak Tempuh (KM)" hint="Contoh: 50.000">
+              <Field label="Jarak Tempuh (KM)" required hint="KM standar adalah 15.000 per tahun kendaraan.">
                 <input
                   type="text"
                   inputMode="numeric"
                   value={formatThousands(form.mileage)}
                   onChange={(event) => update("mileage", event.target.value.replace(/\D/g, ""))}
                   placeholder="Contoh: 50.000"
+                  required
                   className="h-11 w-full rounded-[12px] border border-line bg-surface px-3.5 text-[13px] text-ink outline-none transition placeholder:text-placeholder focus:border-teal-deep"
                 />
+              </Field>
+
+              <Field label="Atas Nama" required hint="Pilih jenis kepemilikan yang tercantum pada dokumen kendaraan.">
+                <SelectField
+                  value={form.ownershipType}
+                  onChange={(value) => update("ownershipType", value)}
+                  placeholder="Pilih jenis kepemilikan"
+                  required
+                >
+                  <option value="Perorangan">Perorangan</option>
+                  <option value="Perusahaan">Perusahaan</option>
+                  <option value="Perusahaan (Rental)">Perusahaan (Rental)</option>
+                </SelectField>
               </Field>
 
               <Field label="Plat" required hint="Bisa dicek melalui kode provinsi pada plat kendaraan.">
