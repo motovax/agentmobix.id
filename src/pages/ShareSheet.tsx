@@ -1147,7 +1147,7 @@ export function ShareSheet({ embedded = false }: any = {}) {
     });
   }
 
-  const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
+  const backHref = embedded ? "#simulasi-kredit" : unit ? `/unit/${unit.slug}` : "/katalog";
   const aiActiveUrl = activeMedia?.kind === "image" && aiPreviewMode === "ai"
     ? aiBackgroundUrls[activeMedia.id]
     : undefined;
@@ -1175,9 +1175,9 @@ export function ShareSheet({ embedded = false }: any = {}) {
   const showAiOriginalToggle = activeMedia?.kind === "image" && activeHasAiBackground;
 
   return (
-    <AppShell overlay={embedded}>
+    <AppShell overlay={embedded} bare={embedded}>
       {/* sheet */}
-      <div className="min-h-[560px] px-4 pb-24 pt-[18px]">
+      <div className="min-h-[560px] bg-surface-2 px-4 pb-24 pt-[18px]">
         {/* shareable preview */}
         <div className="relative mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
           {activeMedia?.kind === "video" ? (

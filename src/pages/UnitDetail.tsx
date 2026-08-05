@@ -165,6 +165,15 @@ export function UnitDetail() {
   const [smartCreditPriceError, setSmartCreditPriceError] = useState(false);
   const pageRef = useRef<HTMLElement>(null);
   const galleryRef = useRef<Splide>(null);
+  const sharePanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!sharePanelOpen || !unit) return;
+    const frame = window.requestAnimationFrame(() => {
+      sharePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [sharePanelOpen, unit]);
 
   const originalPrice = unit?.harga ?? 0;
   const price = builderPrice > 0 ? builderPrice : originalPrice;
@@ -1656,6 +1665,18 @@ export function UnitDetail() {
         </div>
         )}
 
+        {sharePanelOpen && (
+          <div ref={sharePanelRef} id="share-client" className="scroll-mt-3 border-t border-line-2 pt-4">
+            <div className="px-[18px] pb-1">
+              <div className="text-[16px] font-extrabold text-ink">Generate &amp; share ke client</div>
+              <p className="m-0 mt-1 text-[12px] text-muted">
+                Gunakan hasil simulasi di atas untuk membuat caption dan membagikan unit.
+              </p>
+            </div>
+            <ShareSheet embedded />
+          </div>
+        )}
+
         {/* KELENGKAPAN DOKUMEN */}
         {docs.length > 0 && (
         <div className="px-[18px] pb-4">
@@ -1754,7 +1775,6 @@ export function UnitDetail() {
           buttonClassName="flex h-12 w-full items-center justify-center rounded-2xl border border-teal-tint-border bg-teal text-ink"
         />
       </div>
-      {sharePanelOpen && <ShareSheet embedded />}
     </AppShell>
   );
 }

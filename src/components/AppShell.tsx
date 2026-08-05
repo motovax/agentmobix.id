@@ -12,12 +12,16 @@ export function AppShell({
   /** when true the frame is a fixed-height column (for chat-style screens) */
   flexColumn = false,
   overlay = false,
+  bare = false,
 }: {
   children: ReactNode;
   bg?: string;
   flexColumn?: boolean;
   overlay?: boolean;
+  bare?: boolean;
 }) {
+  if (bare) return <>{children}</>;
+
   return (
     <div className={["flex min-h-screen justify-center bg-app-bg sm:py-6", overlay ? "fixed inset-0 z-50 overflow-y-auto" : ""].join(" ")}>
       <div
