@@ -13,7 +13,7 @@ const SEED: Message[] = [
   {
     id: 1,
     kind: "in",
-    html: "Halo 👋 Aku Talon AI, asisten jualanmu. Aku bisa bantu mencari unit di inventory Motovax, membuat caption, atau menghitung paket cicilan. Silakan tanyakan apa saja.",
+    html: "Halo 👋 Aku Talon AI, asisten jualanmu. Aku bisa bantu mencari unit di inventory Mobix, membuat caption, atau menghitung paket cicilan. Silakan tanyakan apa saja.",
   },
 ];
 
