@@ -1098,24 +1098,6 @@ export function UnitDetail() {
           </>
         )}
 
-        {aiShareHref && (
-          <Link
-            href={aiShareHref}
-            className="mx-[18px] mb-2 flex items-center gap-3 rounded-[14px] border border-teal-tint-border bg-teal-tint px-3.5 py-3 text-ink no-underline"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-teal-deep shadow-sm">
-              <Sparkles size={19} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-extrabold">Buat konten dengan AI</span>
-              <span className="mt-0.5 block text-[11px] leading-[1.4] text-mid">
-                Ganti background foto dan buat caption siap share.
-              </span>
-            </span>
-            <span className="text-[22px] leading-none text-teal-deep">›</span>
-          </Link>
-        )}
-
         {/* TITLE BLOCK */}
         <div className="px-[18px] pt-1">
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
