@@ -50,6 +50,7 @@ import {
   getCatalogReturnHref,
 } from "../lib/catalogSearch";
 import { buildJasmineWhatsAppHref } from "../lib/jasmine";
+import { ShareSheet } from "./ShareSheet";
 
 const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
 const MIN_DP_PERCENT = 15;
@@ -128,7 +129,10 @@ function maskBpkbValue(value: string) {
 
 export function UnitDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const returnHref = getCatalogReturnHref(useSearch());
+  const search = useSearch();
+  const searchParams = new URLSearchParams(search);
+  const returnHref = getCatalogReturnHref(search);
+  const sharePanelOpen = searchParams.get("share") === "1";
   const { data: unit, loading, error } = useAsync(
     () => fetchUnitDetail(slug),
     [slug],
@@ -161,6 +165,15 @@ export function UnitDetail() {
   const [smartCreditPriceError, setSmartCreditPriceError] = useState(false);
   const pageRef = useRef<HTMLElement>(null);
   const galleryRef = useRef<Splide>(null);
+  const sharePanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!sharePanelOpen || !unit) return;
+    const frame = window.requestAnimationFrame(() => {
+      sharePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [sharePanelOpen, unit]);
 
   const originalPrice = unit?.harga ?? 0;
   const price = builderPrice > 0 ? builderPrice : originalPrice;
@@ -270,7 +283,8 @@ export function UnitDetail() {
   const currencyFormatter = new Intl.NumberFormat("id-ID");
   const shareTenor = simTab === "dpminim" ? dpMinimInstallmentCount(tenor) : tenor;
   const shareHref = canShareSimulation
-    ? `/share?${new URLSearchParams({
+    ? `/unit/${encodeURIComponent(unit?.slug ?? slug ?? "")}?${new URLSearchParams({
+        share: "1",
         u: unit?.slug ?? slug ?? "",
         sim: simTab,
         harga: String(Math.round(price)),
@@ -285,7 +299,8 @@ export function UnitDetail() {
         tdp: String(Math.round(shareTdp)),
       }).toString()}`
     : salesContactRequired && unit
-      ? `/share?${new URLSearchParams({
+      ? `/unit/${encodeURIComponent(unit.slug)}?${new URLSearchParams({
+          share: "1",
           u: unit.slug,
           harga: String(Math.round(price)),
           komisi: String(Math.round(estimatedCommission)),
@@ -1648,6 +1663,18 @@ export function UnitDetail() {
             </p>
           </div>
         </div>
+        )}
+
+        {sharePanelOpen && (
+          <div ref={sharePanelRef} id="share-client" className="scroll-mt-3 border-t border-line-2 pt-4">
+            <div className="px-[18px] pb-1">
+              <div className="text-[16px] font-extrabold text-ink">Generate &amp; share ke client</div>
+              <p className="m-0 mt-1 text-[12px] text-muted">
+                Gunakan hasil simulasi di atas untuk membuat caption dan membagikan unit.
+              </p>
+            </div>
+            <ShareSheet embedded />
+          </div>
         )}
 
         {/* KELENGKAPAN DOKUMEN */}

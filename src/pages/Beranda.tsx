@@ -4,7 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { BottomNav } from "../components/BottomNav";
 import { FloatingContactCta } from "../components/FloatingContactCta";
 import { UnitRow } from "../components/UnitRow";
-import { Search } from "../components/icons";
+import { Chat, Search } from "../components/icons";
 import { Photo, Skeleton, SkeletonRow } from "../components/ui";
 import {
   fetchUnits,
@@ -404,6 +404,13 @@ export function Beranda() {
               </Link>
             ))}
           </div>
+          <Link
+            href="/ai"
+            className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-teal/30 bg-teal px-4 py-2.5 text-[12px] font-extrabold text-ink no-underline"
+          >
+            <Chat size={16} strokeWidth={1.8} />
+            Bantuan AI <span aria-hidden="true">→</span>
+          </Link>
         </header>
 
         {/* CARI PER MEREK */}

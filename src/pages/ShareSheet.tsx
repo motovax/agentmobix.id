@@ -39,6 +39,7 @@ import { formatJt, formatOdometer, formatRupiah } from "../lib/format";
 import { estimateBuilderCommission } from "../lib/commission";
 import {
   buildAgenMobixUnitLink,
+  buildWhatsAppShareText,
   ensureRequiredCaptionFacts,
   formatCaptionReadability,
   removeCaptionParagraphsContaining,
@@ -412,7 +413,7 @@ const CAPTION_STYLE_HINTS = [
   "Energetic social caption, concise, persuasive, and not exaggerated.",
 ];
 
-export function ShareSheet() {
+export function ShareSheet({ embedded = false }: any = {}) {
   const search = useSearch();
   const searchParams = new URLSearchParams(search);
   const slug = searchParams.get("u") ?? "";
@@ -1123,7 +1124,15 @@ export function ShareSheet() {
   }
 
   function shareVia(channel: "wa" | "tg" | "x") {
-    const encoded = encodeURIComponent(captionText);
+    const imageUrls = channel === "wa"
+      ? selectedImageMedia.map((media) =>
+          aiBackgroundUrls[media.id] ?? mobixImage(media.item.url, MOBIX_SHARE_WIDTH),
+        ).filter((url): url is string => Boolean(url))
+      : [];
+    const shareText = channel === "wa"
+      ? buildWhatsAppShareText(captionText, imageUrls)
+      : captionText;
+    const encoded = encodeURIComponent(shareText);
     const urls: Record<string, string> = {
       wa: `https://wa.me/?text=${encoded}`,
       tg: `https://t.me/share/url?url=${encoded}`,
@@ -1147,7 +1156,7 @@ export function ShareSheet() {
     });
   }
 
-  const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
+  const backHref = embedded ? "#simulasi-kredit" : unit ? `/unit/${unit.slug}` : "/katalog";
   const aiActiveUrl = activeMedia?.kind === "image" && aiPreviewMode === "ai"
     ? aiBackgroundUrls[activeMedia.id]
     : undefined;
@@ -1175,9 +1184,9 @@ export function ShareSheet() {
   const showAiOriginalToggle = activeMedia?.kind === "image" && activeHasAiBackground;
 
   return (
-    <AppShell>
+    <AppShell overlay={embedded} bare={embedded}>
       {/* sheet */}
-      <div className="min-h-[560px] px-4 pb-24 pt-[18px]">
+      <div className="min-h-[560px] bg-surface-2 px-4 pb-24 pt-[18px]">
         {/* shareable preview */}
         <div className="relative mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
           {activeMedia?.kind === "video" ? (

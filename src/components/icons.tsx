@@ -134,6 +134,15 @@ export function Camera({ size = 22, className, strokeWidth = 1.5 }: IconProps) {
   );
 }
 
+export function VideoCamera({ size = 20, className, strokeWidth = 1.5 }: IconProps) {
+  return (
+    <svg {...base(size)} viewBox="0 0 20 20" className={className}>
+      <rect x="2.5" y="5" width="10.5" height="10" rx="2" stroke="currentColor" strokeWidth={strokeWidth} />
+      <path d="m13 8 4.5-2v8L13 12" stroke="currentColor" strokeWidth={strokeWidth} strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** Image / gallery picker icon. */
 export function Image({ size = 18, className, strokeWidth = 1.5 }: IconProps) {
   return (
