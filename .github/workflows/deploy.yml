@@ -40,6 +40,15 @@ jobs:
           VITE_CMS_IMAGE_BASE: ${{ vars.VITE_CMS_IMAGE_BASE || 'https://api.mobixbydss.id' }}
           VITE_DSF_BEARER_TOKEN: ${{ vars.VITE_DSF_BEARER_TOKEN }}
           VITE_DSF_BASE_URL: ${{ vars.VITE_DSF_BASE_URL || 'https://simulation.dipostar.com' }}
+          VITE_FALCON_API_BASE: ${{ vars.VITE_FALCON_API_BASE || 'https://motovax-ai.motovax.com' }}
+          VITE_FALCON_SSE_URL: ${{ vars.VITE_FALCON_SSE_URL || 'https://motovax-ai.motovax.com/api/falcon/external/stream' }}
+          VITE_FALCON_CLIENT: ${{ vars.VITE_FALCON_CLIENT || 'mobix' }}
+          VITE_FALCON_TOKEN: ${{ secrets.VITE_FALCON_TOKEN }}
+
+      - name: Verify Falcon configuration
+        env:
+          VITE_FALCON_TOKEN: ${{ secrets.VITE_FALCON_TOKEN }}
+        run: test -n "$VITE_FALCON_TOKEN"
 
       - name: SPA fallback (client-side routing on Pages)
         run: cp dist/index.html dist/404.html

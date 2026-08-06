@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState, type ComponentType, type MouseEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { AppShell } from "../components/AppShell";
-import { Camera, Calculator, Chat, ChevronLeft, Plus, Search, Send, VideoCamera } from "../components/icons";
-import { classifyQuery, fetchUnits, mobixImage, type ProductListItem } from "../lib/mobix";
-import { formatJt } from "../lib/format";
+import { ChevronLeft, Search, Send } from "../components/icons";
+import {
+  askFalcon,
+  buildFalconContextMessage,
+  formatFalconReplyHtml,
+  resolveFalconUnitLinks,
+  type FalconConversationTurn,
+} from "../lib/falcon";
 
 type Message =
   | { id: number; kind: "in"; html: string }
@@ -13,7 +18,7 @@ const SEED: Message[] = [
   {
     id: 1,
     kind: "in",
-    html: "Halo 👋 Aku Talon AI, asisten jualanmu. Aku bisa bantu mencari unit di inventory Mobix, membuat caption, atau menghitung paket cicilan. Silakan tanyakan apa saja.",
+    html: "Halo 👋 Aku AI Mobix Assistant, asisten read-only Mobix. Aku bisa membantu mencari dan membandingkan unit dari inventory. Detail unit selalu diarahkan ke agentmobix.id.",
   },
 ];
 
@@ -25,10 +30,7 @@ type QuickAction = {
 
 const QUICK_ACTIONS: QuickAction[] = [
   { label: "Cari unit", prompt: "Cari unit: ", Icon: Search },
-  { label: "Minta foto", prompt: "Minta foto unit: ", Icon: Camera },
-  { label: "Minta video", prompt: "Minta video unit: ", Icon: VideoCamera },
-  { label: "Hitung cicilan", prompt: "Hitung cicilan unit: ", Icon: Calculator },
-  { label: "Estafet lead", prompt: "Estafet lead: ", Icon: Chat },
+  { label: "Bandingkan unit", prompt: "Bandingkan unit: ", Icon: Search },
 ];
 
 function escapeHtml(value: string) {
@@ -83,6 +85,7 @@ export function AiMobix() {
   const [draft, setDraft] = useState("");
   const [isSearchingInventory, setIsSearchingInventory] = useState(false);
   const nextId = useRef(100);
+  const conversationRef = useRef<FalconConversationTurn[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -122,36 +125,37 @@ export function AiMobix() {
     setMessages((m) => [...m, { id: outId, kind: "out", html: value }]);
     setDraft("");
 
-    if (isInventoryRequest(value)) {
-      setIsSearchingInventory(true);
-      try {
-        const result = await fetchUnits(inventoryRequest(value));
-        setMessages((m) => [...m, { id: nextId.current++, kind: "in", html: inventoryReply(result.items, result.total) }]);
-      } catch {
-        setMessages((m) => [...m, { id: nextId.current++, kind: "in", html: "Inventory sedang tidak dapat diakses. Coba lagi beberapa saat atau buka katalog untuk melihat stok terbaru." }]);
-      } finally {
-        setIsSearchingInventory(false);
-      }
-      return;
+    setIsSearchingInventory(true);
+    try {
+      const result = await askFalcon(
+        buildFalconContextMessage(value, conversationRef.current),
+      );
+      conversationRef.current = [
+        ...conversationRef.current,
+        { role: "user", content: value },
+        { role: "assistant", content: result.reply },
+      ];
+      const units = await resolveFalconUnitLinks(result.reply);
+      setMessages((m) => [...m, {
+        id: nextId.current++,
+        kind: "in",
+        html: formatFalconReplyHtml(result.reply, units),
+      }]);
+    } catch {
+      setMessages((m) => [...m, {
+        id: nextId.current++,
+        kind: "in",
+            html: "Falcon sedang tidak dapat diakses. Coba lagi beberapa saat atau buka katalog untuk melihat stok terbaru.",
+      }]);
+    } finally {
+      setIsSearchingInventory(false);
     }
-
-    const inId = nextId.current++;
-    window.setTimeout(() => {
-      setMessages((m) => [
-        ...m,
-        {
-          id: inId,
-          kind: "in",
-          html: "Siap, aku bantu proses. Aku teruskan ke tim cabang dan kabari kamu di sini ya. 🙌",
-        },
-      ]);
-    }, 700);
   }
 
   return (
     <AppShell bg="bg-surface-2" flexColumn>
       {/* header */}
-      <div className="flex flex-shrink-0 items-center gap-3 border-b border-[#EEF2F3] bg-surface px-3.5 pb-3.5 pt-3">
+      <div className="flex flex-shrink-0 items-center gap-3 border-b border-[#EEF2F3] bg-surface px-3.5 pb-3.5 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <Link
           href="/"
           aria-label="Kembali"
@@ -163,7 +167,7 @@ export function AiMobix() {
           T
         </div>
         <div className="flex-1">
-          <div className="-tracking-[0.01em] text-[15px] font-extrabold">Talon AI</div>
+          <div className="-tracking-[0.01em] text-[15px] font-extrabold">AI Mobix Assistant</div>
           <div className="flex items-center gap-1.5 text-[11px] text-teal-deep">
             <span className="h-1.5 w-1.5 rounded-full bg-teal" />
             Aktif · biasanya balas &lt; 30 detik
@@ -202,7 +206,7 @@ export function AiMobix() {
         })}
         {isSearchingInventory && (
           <div className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] text-muted">
-            Talon AI sedang mengecek inventory Motovax…
+            AI Mobix Assistant sedang membaca inventory Mobix…
           </div>
         )}
       </div>
@@ -235,19 +239,12 @@ export function AiMobix() {
           }}
           className="flex items-center gap-2"
         >
-          <button
-            type="button"
-            aria-label="Lampirkan"
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-line bg-surface-2 text-muted"
-          >
-            <Plus />
-          </button>
           <div className="flex flex-1 items-center rounded-full border border-line bg-surface-2 px-4 py-2.5">
             <input
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Tulis pesan untuk Talon AI…"
+              placeholder="Tulis pertanyaan read-only untuk AI Mobix Assistant…"
               className="min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-placeholder"
             />
           </div>

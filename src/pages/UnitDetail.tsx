@@ -8,7 +8,7 @@ import { AppBar } from "../components/AppBar";
 import { ContactActionMenu } from "../components/FloatingContactCta";
 import { Photo, Skeleton } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
-import { ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
+import { ChevronLeft, ShareArrow, Check, Close, Play, Sparkles } from "../components/icons";
 import {
   fetchUnitDetail,
   mobixImage,
@@ -145,6 +145,8 @@ export function UnitDetail() {
   const [activeThumb, setActiveThumb] = useState(0);
   const [showAllThumbs, setShowAllThumbs] = useState(false);
   const [lightbox, setLightbox] = useState(false);
+  const [simulationOpen, setSimulationOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [dpPercentInput, setDpPercentInput] = useState(String(MIN_DP_PERCENT));
   const [dpAmountInput, setDpAmountInput] = useState("");
   const [tdpAmount, setTdpAmount] = useState(0);
@@ -297,17 +299,25 @@ export function UnitDetail() {
           : {}),
         cicilan: String(Math.round(displayMonthly)),
         tdp: String(Math.round(shareTdp)),
-      }).toString()}`
+        }).toString()}`
     : salesContactRequired && unit
       ? `/unit/${encodeURIComponent(unit.slug)}?${new URLSearchParams({
           share: "1",
           u: unit.slug,
           harga: String(Math.round(price)),
           komisi: String(Math.round(estimatedCommission)),
-        }).toString()}`
+      }).toString()}`
       : null;
+  const aiShareHref = unit
+    ? shareHref ?? `/unit/${encodeURIComponent(unit.slug)}?${new URLSearchParams({
+        share: "1",
+        u: unit.slug,
+        harga: String(Math.round(price)),
+        komisi: String(Math.round(estimatedCommission)),
+      }).toString()}`
+    : null;
   const unitAdminMessage = unit
-    ? `Halo AI Mobix! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
+    ? `Halo AI Mobix Assistant! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
     : undefined;
   const unitCalculationMessage = unit
     ? salesContactRequired
@@ -757,6 +767,8 @@ export function UnitDetail() {
     setActiveThumb(0);
     setShowAllThumbs(false);
     setLightbox(false);
+    setSimulationOpen(false);
+    setDetailsOpen(false);
     setSimTab("reguler");
     setSimulationMethod("DP");
     setDpPercent(minDsfDpPercent);
@@ -953,9 +965,23 @@ export function UnitDetail() {
               <ShareArrow size={17} />
             </button>
           )}
-          <span className="absolute bottom-3.5 left-3.5 rounded-lg bg-teal px-2.5 py-1 text-[16px] font-bold text-ink">
-            {badge ?? "Stok aktif"} · {unit.plate_no}
-          </span>
+          {aiShareHref && (
+            <Link
+              href={aiShareHref}
+              aria-label="Buat konten dengan AI"
+              className="absolute right-3.5 top-[62px] flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/70 bg-teal-deep text-white shadow-sm backdrop-blur"
+            >
+              <Sparkles size={18} />
+            </Link>
+          )}
+          <div className="absolute bottom-3.5 left-3.5 rounded-xl bg-ink/85 px-3 py-2 text-surface shadow-sm backdrop-blur">
+            <div className="text-[16px] font-extrabold leading-none">
+              {price ? formatRupiah(price) : "Hubungi kami"}
+            </div>
+            <div className="mt-1 text-[10px] font-semibold text-white/75">
+              {displayTdp ? `TDP ${formatRupiah(displayTdp)}` : badge ?? "Stok aktif"}
+            </div>
+          </div>
           {mediaItems.length > 0 && (
             <div className="absolute bottom-3.5 right-3.5 rounded-lg bg-ink/80 px-2.5 py-[3px] text-[11px] font-semibold text-surface">
               {activeThumb + 1} / {mediaItems.length}
@@ -1072,11 +1098,29 @@ export function UnitDetail() {
           </>
         )}
 
+        {aiShareHref && (
+          <Link
+            href={aiShareHref}
+            className="mx-[18px] mb-2 flex items-center gap-3 rounded-[14px] border border-teal-tint-border bg-teal-tint px-3.5 py-3 text-ink no-underline"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-teal-deep shadow-sm">
+              <Sparkles size={19} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-extrabold">Buat konten dengan AI</span>
+              <span className="mt-0.5 block text-[11px] leading-[1.4] text-mid">
+                Ganti background foto dan buat caption siap share.
+              </span>
+            </span>
+            <span className="text-[22px] leading-none text-teal-deep">›</span>
+          </Link>
+        )}
+
         {/* TITLE BLOCK */}
         <div className="px-[18px] pt-1">
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-            <span className="rounded-md bg-field px-1.5 py-0.5 text-[11px] font-medium text-muted">
-              🏢 Cabang: {titleCase(unit.lokasi || "Mobix")}
+              <span className="rounded-md bg-field px-1.5 py-0.5 text-[11px] font-medium text-muted">
+              Cabang: {titleCase(unit.lokasi || "Mobix")}
             </span>
             {unit.posisi && titleCase(unit.posisi) !== titleCase(unit.lokasi || "") && (
               <span className="rounded-md bg-field px-1.5 py-0.5 text-[11px] font-medium text-muted">
@@ -1090,7 +1134,7 @@ export function UnitDetail() {
           <h1 className="m-0 mt-0.5 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2]">
             {unit.nama}
           </h1>
-          <div className="mt-2.5 flex items-center justify-between">
+            <div className="mt-2.5 flex items-center justify-between">
             <div>
               <div className="-tracking-[0.02em] text-[24px] font-extrabold">
                 {price ? formatRupiah(price) : "Hubungi kami"}
@@ -1138,6 +1182,21 @@ export function UnitDetail() {
           </div>
           {originalPrice > 0 && (
             <div className="mt-3 rounded-[14px] border border-line bg-surface px-3.5 py-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-[15px] font-extrabold text-ink">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-tint text-[17px]">✎</span>
+                  Pengaturan harga
+                </div>
+                {price !== originalPrice && (
+                  <button
+                    type="button"
+                    onClick={() => commitBuilderPrice(originalPrice)}
+                    className="text-[12px] font-bold text-teal-deep"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
               <div className="mb-1.5 flex items-center justify-between gap-2">
                 <label
                   htmlFor="builder-price"
@@ -1145,15 +1204,6 @@ export function UnitDetail() {
                 >
                   Harga jual builder
                 </label>
-                {price !== originalPrice && (
-                  <button
-                    type="button"
-                    onClick={() => commitBuilderPrice(originalPrice)}
-                    className="text-[11px] font-semibold text-muted underline"
-                  >
-                    Reset
-                  </button>
-                )}
               </div>
               <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2.5">
                 <span className="shrink-0 text-[13px] font-semibold text-muted">Rp</span>
@@ -1173,25 +1223,48 @@ export function UnitDetail() {
                 <span>Minimum {formatRupiah(minimumBuilderPrice)}</span>
                 <span>Turun maks. {formatRupiah(MAX_BUILDER_PRICE_DROP)}</span>
               </div>
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-teal-tint px-3 py-2.5">
+                <div className="flex min-w-0 items-center gap-2 text-[12px] font-bold text-ink">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-teal-deep" />
+                  <span>Estimasi komisi kamu</span>
+                </div>
+                <span className="shrink-0 text-[16px] font-extrabold text-teal-deep">
+                  {formatRupiah(estimatedCommission)}
+                </span>
+              </div>
+              <p className="m-0 mt-2 text-[10px] leading-[1.45] text-muted">
+                Naikkan harga jual untuk menambah estimasi komisi.
+              </p>
             </div>
           )}
         </div>
 
-        {/* SPEC GRID */}
-        <div className="px-[18px] py-4">
-          <div className="grid grid-cols-3 gap-2">
-            {topSpecs.map((s) => (
-              <div key={s.label} className="rounded-xl bg-field p-3 text-center">
-                <div className="text-[11px] text-muted">{s.label}</div>
-                <div className="mt-0.5 truncate text-[13px] font-bold">{s.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* CALCULATOR */}
-        {salesContactRequired ? (
-          <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4">
+        <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4 pt-3">
+          <button
+            type="button"
+            aria-expanded={simulationOpen}
+            onClick={() => setSimulationOpen((open) => !open)}
+            className="flex w-full items-center gap-3 rounded-[18px] border border-line bg-surface px-4 py-3 text-left"
+          >
+            <span className="flex-1">
+              <span className="flex items-center gap-2 text-[15px] font-extrabold text-ink">
+                Simulasi kredit
+                <span className="rounded-[7px] bg-teal-tint px-2 py-[3px] text-[11px] font-bold text-teal-deep">
+                  {canShareSimulation ? "Bisa di-share" : "Menunggu DSF"}
+                </span>
+              </span>
+              <span className="mt-1 block truncate text-[12px] font-semibold text-muted">
+                {salesContactRequired
+                  ? "Tanya sales untuk opsi pembiayaan"
+                  : `Reguler · DP ${Math.round(displayDpPercent)}% · ${tenor} bln · Cicilan ${displayMonthly ? formatRupiah(displayMonthly) : "Menghitung..."}/bln`}
+              </span>
+            </span>
+            <span className={`text-[22px] leading-none text-muted transition-transform ${simulationOpen ? "rotate-90" : ""}`}>›</span>
+          </button>
+
+          {simulationOpen && (salesContactRequired ? (
+          <div className="pt-3">
             <div className="rounded-[18px] border border-[#E8C98B] bg-[#FFF8E8] p-4">
               <div className="inline-flex rounded-full bg-[#F7DFAC] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#7A4700]">
                 Tidak eligible DSF
@@ -1223,7 +1296,7 @@ export function UnitDetail() {
             </div>
           </div>
         ) : (
-        <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4">
+        <div className="pt-3">
           <div className="rounded-[18px] border border-line bg-surface p-4">
             <div className="mb-3.5 flex items-center justify-between">
               <div className="-tracking-[0.01em] text-[15px] font-extrabold">
@@ -1663,7 +1736,8 @@ export function UnitDetail() {
             </p>
           </div>
         </div>
-        )}
+        ))}
+        </div>
 
         {sharePanelOpen && (
           <div ref={sharePanelRef} id="share-client" className="scroll-mt-3 border-t border-line-2 pt-4">
@@ -1676,6 +1750,32 @@ export function UnitDetail() {
             <ShareSheet embedded />
           </div>
         )}
+
+        {/* DETAIL ACCORDION — selalu berada di bawah simulasi */}
+        <div className="mx-[18px] mb-4 mt-1 overflow-hidden rounded-[18px] border border-line bg-surface">
+          <button
+            type="button"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((open) => !open)}
+            className="flex min-h-[76px] w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+          >
+            <span className="flex-1 text-[15px] font-extrabold text-ink">Cek detail unit lengkapnya</span>
+            <span className={`text-[24px] leading-none text-muted transition-transform ${detailsOpen ? "rotate-90" : ""}`}>›</span>
+          </button>
+
+        {detailsOpen && (
+        <>
+        {/* SPEC GRID */}
+        <div className="px-3.5 py-4">
+          <div className="grid grid-cols-3 gap-2">
+            {topSpecs.map((s) => (
+              <div key={s.label} className="rounded-xl bg-field p-3 text-center">
+                <div className="text-[11px] text-muted">{s.label}</div>
+                <div className="mt-0.5 truncate text-[13px] font-bold">{s.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* KELENGKAPAN DOKUMEN */}
         {docs.length > 0 && (
@@ -1740,6 +1840,10 @@ export function UnitDetail() {
             </div>
           </div>
         )}
+
+        </>
+        )}
+        </div>
 
         <div className="h-[104px]" />
       </main>

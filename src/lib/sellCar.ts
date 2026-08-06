@@ -265,7 +265,7 @@ export async function fetchSellCarAIExtraction(
     body,
   });
   if (!response.ok) {
-    throw new Error(await readAPIError(response, "AIFalcon belum dapat membaca foto. Coba lagi."));
+    throw new Error(await readAPIError(response, "AI Mobix Assistant belum dapat membaca foto. Coba lagi."));
   }
   return response.json() as Promise<SellCarAIExtraction>;
 }
