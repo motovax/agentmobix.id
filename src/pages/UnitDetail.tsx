@@ -1206,7 +1206,6 @@ export function UnitDetail() {
             onClick={() => setDetailsOpen((open) => !open)}
             className="flex min-h-[76px] w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
           >
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-field text-[22px]">📄</span>
             <span className="flex-1 text-[15px] font-extrabold text-ink">Cek detail unit lengkapnya</span>
             <span className={`text-[24px] leading-none text-muted transition-transform ${detailsOpen ? "rotate-90" : ""}`}>›</span>
           </button>
@@ -1228,6 +1227,7 @@ export function UnitDetail() {
 
           </>
           )}
+        </div>
 
         {/* CALCULATOR */}
         <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4">
@@ -1809,7 +1809,6 @@ export function UnitDetail() {
 
         </>
         )}
-        </div>
 
         <div className="h-[104px]" />
       </main>
