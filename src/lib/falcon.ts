@@ -46,14 +46,32 @@ function normalizedPlate(value: string) {
   return value.replace(/\s+/g, "").toUpperCase();
 }
 
-/** Render Falcon markdown and place each resolved unit URL below its recommendation title. */
+/** Render Falcon markdown and place each resolved URL after its recommendation details. */
 export function formatFalconReplyHtml(reply: string, units: FalconUnitLink[] = []) {
-  return reply.split("\n").map((line) => {
+  const lines = reply.split("\n");
+  const linksAfterLine = new Map<number, FalconUnitLink>();
+
+  lines.forEach((line, index) => {
     const reference = extractFalconUnitReferences(line)[0];
     const unit = reference
       ? units.find(({ plateNo }) => normalizedPlate(plateNo) === reference.plateNo)
       : undefined;
+    if (!unit) return;
+
+    let endOfUnit = index;
+    while (
+      endOfUnit + 1 < lines.length
+      && lines[endOfUnit + 1].trim() !== ""
+      && extractFalconUnitReferences(lines[endOfUnit + 1]).length === 0
+    ) {
+      endOfUnit += 1;
+    }
+    linksAfterLine.set(endOfUnit, unit);
+  });
+
+  return lines.map((line, index) => {
     const formattedLine = formatFalconLine(line);
+    const unit = linksAfterLine.get(index);
 
     if (!unit) return formattedLine;
 

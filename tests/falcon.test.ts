@@ -46,10 +46,12 @@ describe("format jawaban Falcon", () => {
     );
 
     expect(html).toContain(
-      "<strong>Toyota Calya — B 2203 FFE</strong><br/><a href=\"https://agenmobix.id/unit/toyota-calya\"",
+      "Otomatis, 77.166 km.<br/><a href=\"https://agenmobix.id/unit/toyota-calya\"",
     );
-    expect(html.indexOf("toyota-calya")).toBeLessThan(html.indexOf("Otomatis, 77.166 km."));
-    expect(html.indexOf("honda-mobilio")).toBeLessThan(html.indexOf("Otomatis, 138.069 km."));
+    expect(html.indexOf("Otomatis, 77.166 km.")).toBeLessThan(html.indexOf("toyota-calya"));
+    expect(html.indexOf("toyota-calya")).toBeLessThan(html.indexOf("Honda Mobilio"));
+    expect(html.indexOf("Otomatis, 138.069 km.")).toBeLessThan(html.indexOf("honda-mobilio"));
+    expect(html.indexOf("honda-mobilio")).toBeLessThan(html.indexOf("Saya paling menyarankan"));
     expect(html.match(/<a href=/g)).toHaveLength(2);
     expect(html).not.toContain("URL detail unit");
   });
