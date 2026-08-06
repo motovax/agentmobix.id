@@ -45,6 +45,11 @@ jobs:
           VITE_FALCON_CLIENT: ${{ vars.VITE_FALCON_CLIENT || 'mobix' }}
           VITE_FALCON_TOKEN: ${{ secrets.VITE_FALCON_TOKEN }}
 
+      - name: Verify Falcon configuration
+        env:
+          VITE_FALCON_TOKEN: ${{ secrets.VITE_FALCON_TOKEN }}
+        run: test -n "$VITE_FALCON_TOKEN"
+
       - name: SPA fallback (client-side routing on Pages)
         run: cp dist/index.html dist/404.html
 

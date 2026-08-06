@@ -26,6 +26,44 @@ export type FalconUnitReference = {
   plateNo: string;
 };
 
+type FalconStreamPayload = {
+  answer?: string;
+  content?: string;
+  reply?: string;
+  text?: string;
+  delta?: string;
+  message?: string;
+  error?: string;
+};
+
+/** Parse one SSE event, including CRLF and multi-line data fields. */
+export function parseFalconSseFrame(frame: string): {
+  event: string;
+  payload?: FalconStreamPayload;
+} {
+  let event = "message";
+  const data: string[] = [];
+  for (const line of frame.replace(/\r/g, "").split("\n")) {
+    if (line.startsWith(":")) continue;
+    const separator = line.indexOf(":");
+    const field = separator === -1 ? line : line.slice(0, separator);
+    const value = (separator === -1 ? "" : line.slice(separator + 1)).replace(/^ /, "");
+    if (field === "event") event = value;
+    if (field === "data") data.push(value);
+  }
+  if (data.length === 0) return { event };
+  const raw = data.join("\n");
+  try {
+    return { event, payload: JSON.parse(raw) as FalconStreamPayload };
+  } catch {
+    return { event, payload: { message: raw } };
+  }
+}
+
+function streamText(payload: FalconStreamPayload) {
+  return payload.answer ?? payload.content ?? payload.reply ?? payload.text ?? payload.delta ?? "";
+}
+
 /**
  * Falcon currently returns inventory as formatted text. The plate number is
  * the stable identifier we can use to resolve the matching Mobix slug.
@@ -94,16 +132,24 @@ export async function askFalcon(message: string): Promise<FalconReply> {
     const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    const frames = buffer.split("\n\n");
+    const frames = buffer.replace(/\r\n/g, "\n").split("\n\n");
     buffer = frames.pop() || "";
     for (const frame of frames) {
-      const event = frame.match(/^event: (.+)$/m)?.[1];
-      const data = frame.match(/^data: (.+)$/m)?.[1];
-      if (!data) continue;
-      const payload = JSON.parse(data) as { answer?: string; message?: string };
-      if (event === "message") answer = payload.answer?.trim() || "";
-      if (event === "error") throw new Error(payload.message || "Falcon gagal menjawab");
+      const parsed = parseFalconSseFrame(frame);
+      if (!parsed.payload) continue;
+      if (parsed.event === "error") {
+        throw new Error(parsed.payload.message || parsed.payload.error || "Falcon gagal menjawab");
+      }
+      const text = streamText(parsed.payload);
+      if (text) answer += text;
     }
+  }
+  if (buffer.trim()) {
+    const parsed = parseFalconSseFrame(buffer);
+    if (parsed.event === "error") {
+      throw new Error(parsed.payload?.message || parsed.payload?.error || "Falcon gagal menjawab");
+    }
+    answer += streamText(parsed.payload ?? {});
   }
   if (!answer) throw new Error("Falcon mengirim jawaban kosong");
   return { reply: answer };

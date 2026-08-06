@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { extractFalconUnitReferences } from "../src/lib/falcon";
+import { extractFalconUnitReferences, parseFalconSseFrame } from "../src/lib/falcon";
 
 describe("referensi unit dari respons Falcon", () => {
   test("membaca daftar rekomendasi berbasis nomor polisi", () => {
@@ -18,5 +18,23 @@ describe("referensi unit dari respons Falcon", () => {
     expect(
       extractFalconUnitReferences("*Toyota Avanza — B 1234 CD*\n*Toyota Avanza — B1234CD*"),
     ).toHaveLength(1);
+  });
+});
+
+describe("parser SSE Falcon", () => {
+  test("membaca frame CRLF dan data multi-baris", () => {
+    expect(parseFalconSseFrame(
+      ": keep-alive\r\n" +
+      "event: message\r\n" +
+      "data: {\"answer\":\"Halo\"}\r\n" +
+      "data: {\"content\":\" dunia\"}",
+    )).toEqual({ event: "message", payload: { message: '{"answer":"Halo"}\n{"content":" dunia"}' } });
+  });
+
+  test("menerima frame terakhir tanpa baris kosong penutup", () => {
+    expect(parseFalconSseFrame('event: message\ndata: {"reply":"Siap"}')).toEqual({
+      event: "message",
+      payload: { reply: "Siap" },
+    });
   });
 });
