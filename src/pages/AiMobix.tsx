@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Link } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { Camera, Calculator, Chat, ChevronLeft, Plus, Search, Send, VideoCamera } from "../components/icons";
-import { askFalcon } from "../lib/falcon";
+import { askFalcon, resolveFalconUnitLinks, type FalconUnitLink } from "../lib/falcon";
 
 type Message =
-  | { id: number; kind: "in"; html: string; photos?: Array<{ url: string; label?: string }> }
+  | { id: number; kind: "in"; html: string; photos?: Array<{ url: string; label?: string }>; units?: FalconUnitLink[] }
   | { id: number; kind: "out"; html: string };
 
 const SEED: Message[] = [
@@ -69,11 +69,13 @@ export function AiMobix() {
     setIsSearchingInventory(true);
     try {
       const result = await askFalcon(value);
+      const units = await resolveFalconUnitLinks(result.reply);
       setMessages((m) => [...m, {
         id: nextId.current++,
         kind: "in",
         html: falconHtml(result.reply),
         photos: result.photos,
+        units,
       }]);
     } catch {
       setMessages((m) => [...m, {
@@ -127,6 +129,22 @@ export function AiMobix() {
                     {photo.label || "Lihat foto unit"}
                   </a>
                 ))}
+                {m.units && m.units.length > 0 && (
+                  <div className="mt-3 border-t border-line pt-2">
+                    <div className="mb-1 text-[11px] font-bold text-muted">Link detail unit</div>
+                    {m.units.map((unit) => (
+                      <a
+                        key={unit.slug}
+                        href={unit.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block py-1 text-teal-deep underline"
+                      >
+                        {unit.title}{unit.plateNo ? ` · ${unit.plateNo}` : ""}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           }
