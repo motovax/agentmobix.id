@@ -317,7 +317,7 @@ export function UnitDetail() {
       }).toString()}`
     : null;
   const unitAdminMessage = unit
-    ? `Halo AI Mobix! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
+    ? `Halo Sparrow! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
     : undefined;
   const unitCalculationMessage = unit
     ? salesContactRequired

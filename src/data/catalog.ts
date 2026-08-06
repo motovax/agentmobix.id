@@ -25,7 +25,7 @@ export const TESTIMONIALS: Testimonial[] = [
     name: "Sari P., Bandung",
     role: "Ibu rumah tangga · 14 unit closing",
     quote:
-      "AI Mobix kerasa banget bantunya. Customer minta video keliling, tinggal chat, dalam setengah jam foto dan video sudah siap. Saya tinggal teruskan.",
+      "Sparrow kerasa banget bantuannya. Customer minta video keliling, tinggal chat, dalam setengah jam foto dan video sudah siap. Saya tinggal teruskan.",
     gradient: "linear-gradient(135deg,#F5B764,#E08A2C)",
     textOnGradient: "#FFFFFF",
   },

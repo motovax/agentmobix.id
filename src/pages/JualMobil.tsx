@@ -561,7 +561,7 @@ export function JualMobil() {
     const stnk = aiPhotos.stnk?.file;
     const odometer = aiPhotos.odometer?.file;
     if (!vehicle || !stnk || !odometer) {
-      setAIError("Lengkapi ketiga foto agar AIFalcon dapat membaca data kendaraan.");
+      setAIError("Lengkapi ketiga foto agar Sparrow dapat membaca data kendaraan.");
       return;
     }
     setAIError("");
@@ -573,7 +573,7 @@ export function JualMobil() {
       setError("");
       setActiveTab("form");
     } catch (cause) {
-      setAIError(cause instanceof Error ? cause.message : "AIFalcon belum dapat membaca foto.");
+      setAIError(cause instanceof Error ? cause.message : "Sparrow belum dapat membaca foto.");
     } finally {
       setAIAnalyzing(false);
     }
@@ -613,7 +613,7 @@ export function JualMobil() {
                 activeTab === "ai" ? "bg-surface text-teal-deep shadow-sm" : "text-muted"
               }`}
             >
-              Bantuan AI
+              Bantuan Sparrow
               <Sparkles size={13} />
             </button>
           </div>
@@ -627,7 +627,7 @@ export function JualMobil() {
                       <Sparkles size={15} />
                     </span>
                     <div>
-                      <div className="text-[12px] font-extrabold text-ink">Data berhasil dibaca AIFalcon</div>
+                      <div className="text-[12px] font-extrabold text-ink">Data berhasil dibaca Sparrow</div>
                       <p className="m-0 mt-1 text-[10px] leading-[1.45] text-muted">
                         Periksa semua isian sebelum menghitung harga
                         {aiReview.needs_confirmation.length > 0 && (
@@ -756,10 +756,10 @@ export function JualMobil() {
                     Isi otomatis dari foto
                   </div>
                   <h2 className="m-0 text-[18px] font-extrabold leading-[1.25] text-ink">
-                    AIFalcon bantu hitungkan harga
+                    Sparrow bantu hitungkan harga
                   </h2>
                   <p className="m-0 mt-1.5 text-[12px] leading-[1.5] text-muted">
-                    Unggah tiga foto. AIFalcon akan membaca data kendaraan, lalu Anda tetap dapat memeriksa dan mengubah hasilnya.
+                    Unggah tiga foto. Sparrow akan membaca data kendaraan, lalu Anda tetap dapat memeriksa dan mengubah hasilnya.
                   </p>
                 </div>
               </div>
@@ -767,7 +767,7 @@ export function JualMobil() {
               <div className="mb-3 rounded-[14px] border border-[#E8D7A2] bg-[#FFF9E8] p-3">
                 <div className="text-[11px] font-extrabold text-ink">Privasi foto STNK</div>
                 <p className="m-0 mt-1 text-[10px] leading-[1.5] text-muted">
-                  Foto STNK dapat memuat data pribadi. Anda dapat menutupi nama, alamat, nomor rangka, dan nomor mesin selama data kendaraan serta masa berlaku STNK tetap terbaca. Foto hanya digunakan AIFalcon untuk membaca data kendaraan; informasi pribadi tersebut tidak diambil ke hasil prediksi.
+                  Foto STNK dapat memuat data pribadi. Anda dapat menutupi nama, alamat, nomor rangka, dan nomor mesin selama data kendaraan serta masa berlaku STNK tetap terbaca. Foto hanya digunakan Sparrow untuk membaca data kendaraan; informasi pribadi tersebut tidak diambil ke hasil prediksi.
                 </p>
                 <label className="mt-2.5 flex cursor-pointer items-start gap-2.5">
                   <input
@@ -827,7 +827,7 @@ export function JualMobil() {
                 className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-[12px] bg-teal-deep text-[13px] font-extrabold text-white transition hover:bg-[#078e8b] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Sparkles size={16} />
-                {aiAnalyzing ? "AIFalcon sedang membaca foto..." : "Baca Data Kendaraan"}
+                {aiAnalyzing ? "Sparrow sedang membaca foto..." : "Baca Data Kendaraan"}
               </button>
             </section>
           )}

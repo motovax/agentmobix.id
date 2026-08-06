@@ -12,7 +12,7 @@ const SEED: Message[] = [
   {
     id: 1,
     kind: "in",
-    html: "Halo 👋 Aku Falcon Jr, asisten jualanmu. Aku bisa bantu mencari unit di inventory Mobix, membuat caption, atau menghitung paket cicilan. Silakan tanyakan apa saja.",
+    html: "Halo 👋 Aku Sparrow, asisten jualanmu. Aku bisa bantu mencari unit di inventory Mobix, membuat caption, atau menghitung paket cicilan. Silakan tanyakan apa saja.",
   },
 ];
 
@@ -81,7 +81,7 @@ export function AiMobix() {
       setMessages((m) => [...m, {
         id: nextId.current++,
         kind: "in",
-        html: "Falcon sedang tidak dapat diakses. Coba lagi beberapa saat atau buka katalog untuk melihat stok terbaru.",
+        html: "Sparrow sedang tidak dapat diakses. Coba lagi beberapa saat atau buka katalog untuk melihat stok terbaru.",
       }]);
     } finally {
       setIsSearchingInventory(false);
@@ -103,7 +103,7 @@ export function AiMobix() {
           T
         </div>
         <div className="flex-1">
-          <div className="-tracking-[0.01em] text-[15px] font-extrabold">Falcon Jr</div>
+          <div className="-tracking-[0.01em] text-[15px] font-extrabold">Sparrow</div>
           <div className="flex items-center gap-1.5 text-[11px] text-teal-deep">
             <span className="h-1.5 w-1.5 rounded-full bg-teal" />
             Aktif · biasanya balas &lt; 30 detik
@@ -160,7 +160,7 @@ export function AiMobix() {
         })}
         {isSearchingInventory && (
           <div className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] text-muted">
-            Falcon Jr sedang mengecek inventory Motovax…
+            Sparrow sedang mengecek inventory Motovax…
           </div>
         )}
       </div>
@@ -205,7 +205,7 @@ export function AiMobix() {
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Tulis pesan untuk Falcon Jr…"
+              placeholder="Tulis pesan untuk Sparrow…"
               className="min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-placeholder"
             />
           </div>

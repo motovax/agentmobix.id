@@ -2,7 +2,7 @@
 
 Mobile-first React app for the Mobix agent program. Agents can browse active
 used-car inventory, view commission estimates and installment packages, share units, chat
-with AI Mobix, and register as an agent.
+with Sparrow, and register as an agent.
 
 ## Stack
 

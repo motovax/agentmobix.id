@@ -93,10 +93,10 @@ export async function askFalcon(message: string): Promise<FalconReply> {
   );
 
   if (!response.ok) {
-    throw new Error("Falcon sedang tidak dapat diakses");
+    throw new Error("Sparrow sedang tidak dapat diakses");
   }
 
   const payload = await response.json() as FalconReply;
-  if (!payload.reply?.trim()) throw new Error("Falcon mengirim jawaban kosong");
+  if (!payload.reply?.trim()) throw new Error("Sparrow mengirim jawaban kosong");
   return payload;
 }
