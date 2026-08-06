@@ -7,7 +7,6 @@ import { DaftarAgen } from "./pages/DaftarAgen";
 import { AiMobix } from "./pages/AiMobix";
 import { HotDeals } from "./pages/HotDeals";
 import { Lokasi } from "./pages/Lokasi";
-import { ShareSheet } from "./pages/ShareSheet";
 import { PromoList } from "./pages/PromoList";
 import { PromoDetail } from "./pages/PromoDetail";
 import { JualMobil } from "./pages/JualMobil";
@@ -61,7 +60,6 @@ export default function App({
         <Route path="/promo" component={PromoList} />
         <Route path="/promo/:slug" component={PromoDetail} />
         <Route path="/lokasi" component={Lokasi} />
-        <Route path="/share" component={ShareSheet} />
         <Route path="/jual-mobil/hasil" component={JualMobilHasil} />
         <Route path="/jual-mobil" component={JualMobil} />
         <Route component={Beranda} />

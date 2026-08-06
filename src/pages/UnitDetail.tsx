@@ -50,7 +50,7 @@ import {
   getCatalogReturnHref,
 } from "../lib/catalogSearch";
 import { buildJasmineWhatsAppHref } from "../lib/jasmine";
-import { ShareSheet } from "./ShareSheet";
+import { ShareSheet, type ShareSheetHandle } from "./ShareSheet";
 
 const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
 const MIN_DP_PERCENT = 15;
@@ -130,9 +130,7 @@ function maskBpkbValue(value: string) {
 export function UnitDetail() {
   const { slug } = useParams<{ slug: string }>();
   const search = useSearch();
-  const searchParams = new URLSearchParams(search);
   const returnHref = getCatalogReturnHref(search);
-  const sharePanelOpen = searchParams.get("share") === "1";
   const { data: unit, loading, error } = useAsync(
     () => fetchUnitDetail(slug),
     [slug],
@@ -167,15 +165,7 @@ export function UnitDetail() {
   const [smartCreditPriceError, setSmartCreditPriceError] = useState(false);
   const pageRef = useRef<HTMLElement>(null);
   const galleryRef = useRef<Splide>(null);
-  const sharePanelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!sharePanelOpen || !unit) return;
-    const frame = window.requestAnimationFrame(() => {
-      sharePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [sharePanelOpen, unit]);
+  const shareSheetRef = useRef<ShareSheetHandle>(null);
 
   const originalPrice = unit?.harga ?? 0;
   const price = builderPrice > 0 ? builderPrice : originalPrice;
@@ -284,9 +274,8 @@ export function UnitDetail() {
     creditPriceForDisplay !== null;
   const currencyFormatter = new Intl.NumberFormat("id-ID");
   const shareTenor = simTab === "dpminim" ? dpMinimInstallmentCount(tenor) : tenor;
-  const shareHref = canShareSimulation
-    ? `/unit/${encodeURIComponent(unit?.slug ?? slug ?? "")}?${new URLSearchParams({
-        share: "1",
+  const shareParams = canShareSimulation
+    ? new URLSearchParams({
         u: unit?.slug ?? slug ?? "",
         sim: simTab,
         harga: String(Math.round(price)),
@@ -299,14 +288,13 @@ export function UnitDetail() {
           : {}),
         cicilan: String(Math.round(displayMonthly)),
         tdp: String(Math.round(shareTdp)),
-        }).toString()}`
+        })
     : salesContactRequired && unit
-      ? `/unit/${encodeURIComponent(unit.slug)}?${new URLSearchParams({
-          share: "1",
+      ? new URLSearchParams({
           u: unit.slug,
           harga: String(Math.round(price)),
           komisi: String(Math.round(estimatedCommission)),
-      }).toString()}`
+        })
       : null;
   const unitAdminMessage = unit
     ? `Halo AI Mobix Assistant! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
@@ -939,14 +927,15 @@ export function UnitDetail() {
           >
             <ChevronLeft />
           </Link>
-          {shareHref ? (
-            <Link
-              href={shareHref}
+          {shareParams ? (
+            <button
+              type="button"
+              onClick={() => shareSheetRef.current?.share()}
               aria-label="Share"
               className="absolute right-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
             >
               <ShareArrow size={17} />
-            </Link>
+            </button>
           ) : (
             <button
               type="button"
@@ -1704,10 +1693,14 @@ export function UnitDetail() {
         ))}
         </div>
 
-        {sharePanelOpen && (
-          <div ref={sharePanelRef} id="share-client" className="scroll-mt-3 border-t border-line-2 pt-4">
-            <ShareSheet embedded />
-          </div>
+        {shareParams && unit && (
+          <ShareSheet
+            ref={shareSheetRef}
+            controllerOnly
+            unitData={unit}
+            unitSlug={unit.slug}
+            params={shareParams.toString()}
+          />
         )}
 
         {/* DETAIL ACCORDION — selalu berada di bawah simulasi */}
@@ -1809,14 +1802,15 @@ export function UnitDetail() {
 
       {/* STICKY ACTIONS */}
       <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-40 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
-        {shareHref ? (
-          <Link
-            href={shareHref}
+        {shareParams ? (
+          <button
+            type="button"
+            onClick={() => shareSheetRef.current?.share()}
             className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl bg-ink px-3 text-[13px] font-bold text-surface no-underline"
           >
             <span className="truncate">Share ke klien</span>
             <ShareArrow size={14} />
-          </Link>
+          </button>
         ) : (
           <button
             type="button"

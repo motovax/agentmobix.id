@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { FloatingPicAgentCta } from "../components/FloatingPicAgentCta";
@@ -58,6 +58,18 @@ type PendingShareStep = {
 };
 
 type AiBackgroundStatus = "idle" | "generating" | "done" | "failed";
+
+export type ShareSheetHandle = {
+  share: () => void;
+};
+
+type ShareSheetProps = {
+  embedded?: boolean;
+  controllerOnly?: boolean;
+  unitData?: ProductDetail;
+  unitSlug?: string;
+  params?: string;
+};
 
 /* ---- canvas overlay composition ---- */
 
@@ -412,11 +424,19 @@ const CAPTION_STYLE_HINTS = [
   "Energetic social caption, concise, persuasive, and not exaggerated.",
 ];
 
-export function ShareSheet({ embedded = false }: any = {}) {
+export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function ShareSheet(
+  { embedded = false, controllerOnly = false, unitData, unitSlug, params },
+  ref,
+) {
   const search = useSearch();
-  const searchParams = new URLSearchParams(search);
-  const slug = searchParams.get("u") ?? "";
-  const { data: unit, loading } = useAsync(() => fetchUnitDetail(slug), [slug]);
+  const searchParams = new URLSearchParams(params ?? search);
+  const slug = unitSlug ?? searchParams.get("u") ?? "";
+  const { data: fetchedUnit, loading: unitLoading } = useAsync(
+    () => unitData ? Promise.resolve(unitData) : fetchUnitDetail(slug),
+    [slug, unitData?.id],
+  );
+  const unit = unitData ?? fetchedUnit;
+  const loading = !unitData && unitLoading;
 
   const [, setCopied] = useState<"" | "caption" | "link">("");
   const [captionText, setCaptionText] = useState("");
@@ -1061,11 +1081,6 @@ export function ShareSheet({ embedded = false }: any = {}) {
   }
 
   function handleShare() {
-    if (embedded) {
-      setShowChannels(true);
-      return;
-    }
-
     const share = async () => {
       const caption = captionText.trim();
       const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
@@ -1102,7 +1117,8 @@ export function ShareSheet({ embedded = false }: any = {}) {
         if (caption && (await copyToClipboard(caption))) {
           showCopiedState("caption", true);
         }
-        setShowChannels((v) => !v);
+        if (controllerOnly) shareVia("wa");
+        else setShowChannels((v) => !v);
         return;
       }
 
@@ -1125,13 +1141,18 @@ export function ShareSheet({ embedded = false }: any = {}) {
         showCopiedState("caption", true);
       }
 
-      setShowChannels((v) => !v);
+      if (controllerOnly) shareVia("wa");
+      else setShowChannels((v) => !v);
     };
 
-    void share().catch(() => {
-      setShowChannels((v) => !v);
+    void share().catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      if (controllerOnly) shareVia("wa");
+      else setShowChannels((v) => !v);
     });
   }
+
+  useImperativeHandle(ref, () => ({ share: handleShare }));
 
   function shareVia(channel: "wa" | "tg" | "x") {
     const imageUrls = channel === "wa"
@@ -1182,6 +1203,8 @@ export function ShareSheet({ embedded = false }: any = {}) {
   const selectedAiBackgroundCount = selectedImageMedia.filter((media) => aiBackgroundUrls[media.id]).length;
   const selectedAiBackgroundComplete =
     selectedImageMedia.length > 0 && selectedAiBackgroundCount === selectedImageMedia.length;
+
+  if (controllerOnly) return null;
 
   return (
     <AppShell overlay={embedded} bare={embedded}>
@@ -1479,4 +1502,4 @@ export function ShareSheet({ embedded = false }: any = {}) {
       <FloatingPicAgentCta unit={unit} />
     </AppShell>
   );
-}
+});
