@@ -151,7 +151,7 @@ export function AiMobix() {
         })}
         {isSearchingInventory && (
           <div className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] text-muted">
-            Sparrow sedang membaca inventory Motovax…
+            Sparrow sedang membaca inventory Mobix…
           </div>
         )}
       </div>
