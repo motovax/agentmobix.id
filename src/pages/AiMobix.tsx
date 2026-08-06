@@ -12,7 +12,7 @@ const SEED: Message[] = [
   {
     id: 1,
     kind: "in",
-    html: "Halo 👋 Aku Falcon, asisten read-only Mobix. Aku bisa membantu mencari dan membandingkan unit dari inventory. Detail unit selalu diarahkan ke agentmobix.id.",
+    html: "Halo 👋 Aku Sparrow, asisten read-only Mobix. Aku bisa membantu mencari dan membandingkan unit dari inventory. Detail unit selalu diarahkan ke agentmobix.id.",
   },
 ];
 
@@ -151,7 +151,7 @@ export function AiMobix() {
         })}
         {isSearchingInventory && (
           <div className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] text-muted">
-            Falcon sedang membaca inventory Motovax…
+            Sparrow sedang membaca inventory Motovax…
           </div>
         )}
       </div>
@@ -189,7 +189,7 @@ export function AiMobix() {
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Tulis pertanyaan read-only untuk Falcon…"
+              placeholder="Tulis pertanyaan read-only untuk Sparrow…"
               className="min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-placeholder"
             />
           </div>
