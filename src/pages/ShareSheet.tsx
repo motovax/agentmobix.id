@@ -429,7 +429,7 @@ export function ShareSheet({ embedded = false }: any = {}) {
   const [pendingShareStep, setPendingShareStep] = useState<PendingShareStep | null>(null);
 
   // multi-select share media
-  const [selectedIdxes, setSelectedIdxes] = useState<number[]>([0]);
+  const [selectedIdxes, setSelectedIdxes] = useState<number[]>([]);
   const [previewIdx, setPreviewIdx] = useState(0);
 
   // canvas-composed files without price/TDP overlay — for download
@@ -609,7 +609,10 @@ export function ShareSheet({ embedded = false }: any = {}) {
   // init when unit loads
   useEffect(() => {
     if (!unit) return;
-    setSelectedIdxes([0]);
+    const allPhotoIndexes = unit.galeri.map((_, index) => index);
+    setSelectedIdxes(
+      allPhotoIndexes.length > 0 ? allPhotoIndexes : (unit.video?.length ? [0] : []),
+    );
     setPreviewIdx(0);
     setCaptionText(autoCaption);
     setPendingShareStep(null);

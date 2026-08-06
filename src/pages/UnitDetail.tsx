@@ -8,7 +8,7 @@ import { AppBar } from "../components/AppBar";
 import { ContactActionMenu } from "../components/FloatingContactCta";
 import { Photo, Skeleton } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
-import { ChevronLeft, ShareArrow, Check, Close, Play, Sparkles } from "../components/icons";
+import { ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
 import {
   fetchUnitDetail,
   mobixImage,
@@ -308,14 +308,6 @@ export function UnitDetail() {
           komisi: String(Math.round(estimatedCommission)),
       }).toString()}`
       : null;
-  const aiShareHref = unit
-    ? shareHref ?? `/unit/${encodeURIComponent(unit.slug)}?${new URLSearchParams({
-        share: "1",
-        u: unit.slug,
-        harga: String(Math.round(price)),
-        komisi: String(Math.round(estimatedCommission)),
-      }).toString()}`
-    : null;
   const unitAdminMessage = unit
     ? `Halo AI Mobix Assistant! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
     : undefined;
@@ -964,15 +956,6 @@ export function UnitDetail() {
             >
               <ShareArrow size={17} />
             </button>
-          )}
-          {aiShareHref && (
-            <Link
-              href={aiShareHref}
-              aria-label="Buat konten dengan AI"
-              className="absolute right-3.5 top-[62px] flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/70 bg-teal-deep text-white shadow-sm backdrop-blur"
-            >
-              <Sparkles size={18} />
-            </Link>
           )}
           <div className="absolute bottom-3.5 left-3.5 rounded-xl bg-ink/85 px-3 py-2 text-surface shadow-sm backdrop-blur">
             <div className="text-[16px] font-extrabold leading-none">
@@ -1723,12 +1706,6 @@ export function UnitDetail() {
 
         {sharePanelOpen && (
           <div ref={sharePanelRef} id="share-client" className="scroll-mt-3 border-t border-line-2 pt-4">
-            <div className="px-[18px] pb-1">
-              <div className="text-[16px] font-extrabold text-ink">Generate &amp; share ke client</div>
-              <p className="m-0 mt-1 text-[12px] text-muted">
-                Gunakan hasil simulasi di atas untuk membuat caption dan membagikan unit.
-              </p>
-            </div>
             <ShareSheet embedded />
           </div>
         )}
