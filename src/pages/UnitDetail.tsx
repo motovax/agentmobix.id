@@ -969,7 +969,7 @@ export function UnitDetail() {
             <Link
               href={aiShareHref}
               aria-label="Buat konten dengan AI"
-              className="absolute right-3.5 top-[62px] flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/70 bg-[#6B57E8] text-white shadow-sm backdrop-blur"
+              className="absolute right-3.5 top-[62px] flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/70 bg-teal-deep text-white shadow-sm backdrop-blur"
             >
               <Sparkles size={18} />
             </Link>
@@ -1101,9 +1101,9 @@ export function UnitDetail() {
         {aiShareHref && (
           <Link
             href={aiShareHref}
-            className="mx-[18px] mb-2 flex items-center gap-3 rounded-[14px] border border-[#D9D4FF] bg-[#F5F2FF] px-3.5 py-3 text-ink no-underline"
+            className="mx-[18px] mb-2 flex items-center gap-3 rounded-[14px] border border-teal-tint-border bg-teal-tint px-3.5 py-3 text-ink no-underline"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-[#6B57E8] shadow-sm">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-teal-deep shadow-sm">
               <Sparkles size={19} />
             </span>
             <span className="min-w-0 flex-1">
@@ -1112,7 +1112,7 @@ export function UnitDetail() {
                 Ganti background foto dan buat caption siap share.
               </span>
             </span>
-            <span className="text-[22px] leading-none text-[#6B57E8]">›</span>
+            <span className="text-[22px] leading-none text-teal-deep">›</span>
           </Link>
         )}
 

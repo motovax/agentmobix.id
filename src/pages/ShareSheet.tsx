@@ -1342,9 +1342,9 @@ export function ShareSheet({ embedded = false }: any = {}) {
         )}
 
         {/* AI background */}
-        <div className="mb-[18px] rounded-[14px] border border-dashed border-[#8D7DFF] bg-surface px-3.5 py-3">
+        <div className="mb-[18px] rounded-[14px] border border-dashed border-teal-tint-border bg-surface px-3.5 py-3">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#D9D4FF] bg-[#F5F2FF] text-[#6B57E8]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-teal-tint-border bg-teal-tint text-teal-deep">
               <Sparkles size={19} />
             </div>
             <div className="min-w-0 flex-1">
@@ -1353,7 +1353,7 @@ export function ShareSheet({ embedded = false }: any = {}) {
                 <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
                   aiBackgroundDone
                     ? "bg-emerald-50 text-emerald-700"
-                    : "bg-[#F0ECFF] text-[#6B57E8]"
+                    : "bg-teal-tint text-teal-deep"
                 }`}>
                   {aiBackgroundDone ? "Selesai" : "Baru"}
                 </span>
@@ -1465,7 +1465,7 @@ export function ShareSheet({ embedded = false }: any = {}) {
                 type="button"
                 onClick={handleCaptionAiHelp}
                 disabled={!unit || captionSuggesting}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-indigo-50 px-2 text-[11px] font-bold text-indigo-700 disabled:opacity-50"
+                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-teal-tint px-2 text-[11px] font-bold text-teal-deep disabled:opacity-50"
               >
                 <Sparkles size={13} />
                 {captionSuggesting ? "Mengolah..." : "Bantuan Sparrow"}
