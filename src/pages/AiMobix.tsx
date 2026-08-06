@@ -12,7 +12,7 @@ const SEED: Message[] = [
   {
     id: 1,
     kind: "in",
-    html: "Halo 👋 Aku Sparrow, asisten read-only Mobix. Aku bisa membantu mencari dan membandingkan unit dari inventory. Detail unit selalu diarahkan ke agentmobix.id.",
+    html: "Halo 👋 Aku AI Mobix Assistant, asisten read-only Mobix. Aku bisa membantu mencari dan membandingkan unit dari inventory. Detail unit selalu diarahkan ke agentmobix.id.",
   },
 ];
 
@@ -99,7 +99,7 @@ export function AiMobix() {
           T
         </div>
         <div className="flex-1">
-          <div className="-tracking-[0.01em] text-[15px] font-extrabold">Sparrow</div>
+          <div className="-tracking-[0.01em] text-[15px] font-extrabold">AI Mobix Assistant</div>
           <div className="flex items-center gap-1.5 text-[11px] text-teal-deep">
             <span className="h-1.5 w-1.5 rounded-full bg-teal" />
             Aktif · biasanya balas &lt; 30 detik
@@ -152,7 +152,7 @@ export function AiMobix() {
         })}
         {isSearchingInventory && (
           <div className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] text-muted">
-            Sparrow sedang membaca inventory Mobix…
+            AI Mobix Assistant sedang membaca inventory Mobix…
           </div>
         )}
       </div>
@@ -190,7 +190,7 @@ export function AiMobix() {
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Tulis pertanyaan read-only untuk Sparrow…"
+              placeholder="Tulis pertanyaan read-only untuk AI Mobix Assistant…"
               className="min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-placeholder"
             />
           </div>

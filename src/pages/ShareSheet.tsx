@@ -1468,7 +1468,7 @@ export function ShareSheet({ embedded = false }: any = {}) {
                 className="inline-flex h-7 items-center gap-1.5 rounded-md bg-teal-tint px-2 text-[11px] font-bold text-teal-deep disabled:opacity-50"
               >
                 <Sparkles size={13} />
-                {captionSuggesting ? "Mengolah..." : "Bantuan Sparrow"}
+                {captionSuggesting ? "Mengolah..." : "Bantuan AI Mobix Assistant"}
               </button>
               {unit && captionText !== autoCaption && (
                 <button

@@ -18,7 +18,7 @@ export function DaftarAgen() {
     e.preventDefault();
     if (!agree) return;
     const message = [
-      "Halo Sparrow! Saya mau daftar jadi Agen Mobix 🙏",
+      "Halo AI Mobix Assistant! Saya mau daftar jadi Agen Mobix 🙏",
       "",
       `Nama lengkap: ${name.trim()}`,
       `No. WhatsApp: +62 ${wa.trim()}`,
