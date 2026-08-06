@@ -121,7 +121,7 @@ export function AiMobix() {
   return (
     <AppShell bg="bg-surface-2" flexColumn>
       {/* header */}
-      <div className="flex flex-shrink-0 items-center gap-3 border-b border-[#EEF2F3] bg-surface px-3.5 pb-3.5 pt-3">
+      <div className="flex flex-shrink-0 items-center gap-3 border-b border-[#EEF2F3] bg-surface px-3.5 pb-3.5 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <Link
           href="/"
           aria-label="Kembali"
