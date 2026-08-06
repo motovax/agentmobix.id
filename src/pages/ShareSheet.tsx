@@ -14,7 +14,6 @@ import {
   Check,
   Sparkles,
   Play,
-  Info,
 } from "../components/icons";
 import {
   fetchUnitDetail,
@@ -419,7 +418,7 @@ export function ShareSheet({ embedded = false }: any = {}) {
   const slug = searchParams.get("u") ?? "";
   const { data: unit, loading } = useAsync(() => fetchUnitDetail(slug), [slug]);
 
-  const [copied, setCopied] = useState<"" | "caption" | "link">("");
+  const [, setCopied] = useState<"" | "caption" | "link">("");
   const [captionText, setCaptionText] = useState("");
   const [captionSuggesting, setCaptionSuggesting] = useState(false);
   // Pada embed di halaman detail, pilihan kanal harus langsung terlihat setelah
@@ -442,11 +441,11 @@ export function ShareSheet({ embedded = false }: any = {}) {
   const [shareComposing, setShareComposing] = useState(false);
   const [shareFilesSignature, setShareFilesSignature] = useState("");
   const [aiBackgroundStatus, setAiBackgroundStatus] = useState<AiBackgroundStatus>("idle");
-  const [aiBackgroundProgress, setAiBackgroundProgress] = useState(0);
+  const [, setAiBackgroundProgress] = useState(0);
   const [aiBackgroundFiles, setAiBackgroundFiles] = useState<Record<string, File>>({});
   const [aiBackgroundUrls, setAiBackgroundUrls] = useState<Record<string, string>>({});
   const [aiPreviewMode, setAiPreviewMode] = useState<"ai" | "original">("ai");
-  const [aiBackgroundError, setAiBackgroundError] = useState("");
+  const [, setAiBackgroundError] = useState("");
 
   const blobCache = useRef<Map<string, Blob>>(new Map());
   const captionSuggestionIndex = useRef(0);
@@ -1177,19 +1176,9 @@ export function ShareSheet({ embedded = false }: any = {}) {
   const priceDelta = unit && sharePrice ? sharePrice - unit.harga : 0;
   const canGenerateAiBackground =
     Boolean(unit) && selectedImageMedia.length > 0 && aiBackgroundStatus !== "generating";
-  const aiBackgroundActiveUrl = activeMedia?.kind === "image"
-    ? aiBackgroundUrls[activeMedia.id]
-    : undefined;
-  const activeHasAiBackground = Boolean(aiBackgroundActiveUrl);
   const selectedAiBackgroundCount = selectedImageMedia.filter((media) => aiBackgroundUrls[media.id]).length;
   const selectedAiBackgroundComplete =
     selectedImageMedia.length > 0 && selectedAiBackgroundCount === selectedImageMedia.length;
-  const aiBackgroundDone = selectedAiBackgroundCount > 0 && aiBackgroundStatus !== "generating";
-  const aiBackgroundPreviewMedia =
-    activeMedia?.kind === "image" && selectedImageMedia.some((media) => media.id === activeMedia.id)
-      ? activeMedia
-      : selectedImageMedia[0];
-  const showAiOriginalToggle = activeMedia?.kind === "image" && activeHasAiBackground;
 
   return (
     <AppShell overlay={embedded} bare={embedded}>
@@ -1225,11 +1214,19 @@ export function ShareSheet({ embedded = false }: any = {}) {
                 {shareHasFinancing && <> · {paymentLabel} {formatJt(paymentValue)}</>}
               </div>
             )}
-            <img
-              src="/mobix-logo.png"
-              alt="Mobix"
-              className="absolute right-3 top-3 h-[18px] w-auto opacity-90 [filter:brightness(0)_invert(1)]"
-            />
+            <button
+              type="button"
+              onClick={() => void handleGenerateAiBackground(selectedAiBackgroundComplete)}
+              disabled={!canGenerateAiBackground}
+              className="absolute right-3 top-3 inline-flex min-h-9 items-center gap-1.5 rounded-full bg-white/90 px-3 text-[11px] font-bold text-teal-deep shadow-sm backdrop-blur disabled:opacity-60"
+            >
+              <Sparkles size={13} />
+              {aiBackgroundStatus === "generating"
+                ? "Memproses..."
+                : selectedAiBackgroundComplete
+                  ? "Foto AI ✓"
+                  : "Foto AI"}
+            </button>
           </Photo>
           )}
           <Link
@@ -1239,7 +1236,7 @@ export function ShareSheet({ embedded = false }: any = {}) {
           >
             <ChevronLeft />
           </Link>
-          <div className="px-3.5 py-3">
+          <div className="relative px-3.5 py-3">
             {loading || !unit ? (
               <div className="space-y-2">
                 <Skeleton className="h-3.5 w-48" />
@@ -1247,31 +1244,22 @@ export function ShareSheet({ embedded = false }: any = {}) {
               </div>
             ) : (
               <>
-                <div className="text-[14px] font-bold">{unit.nama}</div>
-                <div className="mt-0.5 text-[12px] text-muted">
-                  {shareHasFinancing ? (
-                    <>
-                      {packageTitle} {formatRupiah(paymentValue)} · Cicilan {formatRupiah(shareCicilan)}/bln ·{" "}
-                      {shareTenor} bln · {titleCase(unit.lokasi || "Mobix")}
-                    </>
-                  ) : (
-                    <>Harga {formatRupiah(sharePrice || unit.harga)} · {titleCase(unit.lokasi || "Mobix")}</>
-                  )}
-                </div>
-                {shareHasFinancing && (shareCreditPrice || shareDp) && (
-                  <div className="mt-1 text-[11px] text-muted">
-                    {!isDpMinimShare && shareCreditPrice && <>Harga kredit {formatRupiah(shareCreditPrice)}</>}
-                    {!isDpMinimShare && shareCreditPrice && shareDp && " · "}
-                    {shareDp && (
-                      <>
-                        {isDpMinimShare ? "TDP" : "DP"} {formatRupiah(shareDp)}
-                        {!isDpMinimShare &&
-                          shareDpPercent &&
-                          ` (${Math.round(shareDpPercent * 10) / 10}%)`}
-                      </>
-                    )}
-                  </div>
-                )}
+                <textarea
+                  value={captionText}
+                  onChange={(event) => setCaptionText(event.target.value)}
+                  rows={6}
+                  aria-label="Caption share unit"
+                  className="min-h-[132px] w-full resize-y bg-transparent pr-9 text-[12px] leading-[1.65] text-mid outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleCaptionAiHelp}
+                  disabled={captionSuggesting}
+                  aria-label="Buat caption dengan AI"
+                  className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg border border-teal-tint-border bg-teal-tint text-teal-deep disabled:opacity-50"
+                >
+                  <Sparkles size={14} />
+                </button>
               </>
             )}
           </div>
@@ -1340,167 +1328,6 @@ export function ShareSheet({ embedded = false }: any = {}) {
             )}
           </div>
         )}
-
-        {/* AI background */}
-        <div className="mb-[18px] rounded-[14px] border border-dashed border-teal-tint-border bg-surface px-3.5 py-3">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-teal-tint-border bg-teal-tint text-teal-deep">
-              <Sparkles size={19} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <div className="text-[13px] font-bold text-ink">AI Background</div>
-                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                  aiBackgroundDone
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-teal-tint text-teal-deep"
-                }`}>
-                  {aiBackgroundDone ? "Selesai" : "Baru"}
-                </span>
-              </div>
-              <div className="mt-1 text-[12px] leading-[1.45] text-mid">
-                Hapus background dan buat background profesional otomatis sesuai angle mobil.
-              </div>
-            </div>
-            {aiBackgroundDone ? (
-              <Check size={18} className="mt-1 shrink-0 text-emerald-600" />
-            ) : (
-              <Info size={18} className="mt-1 shrink-0 text-muted" />
-            )}
-          </div>
-
-          {aiBackgroundStatus === "generating" && (
-            <div className="mt-3 overflow-hidden rounded-[12px] bg-ink">
-              <div className="relative aspect-video">
-                {aiBackgroundPreviewMedia && (
-                  <Photo
-                    className="h-full w-full opacity-45"
-                    src={mobixImage(aiBackgroundPreviewMedia.url, MOBIX_SHARE_WIDTH)}
-                    alt=""
-                  />
-                )}
-                <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center text-surface">
-                  <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/55 bg-white/10">
-                    <Sparkles size={24} />
-                  </div>
-                  <div className="text-[13px] font-bold">Sedang membuat background...</div>
-                  <div className="mt-0.5 text-[12px] text-white/80">Menyesuaikan angle mobil</div>
-                  <div className="mt-3 flex w-full max-w-[250px] items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/25">
-                      <div
-                        className="h-full rounded-full bg-teal-deep transition-all"
-                        style={{ width: `${Math.max(8, aiBackgroundProgress)}%` }}
-                      />
-                    </div>
-                    <span className="w-9 text-right text-[12px] font-bold">
-                      {aiBackgroundProgress}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {aiBackgroundStatus === "failed" && aiBackgroundError && (
-            <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
-              {aiBackgroundError}
-            </div>
-          )}
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            {aiBackgroundDone && (
-              <button
-                type="button"
-                onClick={() => setAiPreviewMode("original")}
-                className="min-h-10 flex-1 rounded-lg border border-line bg-surface px-3 text-[12px] font-bold text-ink"
-              >
-                Lihat Original
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => void handleGenerateAiBackground(selectedAiBackgroundComplete)}
-              disabled={!canGenerateAiBackground}
-              className="min-h-10 flex-1 rounded-lg bg-teal-deep px-3 text-[12px] font-bold text-surface disabled:opacity-50"
-            >
-              {selectedAiBackgroundComplete ? "Generate Ulang" : "Generate Background"}
-            </button>
-          </div>
-
-          {showAiOriginalToggle && (
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="text-[12px] font-bold text-mid">Tampilkan:</span>
-              <div className="grid w-[170px] grid-cols-2 rounded-lg border border-line bg-surface p-0.5 text-[12px] font-bold">
-                <button
-                  type="button"
-                  onClick={() => setAiPreviewMode("ai")}
-                  className={`rounded-md px-3 py-2 ${
-                    aiPreviewMode === "ai" ? "bg-teal-deep text-surface" : "text-mid"
-                  }`}
-                >
-                  AI
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAiPreviewMode("original")}
-                  className={`rounded-md px-3 py-2 ${
-                    aiPreviewMode === "original" ? "bg-teal-deep text-surface" : "text-mid"
-                  }`}
-                >
-                  Original
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* caption – editable */}
-        <div className="mb-[18px] rounded-[14px] border border-line bg-surface px-3.5 py-3">
-          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[11px] font-bold text-muted">
-              Caption (bisa diedit)
-            </span>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={handleCaptionAiHelp}
-                disabled={!unit || captionSuggesting}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-teal-tint px-2 text-[11px] font-bold text-teal-deep disabled:opacity-50"
-              >
-                <Sparkles size={13} />
-                {captionSuggesting ? "Mengolah..." : "Bantuan AI Mobix Assistant"}
-              </button>
-              {unit && captionText !== autoCaption && (
-                <button
-                  onClick={() => setCaptionText(autoCaption)}
-                  className="text-[11px] font-semibold text-muted underline"
-                >
-                  Reset
-                </button>
-              )}
-              <button
-                onClick={() => copy("caption", captionText)}
-                disabled={!unit}
-                className="text-[11px] font-bold text-teal-deep disabled:opacity-40"
-              >
-                {copied === "caption" ? "Tersalin ✓" : "Salin"}
-              </button>
-            </div>
-          </div>
-          {loading || !unit ? (
-            <div className="space-y-2">
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-3 w-2/3" />
-            </div>
-          ) : (
-            <textarea
-              value={captionText}
-              onChange={(e) => setCaptionText(e.target.value)}
-              rows={8}
-              className="min-h-[164px] w-full resize-y bg-transparent text-[12px] leading-[1.55] text-mid outline-none"
-            />
-          )}
-        </div>
 
         {/* builder price */}
         <div className="mb-3 flex items-center justify-between rounded-[14px] border border-line bg-surface px-3.5 py-3">
