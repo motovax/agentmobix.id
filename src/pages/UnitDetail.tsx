@@ -145,6 +145,8 @@ export function UnitDetail() {
   const [activeThumb, setActiveThumb] = useState(0);
   const [showAllThumbs, setShowAllThumbs] = useState(false);
   const [lightbox, setLightbox] = useState(false);
+  const [simulationOpen, setSimulationOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [dpPercentInput, setDpPercentInput] = useState(String(MIN_DP_PERCENT));
   const [dpAmountInput, setDpAmountInput] = useState("");
   const [tdpAmount, setTdpAmount] = useState(0);
@@ -757,6 +759,8 @@ export function UnitDetail() {
     setActiveThumb(0);
     setShowAllThumbs(false);
     setLightbox(false);
+    setSimulationOpen(false);
+    setDetailsOpen(false);
     setSimTab("reguler");
     setSimulationMethod("DP");
     setDpPercent(minDsfDpPercent);
@@ -1194,8 +1198,24 @@ export function UnitDetail() {
           )}
         </div>
 
-        {/* SPEC GRID */}
-        <div className="px-[18px] py-4">
+        {/* DETAIL ACCORDION */}
+        <div className="mx-[18px] mb-4 overflow-hidden rounded-[18px] border border-line bg-surface">
+          <button
+            type="button"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((open) => !open)}
+            className="flex min-h-[76px] w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+          >
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-field text-[22px]">📄</span>
+            <span className="flex-1 text-[15px] font-extrabold text-ink">Cek detail unit lengkapnya</span>
+            <span className={`text-[24px] leading-none text-muted transition-transform ${detailsOpen ? "rotate-90" : ""}`}>›</span>
+          </button>
+
+          {detailsOpen && (
+          <>
+
+          {/* SPEC GRID */}
+        <div className="px-3.5 py-4">
           <div className="grid grid-cols-3 gap-2">
             {topSpecs.map((s) => (
               <div key={s.label} className="rounded-xl bg-field p-3 text-center">
@@ -1206,9 +1226,35 @@ export function UnitDetail() {
           </div>
         </div>
 
+          </>
+          )}
+
         {/* CALCULATOR */}
-        {salesContactRequired ? (
-          <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4">
+        <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4">
+          <button
+            type="button"
+            aria-expanded={simulationOpen}
+            onClick={() => setSimulationOpen((open) => !open)}
+            className="flex w-full items-center gap-3 rounded-[18px] border border-line bg-surface px-4 py-3 text-left"
+          >
+            <span className="flex-1">
+              <span className="flex items-center gap-2 text-[15px] font-extrabold text-ink">
+                Simulasi kredit
+                <span className="rounded-[7px] bg-teal-tint px-2 py-[3px] text-[11px] font-bold text-teal-deep">
+                  {canShareSimulation ? "Bisa di-share" : "Menunggu DSF"}
+                </span>
+              </span>
+              <span className="mt-1 block truncate text-[12px] font-semibold text-muted">
+                {salesContactRequired
+                  ? "Tanya sales untuk opsi pembiayaan"
+                  : `Reguler · DP ${Math.round(displayDpPercent)}% · ${tenor} bln · Cicilan ${displayMonthly ? formatRupiah(displayMonthly) : "Menghitung..."}/bln`}
+              </span>
+            </span>
+            <span className={`text-[22px] leading-none text-muted transition-transform ${simulationOpen ? "rotate-90" : ""}`}>›</span>
+          </button>
+
+          {simulationOpen && (salesContactRequired ? (
+          <div className="pt-3">
             <div className="rounded-[18px] border border-[#E8C98B] bg-[#FFF8E8] p-4">
               <div className="inline-flex rounded-full bg-[#F7DFAC] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#7A4700]">
                 Tidak eligible DSF
@@ -1240,7 +1286,7 @@ export function UnitDetail() {
             </div>
           </div>
         ) : (
-        <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4">
+        <div className="pt-3">
           <div className="rounded-[18px] border border-line bg-surface p-4">
             <div className="mb-3.5 flex items-center justify-between">
               <div className="-tracking-[0.01em] text-[15px] font-extrabold">
@@ -1680,7 +1726,8 @@ export function UnitDetail() {
             </p>
           </div>
         </div>
-        )}
+        ))}
+        </div>
 
         {sharePanelOpen && (
           <div ref={sharePanelRef} id="share-client" className="scroll-mt-3 border-t border-line-2 pt-4">
@@ -1694,6 +1741,8 @@ export function UnitDetail() {
           </div>
         )}
 
+        {detailsOpen && (
+        <>
         {/* KELENGKAPAN DOKUMEN */}
         {docs.length > 0 && (
         <div className="px-[18px] pb-4">
@@ -1757,6 +1806,10 @@ export function UnitDetail() {
             </div>
           </div>
         )}
+
+        </>
+        )}
+        </div>
 
         <div className="h-[104px]" />
       </main>
