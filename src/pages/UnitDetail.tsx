@@ -8,7 +8,7 @@ import { AppBar } from "../components/AppBar";
 import { ContactActionMenu } from "../components/FloatingContactCta";
 import { Photo, Skeleton } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
-import { ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
+import { ChevronLeft, ShareArrow, Check, Close, Play, Sparkles } from "../components/icons";
 import {
   fetchUnitDetail,
   mobixImage,
@@ -299,15 +299,23 @@ export function UnitDetail() {
           : {}),
         cicilan: String(Math.round(displayMonthly)),
         tdp: String(Math.round(shareTdp)),
-      }).toString()}`
+        }).toString()}`
     : salesContactRequired && unit
       ? `/unit/${encodeURIComponent(unit.slug)}?${new URLSearchParams({
           share: "1",
           u: unit.slug,
           harga: String(Math.round(price)),
           komisi: String(Math.round(estimatedCommission)),
-        }).toString()}`
+      }).toString()}`
       : null;
+  const aiShareHref = unit
+    ? shareHref ?? `/unit/${encodeURIComponent(unit.slug)}?${new URLSearchParams({
+        share: "1",
+        u: unit.slug,
+        harga: String(Math.round(price)),
+        komisi: String(Math.round(estimatedCommission)),
+      }).toString()}`
+    : null;
   const unitAdminMessage = unit
     ? `Halo AI Mobix! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
     : undefined;
@@ -957,6 +965,15 @@ export function UnitDetail() {
               <ShareArrow size={17} />
             </button>
           )}
+          {aiShareHref && (
+            <Link
+              href={aiShareHref}
+              aria-label="Buat konten dengan AI"
+              className="absolute right-3.5 top-[62px] flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/70 bg-[#6B57E8] text-white shadow-sm backdrop-blur"
+            >
+              <Sparkles size={18} />
+            </Link>
+          )}
           <div className="absolute bottom-3.5 left-3.5 rounded-xl bg-ink/85 px-3 py-2 text-surface shadow-sm backdrop-blur">
             <div className="text-[16px] font-extrabold leading-none">
               {price ? formatRupiah(price) : "Hubungi kami"}
@@ -1079,6 +1096,24 @@ export function UnitDetail() {
               </div>
             )}
           </>
+        )}
+
+        {aiShareHref && (
+          <Link
+            href={aiShareHref}
+            className="mx-[18px] mb-2 flex items-center gap-3 rounded-[14px] border border-[#D9D4FF] bg-[#F5F2FF] px-3.5 py-3 text-ink no-underline"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-[#6B57E8] shadow-sm">
+              <Sparkles size={19} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-extrabold">Buat konten dengan AI</span>
+              <span className="mt-0.5 block text-[11px] leading-[1.4] text-mid">
+                Ganti background foto dan buat caption siap share.
+              </span>
+            </span>
+            <span className="text-[22px] leading-none text-[#6B57E8]">›</span>
+          </Link>
         )}
 
         {/* TITLE BLOCK */}
