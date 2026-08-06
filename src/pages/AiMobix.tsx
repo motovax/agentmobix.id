@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Link } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { ChevronLeft, Search, Send } from "../components/icons";
-import { askFalcon, resolveFalconUnitLinks, type FalconUnitLink } from "../lib/falcon";
+import { askFalcon, formatFalconReplyHtml, resolveFalconUnitLinks } from "../lib/falcon";
 
 type Message =
-  | { id: number; kind: "in"; html: string; units?: FalconUnitLink[] }
+  | { id: number; kind: "in"; html: string }
   | { id: number; kind: "out"; html: string };
 
 const SEED: Message[] = [
@@ -26,23 +26,6 @@ const QUICK_ACTIONS: QuickAction[] = [
   { label: "Cari unit", prompt: "Cari unit: ", Icon: Search },
   { label: "Bandingkan unit", prompt: "Bandingkan unit: ", Icon: Search },
 ];
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>\"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "\"": "&quot;",
-    "'": "&#39;",
-  })[character] ?? character);
-}
-
-function falconHtml(value: string) {
-  return escapeHtml(value)
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*([^*\n]+)\*/g, "<strong>$1</strong>")
-    .replace(/\n/g, "<br/>");
-}
 
 export function AiMobix() {
   const [messages, setMessages] = useState<Message[]>(SEED);
@@ -70,8 +53,7 @@ export function AiMobix() {
       setMessages((m) => [...m, {
         id: nextId.current++,
         kind: "in",
-        html: falconHtml(result.reply),
-        units,
+        html: formatFalconReplyHtml(result.reply, units),
       }]);
     } catch {
       setMessages((m) => [...m, {
@@ -120,23 +102,6 @@ export function AiMobix() {
             return (
               <div key={m.id} className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] leading-[1.5] text-ink">
                 <div dangerouslySetInnerHTML={{ __html: m.html }} />
-                {m.units && m.units.length > 0 && (
-                  <div className="mt-3 border-t border-line pt-2">
-                    <div className="mb-1 text-[11px] font-bold text-muted">URL detail unit</div>
-                    {m.units.map((unit) => (
-                      <a
-                        key={unit.slug}
-                        href={unit.href}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block py-1 text-teal-deep underline"
-                      >
-                        {unit.title}{unit.plateNo ? ` · ${unit.plateNo}` : ""}
-                        <span className="block break-all text-[11px] font-normal">{unit.href}</span>
-                      </a>
-                    ))}
-                  </div>
-                )}
               </div>
             );
           }

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { extractFalconUnitReferences, parseFalconSseFrame } from "../src/lib/falcon";
+import {
+  extractFalconUnitReferences,
+  formatFalconReplyHtml,
+  parseFalconSseFrame,
+} from "../src/lib/falcon";
 
 describe("referensi unit dari respons Falcon", () => {
   test("membaca daftar rekomendasi berbasis nomor polisi", () => {
@@ -18,6 +22,42 @@ describe("referensi unit dari respons Falcon", () => {
     expect(
       extractFalconUnitReferences("*Toyota Avanza — B 1234 CD*\n*Toyota Avanza — B1234CD*"),
     ).toHaveLength(1);
+  });
+});
+
+describe("format jawaban Falcon", () => {
+  test("menempatkan URL tepat di bawah poin unit yang sesuai", () => {
+    const html = formatFalconReplyHtml(
+      "1. *Toyota Calya — B 2203 FFE*\nOtomatis, 77.166 km.\n\n2. *Honda Mobilio — B2863KYJ*\nOtomatis, 138.069 km.\n\nSaya paling menyarankan Calya B2203FFE.",
+      [
+        {
+          slug: "toyota-calya",
+          title: "Toyota Calya",
+          plateNo: "B2203FFE",
+          href: "https://agenmobix.id/unit/toyota-calya",
+        },
+        {
+          slug: "honda-mobilio",
+          title: "Honda Mobilio",
+          plateNo: "B 2863 KYJ",
+          href: "https://agenmobix.id/unit/honda-mobilio",
+        },
+      ],
+    );
+
+    expect(html).toContain(
+      "<strong>Toyota Calya — B 2203 FFE</strong><br/><a href=\"https://agenmobix.id/unit/toyota-calya\"",
+    );
+    expect(html.indexOf("toyota-calya")).toBeLessThan(html.indexOf("Otomatis, 77.166 km."));
+    expect(html.indexOf("honda-mobilio")).toBeLessThan(html.indexOf("Otomatis, 138.069 km."));
+    expect(html.match(/<a href=/g)).toHaveLength(2);
+    expect(html).not.toContain("URL detail unit");
+  });
+
+  test("tetap mengamankan HTML dari jawaban Falcon", () => {
+    expect(formatFalconReplyHtml("<script>alert('xss')</script>")).toBe(
+      "&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;",
+    );
   });
 });
 

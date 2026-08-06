@@ -26,6 +26,42 @@ export type FalconUnitReference = {
   plateNo: string;
 };
 
+function escapeHtml(value: string) {
+  return value.replace(/[&<>\"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;",
+  })[character] ?? character);
+}
+
+function formatFalconLine(value: string) {
+  return escapeHtml(value)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*\n]+)\*/g, "<strong>$1</strong>");
+}
+
+function normalizedPlate(value: string) {
+  return value.replace(/\s+/g, "").toUpperCase();
+}
+
+/** Render Falcon markdown and place each resolved unit URL below its recommendation title. */
+export function formatFalconReplyHtml(reply: string, units: FalconUnitLink[] = []) {
+  return reply.split("\n").map((line) => {
+    const reference = extractFalconUnitReferences(line)[0];
+    const unit = reference
+      ? units.find(({ plateNo }) => normalizedPlate(plateNo) === reference.plateNo)
+      : undefined;
+    const formattedLine = formatFalconLine(line);
+
+    if (!unit) return formattedLine;
+
+    const href = escapeHtml(unit.href);
+    return `${formattedLine}<br/><a href="${href}" target="_blank" rel="noreferrer" class="break-all text-[11px] font-normal text-teal-deep underline">${href}</a>`;
+  }).join("<br/>");
+}
+
 type FalconStreamPayload = {
   answer?: string;
   content?: string;
