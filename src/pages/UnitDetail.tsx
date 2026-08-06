@@ -1099,7 +1099,7 @@ export function UnitDetail() {
           <h1 className="m-0 mt-0.5 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2]">
             {unit.nama}
           </h1>
-          <div className="mt-2.5 flex items-center justify-between">
+            <div className="mt-2.5 flex items-center justify-between">
             <div>
               <div className="-tracking-[0.02em] text-[24px] font-extrabold">
                 {price ? formatRupiah(price) : "Hubungi kami"}
@@ -1147,6 +1147,21 @@ export function UnitDetail() {
           </div>
           {originalPrice > 0 && (
             <div className="mt-3 rounded-[14px] border border-line bg-surface px-3.5 py-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-[15px] font-extrabold text-ink">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-tint text-[17px]">✎</span>
+                  Pengaturan harga
+                </div>
+                {price !== originalPrice && (
+                  <button
+                    type="button"
+                    onClick={() => commitBuilderPrice(originalPrice)}
+                    className="text-[12px] font-bold text-teal-deep"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
               <div className="mb-1.5 flex items-center justify-between gap-2">
                 <label
                   htmlFor="builder-price"
@@ -1154,15 +1169,6 @@ export function UnitDetail() {
                 >
                   Harga jual builder
                 </label>
-                {price !== originalPrice && (
-                  <button
-                    type="button"
-                    onClick={() => commitBuilderPrice(originalPrice)}
-                    className="text-[11px] font-semibold text-muted underline"
-                  >
-                    Reset
-                  </button>
-                )}
               </div>
               <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2.5">
                 <span className="shrink-0 text-[13px] font-semibold text-muted">Rp</span>
@@ -1195,37 +1201,6 @@ export function UnitDetail() {
                 Naikkan harga jual untuk menambah estimasi komisi.
               </p>
             </div>
-          )}
-        </div>
-
-        {/* DETAIL ACCORDION */}
-        <div className="mx-[18px] mb-4 overflow-hidden rounded-[18px] border border-line bg-surface">
-          <button
-            type="button"
-            aria-expanded={detailsOpen}
-            onClick={() => setDetailsOpen((open) => !open)}
-            className="flex min-h-[76px] w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
-          >
-            <span className="flex-1 text-[15px] font-extrabold text-ink">Cek detail unit lengkapnya</span>
-            <span className={`text-[24px] leading-none text-muted transition-transform ${detailsOpen ? "rotate-90" : ""}`}>›</span>
-          </button>
-
-          {detailsOpen && (
-          <>
-
-          {/* SPEC GRID */}
-        <div className="px-3.5 py-4">
-          <div className="grid grid-cols-3 gap-2">
-            {topSpecs.map((s) => (
-              <div key={s.label} className="rounded-xl bg-field p-3 text-center">
-                <div className="text-[11px] text-muted">{s.label}</div>
-                <div className="mt-0.5 truncate text-[13px] font-bold">{s.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-          </>
           )}
         </div>
 
@@ -1741,8 +1716,32 @@ export function UnitDetail() {
           </div>
         )}
 
+        {/* DETAIL ACCORDION — selalu berada di bawah simulasi */}
+        <div className="mx-[18px] mb-4 mt-1 overflow-hidden rounded-[18px] border border-line bg-surface">
+          <button
+            type="button"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((open) => !open)}
+            className="flex min-h-[76px] w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+          >
+            <span className="flex-1 text-[15px] font-extrabold text-ink">Cek detail unit lengkapnya</span>
+            <span className={`text-[24px] leading-none text-muted transition-transform ${detailsOpen ? "rotate-90" : ""}`}>›</span>
+          </button>
+
         {detailsOpen && (
         <>
+        {/* SPEC GRID */}
+        <div className="px-3.5 py-4">
+          <div className="grid grid-cols-3 gap-2">
+            {topSpecs.map((s) => (
+              <div key={s.label} className="rounded-xl bg-field p-3 text-center">
+                <div className="text-[11px] text-muted">{s.label}</div>
+                <div className="mt-0.5 truncate text-[13px] font-bold">{s.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* KELENGKAPAN DOKUMEN */}
         {docs.length > 0 && (
         <div className="px-[18px] pb-4">
@@ -1809,6 +1808,7 @@ export function UnitDetail() {
 
         </>
         )}
+        </div>
 
         <div className="h-[104px]" />
       </main>
