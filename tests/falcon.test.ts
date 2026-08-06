@@ -91,6 +91,7 @@ describe("format jawaban Falcon", () => {
     expect(html.indexOf("Otomatis, 138.069 km.")).toBeLessThan(html.indexOf("honda-mobilio"));
     expect(html.indexOf("honda-mobilio")).toBeLessThan(html.indexOf("Saya paling menyarankan"));
     expect(html.match(/<a href=/g)).toHaveLength(2);
+    expect(html.match(/data-ai-unit-link="true"/g)).toHaveLength(2);
     expect(html).not.toContain("URL detail unit");
   });
 

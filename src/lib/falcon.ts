@@ -117,7 +117,7 @@ export function formatFalconReplyHtml(reply: string, units: FalconUnitLink[] = [
     if (!unit) return formattedLine;
 
     const href = escapeHtml(unit.href);
-    return `${formattedLine}<br/><a href="${href}" target="_blank" rel="noreferrer" class="break-all text-[11px] font-normal text-teal-deep underline">${href}</a>`;
+    return `${formattedLine}<br/><a href="${href}" data-ai-unit-link="true" target="_blank" rel="noreferrer" class="break-all text-[11px] font-normal text-teal-deep underline">${href}</a>`;
   }).join("<br/>");
 }
 

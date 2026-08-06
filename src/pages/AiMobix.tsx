@@ -33,52 +33,6 @@ const QUICK_ACTIONS: QuickAction[] = [
   { label: "Bandingkan unit", prompt: "Bandingkan unit: ", Icon: Search },
 ];
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>\"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "\"": "&quot;",
-    "'": "&#39;",
-  })[character] ?? character);
-}
-
-function isInventoryRequest(text: string) {
-  return /inventory|stok|unit|cari|avanza|brio|xenia|sigra|mobil|matic|manual/i.test(text);
-}
-
-function inventoryRequest(text: string) {
-  const query = text.replace(/^(cari\s+(unit|inventory)|tampilkan|carikan|cek)\s*[:\-]?\s*/i, "").trim();
-  if (!query || /^(inventory|stok|unit)$/i.test(query)) return { page: 1, limit: 5 };
-  const lowerQuery = query.toLowerCase();
-  if (lowerQuery.includes("keluarga")) {
-    return {
-      kategori: ["MPV", "LCGC"],
-      ...(lowerQuery.includes("murah") || lowerQuery.includes("budget")
-        ? { harga_akhir: 200_000_000 }
-        : {}),
-      page: 1,
-      limit: 5,
-    };
-  }
-  const classification = classifyQuery(query);
-  return { [classification.param]: classification.value, page: 1, limit: 5 };
-}
-
-function inventoryReply(items: ProductListItem[], total: number) {
-  if (!items.length) return "Aku belum menemukan unit yang cocok di inventory Motovax. Coba sebutkan merek, model, atau nomor polisi.";
-  const rows = items.map((item) => {
-    const title = escapeHtml(item.nama);
-    const branch = escapeHtml(item.cabang || "Lokasi belum tersedia");
-    const image = mobixImage(item.thumbnail_depan?.trim() || item.thumbnail, 420);
-    const imagePreview = image
-      ? `<img src="${escapeHtml(image)}" alt="${title}" loading="lazy" class="mb-2 h-24 w-full rounded-xl object-cover" />`
-      : "";
-    return `<a href="/unit/${encodeURIComponent(item.slug)}" data-ai-unit-link="true" class="block font-bold text-teal-deep no-underline">${imagePreview}${title}<br/><span class="font-normal text-muted">Rp ${formatJt(item.harga)} · ${item.year} · ${branch}</span></a>`;
-  });
-  return `<strong>${total} unit ditemukan di inventory Motovax.</strong><br/>${rows.join("<br/><br/>")}<br/><br/><span class="text-muted">Buka salah satu unit untuk melihat detail lengkapnya.</span>`;
-}
-
 export function AiMobix() {
   const [, navigate] = useLocation();
   const [messages, setMessages] = useState<Message[]>(SEED);
