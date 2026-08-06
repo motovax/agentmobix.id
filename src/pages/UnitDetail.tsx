@@ -1084,8 +1084,8 @@ export function UnitDetail() {
         {/* TITLE BLOCK */}
         <div className="px-[18px] pt-1">
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-            <span className="rounded-md bg-field px-1.5 py-0.5 text-[11px] font-medium text-muted">
-              🏢 Cabang: {titleCase(unit.lokasi || "Mobix")}
+              <span className="rounded-md bg-field px-1.5 py-0.5 text-[11px] font-medium text-muted">
+              Cabang: {titleCase(unit.lokasi || "Mobix")}
             </span>
             {unit.posisi && titleCase(unit.posisi) !== titleCase(unit.lokasi || "") && (
               <span className="rounded-md bg-field px-1.5 py-0.5 text-[11px] font-medium text-muted">
@@ -1205,7 +1205,7 @@ export function UnitDetail() {
         </div>
 
         {/* CALCULATOR */}
-        <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4">
+        <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4 pt-3">
           <button
             type="button"
             aria-expanded={simulationOpen}
