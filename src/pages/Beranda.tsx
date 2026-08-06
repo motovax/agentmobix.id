@@ -409,7 +409,7 @@ export function Beranda() {
             className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-teal/30 bg-teal px-4 py-2.5 text-[12px] font-extrabold text-ink no-underline"
           >
             <Chat size={16} strokeWidth={1.8} />
-            Bantuan Sparrow <span aria-hidden="true">→</span>
+            Bantuan AI <span aria-hidden="true">→</span>
           </Link>
         </header>
 
