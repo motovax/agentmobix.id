@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Link } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { Camera, Calculator, Chat, ChevronLeft, Plus, Search, Send, VideoCamera } from "../components/icons";
-import { classifyQuery, fetchUnits, mobixImage, type ProductListItem } from "../lib/mobix";
+import { classifyQuery, fetchUnits, type ProductListItem } from "../lib/mobix";
 import { formatJt } from "../lib/format";
 
 type Message =
@@ -13,7 +13,7 @@ const SEED: Message[] = [
   {
     id: 1,
     kind: "in",
-    html: "Halo 👋 Aku Talon AI, asisten jualanmu. Aku bisa bantu mencari unit di inventory Mobix, membuat caption, atau menghitung paket cicilan. Silakan tanyakan apa saja.",
+    html: "Halo 👋 Aku Falcon Jr, asisten jualanmu. Aku bisa bantu mencari unit di inventory Mobix, membuat caption, atau menghitung paket cicilan. Silakan tanyakan apa saja.",
   },
 ];
 
@@ -68,11 +68,7 @@ function inventoryReply(items: ProductListItem[], total: number) {
   const rows = items.map((item) => {
     const title = escapeHtml(item.nama);
     const branch = escapeHtml(item.cabang || "Lokasi belum tersedia");
-    const image = mobixImage(item.thumbnail_depan?.trim() || item.thumbnail, 420);
-    const imagePreview = image
-      ? `<img src="${escapeHtml(image)}" alt="${title}" loading="lazy" class="mb-2 h-24 w-full rounded-xl object-cover" />`
-      : "";
-    return `<a href="/unit/${encodeURIComponent(item.slug)}" class="block font-bold text-teal-deep no-underline">${imagePreview}${title}<br/><span class="font-normal text-muted">Rp ${formatJt(item.harga)} · ${item.year} · ${branch}</span></a>`;
+    return `<a href="/unit/${encodeURIComponent(item.slug)}" class="block font-bold text-teal-deep no-underline">${title}<br/><span class="font-normal text-muted">Rp ${formatJt(item.harga)} · ${item.year} · ${branch}</span></a>`;
   });
   return `<strong>${total} unit ditemukan di inventory Motovax.</strong><br/>${rows.join("<br/><br/>")}<br/><br/><span class="text-muted">Buka salah satu unit untuk melihat detail lengkapnya.</span>`;
 }
@@ -137,7 +133,7 @@ export function AiMobix() {
           T
         </div>
         <div className="flex-1">
-          <div className="-tracking-[0.01em] text-[15px] font-extrabold">Talon AI</div>
+          <div className="-tracking-[0.01em] text-[15px] font-extrabold">Falcon Jr</div>
           <div className="flex items-center gap-1.5 text-[11px] text-teal-deep">
             <span className="h-1.5 w-1.5 rounded-full bg-teal" />
             Aktif · biasanya balas &lt; 30 detik
@@ -175,7 +171,7 @@ export function AiMobix() {
         })}
         {isSearchingInventory && (
           <div className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] text-muted">
-            Talon AI sedang mengecek inventory Motovax…
+            Falcon Jr sedang mengecek inventory Motovax…
           </div>
         )}
       </div>
@@ -220,7 +216,7 @@ export function AiMobix() {
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Tulis pesan untuk Talon AI…"
+              placeholder="Tulis pesan untuk Falcon Jr…"
               className="min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-placeholder"
             />
           </div>
