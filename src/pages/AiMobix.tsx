@@ -2,11 +2,10 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Link } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { Camera, Calculator, Chat, ChevronLeft, Plus, Search, Send, VideoCamera } from "../components/icons";
-import { classifyQuery, fetchUnits, type ProductListItem } from "../lib/mobix";
-import { formatJt } from "../lib/format";
+import { askFalcon } from "../lib/falcon";
 
 type Message =
-  | { id: number; kind: "in"; html: string }
+  | { id: number; kind: "in"; html: string; photos?: Array<{ url: string; label?: string }> }
   | { id: number; kind: "out"; html: string };
 
 const SEED: Message[] = [
@@ -41,36 +40,11 @@ function escapeHtml(value: string) {
   })[character] ?? character);
 }
 
-function isInventoryRequest(text: string) {
-  return /inventory|stok|unit|cari|avanza|brio|xenia|sigra|mobil|matic|manual/i.test(text);
-}
-
-function inventoryRequest(text: string) {
-  const query = text.replace(/^(cari\s+(unit|inventory)|tampilkan|carikan|cek)\s*[:\-]?\s*/i, "").trim();
-  if (!query || /^(inventory|stok|unit)$/i.test(query)) return { page: 1, limit: 5 };
-  const lowerQuery = query.toLowerCase();
-  if (lowerQuery.includes("keluarga")) {
-    return {
-      kategori: ["MPV", "LCGC"],
-      ...(lowerQuery.includes("murah") || lowerQuery.includes("budget")
-        ? { harga_akhir: 200_000_000 }
-        : {}),
-      page: 1,
-      limit: 5,
-    };
-  }
-  const classification = classifyQuery(query);
-  return { [classification.param]: classification.value, page: 1, limit: 5 };
-}
-
-function inventoryReply(items: ProductListItem[], total: number) {
-  if (!items.length) return "Aku belum menemukan unit yang cocok di inventory Motovax. Coba sebutkan merek, model, atau nomor polisi.";
-  const rows = items.map((item) => {
-    const title = escapeHtml(item.nama);
-    const branch = escapeHtml(item.cabang || "Lokasi belum tersedia");
-    return `<a href="/unit/${encodeURIComponent(item.slug)}" class="block font-bold text-teal-deep no-underline">${title}<br/><span class="font-normal text-muted">Rp ${formatJt(item.harga)} · ${item.year} · ${branch}</span></a>`;
-  });
-  return `<strong>${total} unit ditemukan di inventory Motovax.</strong><br/>${rows.join("<br/><br/>")}<br/><br/><span class="text-muted">Buka salah satu unit untuk melihat detail lengkapnya.</span>`;
+function falconHtml(value: string) {
+  return escapeHtml(value)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*\n]+)\*/g, "<strong>$1</strong>")
+    .replace(/\n/g, "<br/>");
 }
 
 export function AiMobix() {
@@ -92,30 +66,24 @@ export function AiMobix() {
     setMessages((m) => [...m, { id: outId, kind: "out", html: value }]);
     setDraft("");
 
-    if (isInventoryRequest(value)) {
-      setIsSearchingInventory(true);
-      try {
-        const result = await fetchUnits(inventoryRequest(value));
-        setMessages((m) => [...m, { id: nextId.current++, kind: "in", html: inventoryReply(result.items, result.total) }]);
-      } catch {
-        setMessages((m) => [...m, { id: nextId.current++, kind: "in", html: "Inventory sedang tidak dapat diakses. Coba lagi beberapa saat atau buka katalog untuk melihat stok terbaru." }]);
-      } finally {
-        setIsSearchingInventory(false);
-      }
-      return;
+    setIsSearchingInventory(true);
+    try {
+      const result = await askFalcon(value);
+      setMessages((m) => [...m, {
+        id: nextId.current++,
+        kind: "in",
+        html: falconHtml(result.reply),
+        photos: result.photos,
+      }]);
+    } catch {
+      setMessages((m) => [...m, {
+        id: nextId.current++,
+        kind: "in",
+        html: "Falcon sedang tidak dapat diakses. Coba lagi beberapa saat atau buka katalog untuk melihat stok terbaru.",
+      }]);
+    } finally {
+      setIsSearchingInventory(false);
     }
-
-    const inId = nextId.current++;
-    window.setTimeout(() => {
-      setMessages((m) => [
-        ...m,
-        {
-          id: inId,
-          kind: "in",
-          html: "Siap, aku bantu proses. Aku teruskan ke tim cabang dan kabari kamu di sini ya. 🙌",
-        },
-      ]);
-    }, 700);
   }
 
   return (
@@ -152,11 +120,14 @@ export function AiMobix() {
         {messages.map((m) => {
           if (m.kind === "in") {
             return (
-              <div
-                key={m.id}
-                className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] leading-[1.5] text-ink"
-                dangerouslySetInnerHTML={{ __html: m.html }}
-              />
+              <div key={m.id} className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] leading-[1.5] text-ink">
+                <div dangerouslySetInnerHTML={{ __html: m.html }} />
+                {m.photos?.map((photo) => (
+                  <a key={photo.url} href={photo.url} target="_blank" rel="noreferrer" className="mt-2 block text-teal-deep underline">
+                    {photo.label || "Lihat foto unit"}
+                  </a>
+                ))}
+              </div>
             );
           }
           if (m.kind === "out") {

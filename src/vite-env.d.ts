@@ -8,6 +8,8 @@ interface ImportMetaEnv {
   readonly VITE_STRAPI_API_KEY?: string;
   readonly VITE_CMS_API_BASE?: string;
   readonly VITE_CMS_IMAGE_BASE?: string;
+  readonly VITE_FALCON_API_BASE?: string;
+  readonly VITE_FALCON_DEMO_SLUG?: string;
 }
 
 interface ImportMeta {
