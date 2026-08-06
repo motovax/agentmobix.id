@@ -122,7 +122,7 @@ export function AiMobix() {
                 <div dangerouslySetInnerHTML={{ __html: m.html }} />
                 {m.units && m.units.length > 0 && (
                   <div className="mt-3 border-t border-line pt-2">
-                    <div className="mb-1 text-[11px] font-bold text-muted">Link detail unit</div>
+                    <div className="mb-1 text-[11px] font-bold text-muted">URL detail unit</div>
                     {m.units.map((unit) => (
                       <a
                         key={unit.slug}
@@ -132,6 +132,7 @@ export function AiMobix() {
                         className="block py-1 text-teal-deep underline"
                       >
                         {unit.title}{unit.plateNo ? ` · ${unit.plateNo}` : ""}
+                        <span className="block break-all text-[11px] font-normal">{unit.href}</span>
                       </a>
                     ))}
                   </div>
