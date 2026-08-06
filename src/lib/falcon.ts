@@ -4,17 +4,14 @@ import { buildAgenMobixUnitLink } from "./shareCaption";
 const FALCON_API_BASE = (
   import.meta.env.VITE_FALCON_API_BASE || "https://motovax-ai.motovax.com"
 ).replace(/\/$/, "");
-const FALCON_DEMO_SLUG = import.meta.env.VITE_FALCON_DEMO_SLUG || "motovax-ai";
-const SESSION_STORAGE_KEY = "mobix-falcon-session-id";
-
-export type FalconPhoto = {
-  url: string;
-  label?: string;
-};
+const FALCON_SSE_URL = (
+  import.meta.env.VITE_FALCON_SSE_URL || `${FALCON_API_BASE}/api/falcon/external/stream`
+).replace(/\/$/, "");
+const FALCON_CLIENT = import.meta.env.VITE_FALCON_CLIENT || "mobix";
+const FALCON_TOKEN = import.meta.env.VITE_FALCON_TOKEN || "";
 
 export type FalconReply = {
   reply: string;
-  photos?: FalconPhoto[];
 };
 
 export type FalconUnitLink = {
@@ -73,30 +70,41 @@ export async function resolveFalconUnitLinks(reply: string): Promise<FalconUnitL
   return resolved.filter((unit): unit is FalconUnitLink => unit !== null);
 }
 
-function sessionId() {
-  const existing = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
-  if (existing) return existing;
-
-  const value = `mobix-${crypto.randomUUID()}`;
-  window.sessionStorage.setItem(SESSION_STORAGE_KEY, value);
-  return value;
-}
-
 export async function askFalcon(message: string): Promise<FalconReply> {
-  const response = await fetch(
-    `${FALCON_API_BASE}/api/public/demo/${encodeURIComponent(FALCON_DEMO_SLUG)}/falcon-chat`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ session_id: sessionId(), role: "sales", message }),
+  if (!FALCON_TOKEN) throw new Error("Falcon Mobix belum dikonfigurasi");
+  const response = await fetch(FALCON_SSE_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${FALCON_TOKEN}`,
+      "X-Falcon-Client": FALCON_CLIENT,
+      "content-type": "application/json",
+      Accept: "text/event-stream",
     },
-  );
+    body: JSON.stringify({ client_id: FALCON_CLIENT, message }),
+  });
 
-  if (!response.ok) {
-    throw new Error("Sparrow sedang tidak dapat diakses");
+  if (!response.ok) throw new Error(await response.text() || "Falcon sedang tidak dapat diakses");
+  if (!response.body) throw new Error("Falcon tidak mengembalikan stream");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let answer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const frames = buffer.split("\n\n");
+    buffer = frames.pop() || "";
+    for (const frame of frames) {
+      const event = frame.match(/^event: (.+)$/m)?.[1];
+      const data = frame.match(/^data: (.+)$/m)?.[1];
+      if (!data) continue;
+      const payload = JSON.parse(data) as { answer?: string; message?: string };
+      if (event === "message") answer = payload.answer?.trim() || "";
+      if (event === "error") throw new Error(payload.message || "Falcon gagal menjawab");
+    }
   }
-
-  const payload = await response.json() as FalconReply;
-  if (!payload.reply?.trim()) throw new Error("Sparrow mengirim jawaban kosong");
-  return payload;
+  if (!answer) throw new Error("Falcon mengirim jawaban kosong");
+  return { reply: answer };
 }

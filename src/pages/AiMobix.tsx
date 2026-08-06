@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Link } from "wouter";
 import { AppShell } from "../components/AppShell";
-import { Camera, Calculator, Chat, ChevronLeft, Plus, Search, Send, VideoCamera } from "../components/icons";
+import { ChevronLeft, Search, Send } from "../components/icons";
 import { askFalcon, resolveFalconUnitLinks, type FalconUnitLink } from "../lib/falcon";
 
 type Message =
-  | { id: number; kind: "in"; html: string; photos?: Array<{ url: string; label?: string }>; units?: FalconUnitLink[] }
+  | { id: number; kind: "in"; html: string; units?: FalconUnitLink[] }
   | { id: number; kind: "out"; html: string };
 
 const SEED: Message[] = [
   {
     id: 1,
     kind: "in",
-    html: "Halo 👋 Aku Sparrow, asisten jualanmu. Aku bisa bantu mencari unit di inventory Mobix, membuat caption, atau menghitung paket cicilan. Silakan tanyakan apa saja.",
+    html: "Halo 👋 Aku Falcon, asisten read-only Mobix. Aku bisa membantu mencari dan membandingkan unit dari inventory. Detail unit selalu diarahkan ke agentmobix.id.",
   },
 ];
 
@@ -24,10 +24,7 @@ type QuickAction = {
 
 const QUICK_ACTIONS: QuickAction[] = [
   { label: "Cari unit", prompt: "Cari unit: ", Icon: Search },
-  { label: "Minta foto", prompt: "Minta foto unit: ", Icon: Camera },
-  { label: "Minta video", prompt: "Minta video unit: ", Icon: VideoCamera },
-  { label: "Hitung cicilan", prompt: "Hitung cicilan unit: ", Icon: Calculator },
-  { label: "Estafet lead", prompt: "Estafet lead: ", Icon: Chat },
+  { label: "Bandingkan unit", prompt: "Bandingkan unit: ", Icon: Search },
 ];
 
 function escapeHtml(value: string) {
@@ -74,14 +71,13 @@ export function AiMobix() {
         id: nextId.current++,
         kind: "in",
         html: falconHtml(result.reply),
-        photos: result.photos,
         units,
       }]);
     } catch {
       setMessages((m) => [...m, {
         id: nextId.current++,
         kind: "in",
-        html: "Sparrow sedang tidak dapat diakses. Coba lagi beberapa saat atau buka katalog untuk melihat stok terbaru.",
+            html: "Falcon sedang tidak dapat diakses. Coba lagi beberapa saat atau buka katalog untuk melihat stok terbaru.",
       }]);
     } finally {
       setIsSearchingInventory(false);
@@ -124,11 +120,6 @@ export function AiMobix() {
             return (
               <div key={m.id} className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] leading-[1.5] text-ink">
                 <div dangerouslySetInnerHTML={{ __html: m.html }} />
-                {m.photos?.map((photo) => (
-                  <a key={photo.url} href={photo.url} target="_blank" rel="noreferrer" className="mt-2 block text-teal-deep underline">
-                    {photo.label || "Lihat foto unit"}
-                  </a>
-                ))}
                 {m.units && m.units.length > 0 && (
                   <div className="mt-3 border-t border-line pt-2">
                     <div className="mb-1 text-[11px] font-bold text-muted">Link detail unit</div>
@@ -160,7 +151,7 @@ export function AiMobix() {
         })}
         {isSearchingInventory && (
           <div className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] text-muted">
-            Sparrow sedang mengecek inventory Motovax…
+            Falcon sedang membaca inventory Motovax…
           </div>
         )}
       </div>
@@ -193,19 +184,12 @@ export function AiMobix() {
           }}
           className="flex items-center gap-2"
         >
-          <button
-            type="button"
-            aria-label="Lampirkan"
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-line bg-surface-2 text-muted"
-          >
-            <Plus />
-          </button>
           <div className="flex flex-1 items-center rounded-full border border-line bg-surface-2 px-4 py-2.5">
             <input
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Tulis pesan untuk Sparrow…"
+              placeholder="Tulis pertanyaan read-only untuk Falcon…"
               className="min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-placeholder"
             />
           </div>
