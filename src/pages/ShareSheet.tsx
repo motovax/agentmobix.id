@@ -422,7 +422,10 @@ export function ShareSheet({ embedded = false }: any = {}) {
   const [copied, setCopied] = useState<"" | "caption" | "link">("");
   const [captionText, setCaptionText] = useState("");
   const [captionSuggesting, setCaptionSuggesting] = useState(false);
-  const [showChannels, setShowChannels] = useState(false);
+  // Pada embed di halaman detail, pilihan kanal harus langsung terlihat setelah
+  // pengguna masuk ke alur share. Pada halaman share penuh, tetap gunakan
+  // tombol utama agar layout tidak terlalu padat.
+  const [showChannels, setShowChannels] = useState<boolean>(Boolean(embedded));
   const [shareCaptionCopied, setShareCaptionCopied] = useState(false);
   const [pendingShareStep, setPendingShareStep] = useState<PendingShareStep | null>(null);
 
@@ -1056,6 +1059,11 @@ export function ShareSheet({ embedded = false }: any = {}) {
   }
 
   function handleShare() {
+    if (embedded) {
+      setShowChannels(true);
+      return;
+    }
+
     const share = async () => {
       const caption = captionText.trim();
       const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";

@@ -953,9 +953,14 @@ export function UnitDetail() {
               <ShareArrow size={17} />
             </button>
           )}
-          <span className="absolute bottom-3.5 left-3.5 rounded-lg bg-teal px-2.5 py-1 text-[16px] font-bold text-ink">
-            {badge ?? "Stok aktif"} · {unit.plate_no}
-          </span>
+          <div className="absolute bottom-3.5 left-3.5 rounded-xl bg-ink/85 px-3 py-2 text-surface shadow-sm backdrop-blur">
+            <div className="text-[16px] font-extrabold leading-none">
+              {price ? formatRupiah(price) : "Hubungi kami"}
+            </div>
+            <div className="mt-1 text-[10px] font-semibold text-white/75">
+              {displayTdp ? `TDP ${formatRupiah(displayTdp)}` : badge ?? "Stok aktif"}
+            </div>
+          </div>
           {mediaItems.length > 0 && (
             <div className="absolute bottom-3.5 right-3.5 rounded-lg bg-ink/80 px-2.5 py-[3px] text-[11px] font-semibold text-surface">
               {activeThumb + 1} / {mediaItems.length}
@@ -1173,6 +1178,18 @@ export function UnitDetail() {
                 <span>Minimum {formatRupiah(minimumBuilderPrice)}</span>
                 <span>Turun maks. {formatRupiah(MAX_BUILDER_PRICE_DROP)}</span>
               </div>
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-teal-tint px-3 py-2.5">
+                <div className="flex min-w-0 items-center gap-2 text-[12px] font-bold text-ink">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-teal-deep" />
+                  <span>Estimasi komisi kamu</span>
+                </div>
+                <span className="shrink-0 text-[16px] font-extrabold text-teal-deep">
+                  {formatRupiah(estimatedCommission)}
+                </span>
+              </div>
+              <p className="m-0 mt-2 text-[10px] leading-[1.45] text-muted">
+                Naikkan harga jual untuk menambah estimasi komisi.
+              </p>
             </div>
           )}
         </div>
