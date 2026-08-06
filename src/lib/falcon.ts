@@ -14,6 +14,11 @@ export type FalconReply = {
   reply: string;
 };
 
+export type FalconConversationTurn = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export type FalconUnitLink = {
   slug: string;
   title: string;
@@ -44,6 +49,42 @@ function formatFalconLine(value: string) {
 
 function normalizedPlate(value: string) {
   return value.replace(/\s+/g, "").toUpperCase();
+}
+
+const MAX_FALCON_CONTEXT_TURNS = 6;
+const MAX_FALCON_CONTEXT_CHARACTERS = 8_000;
+
+/**
+ * Falcon's external endpoint is stateless, so follow-up requests must carry
+ * enough of the preceding conversation to resolve phrases such as "buatkan".
+ */
+export function buildFalconContextMessage(
+  message: string,
+  conversation: FalconConversationTurn[],
+) {
+  if (conversation.length === 0) return message;
+
+  const recentConversation = conversation.slice(-MAX_FALCON_CONTEXT_TURNS);
+  const lines: string[] = [];
+  let usedCharacters = 0;
+
+  for (let index = recentConversation.length - 1; index >= 0; index -= 1) {
+    const turn = recentConversation[index];
+    const label = turn.role === "user" ? "Pengguna" : "AI Mobix Assistant";
+    const line = `${label}: ${turn.content.trim()}`;
+    if (usedCharacters + line.length > MAX_FALCON_CONTEXT_CHARACTERS) break;
+    lines.unshift(line);
+    usedCharacters += line.length;
+  }
+
+  return [
+    "Lanjutkan percakapan berdasarkan riwayat berikut.",
+    "Pertahankan unit, plat nomor, dan kebutuhan yang sudah disebut. Jangan tanyakan ulang informasi yang sudah ada di riwayat.",
+    "",
+    ...lines,
+    `Pengguna: ${message}`,
+    "AI Mobix Assistant:",
+  ].join("\n");
 }
 
 /** Render Falcon markdown and place each resolved URL after its recommendation details. */

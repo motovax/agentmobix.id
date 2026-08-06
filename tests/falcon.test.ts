@@ -1,9 +1,47 @@
 import { describe, expect, test } from "bun:test";
 import {
+  buildFalconContextMessage,
   extractFalconUnitReferences,
   formatFalconReplyHtml,
   parseFalconSseFrame,
 } from "../src/lib/falcon";
+
+describe("konteks percakapan Falcon", () => {
+  test("request pertama tetap dikirim tanpa pembungkus konteks", () => {
+    expect(buildFalconContextMessage("Cari unit B2302KRJ", [])).toBe(
+      "Cari unit B2302KRJ",
+    );
+  });
+
+  test("follow-up mempertahankan unit dan tawaran dari jawaban sebelumnya", () => {
+    const message = buildFalconContextMessage("Buatkan", [
+      { role: "user", content: "Cari unit B2302KRJ" },
+      {
+        role: "assistant",
+        content: "Unit B2302KRJ ready. Bisa saya bantu buatkan simulasi kredit unit ini.",
+      },
+    ]);
+
+    expect(message).toContain("Pengguna: Cari unit B2302KRJ");
+    expect(message).toContain("AI Mobix Assistant: Unit B2302KRJ ready");
+    expect(message).toContain("Pengguna: Buatkan");
+    expect(message).toContain("Jangan tanyakan ulang informasi yang sudah ada");
+  });
+
+  test("membatasi riwayat ke enam turn terakhir", () => {
+    const conversation = Array.from({ length: 8 }, (_, index) => ({
+      role: index % 2 === 0 ? "user" as const : "assistant" as const,
+      content: `turn-${index + 1}`,
+    }));
+
+    const message = buildFalconContextMessage("lanjut", conversation);
+
+    expect(message).not.toContain("turn-1");
+    expect(message).not.toContain("turn-2");
+    expect(message).toContain("turn-3");
+    expect(message).toContain("turn-8");
+  });
+});
 
 describe("referensi unit dari respons Falcon", () => {
   test("membaca daftar rekomendasi berbasis nomor polisi", () => {

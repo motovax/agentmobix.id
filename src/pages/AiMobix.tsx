@@ -2,7 +2,13 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Link } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { ChevronLeft, Search, Send } from "../components/icons";
-import { askFalcon, formatFalconReplyHtml, resolveFalconUnitLinks } from "../lib/falcon";
+import {
+  askFalcon,
+  buildFalconContextMessage,
+  formatFalconReplyHtml,
+  resolveFalconUnitLinks,
+  type FalconConversationTurn,
+} from "../lib/falcon";
 
 type Message =
   | { id: number; kind: "in"; html: string }
@@ -32,6 +38,7 @@ export function AiMobix() {
   const [draft, setDraft] = useState("");
   const [isSearchingInventory, setIsSearchingInventory] = useState(false);
   const nextId = useRef(100);
+  const conversationRef = useRef<FalconConversationTurn[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -48,7 +55,14 @@ export function AiMobix() {
 
     setIsSearchingInventory(true);
     try {
-      const result = await askFalcon(value);
+      const result = await askFalcon(
+        buildFalconContextMessage(value, conversationRef.current),
+      );
+      conversationRef.current = [
+        ...conversationRef.current,
+        { role: "user", content: value },
+        { role: "assistant", content: result.reply },
+      ];
       const units = await resolveFalconUnitLinks(result.reply);
       setMessages((m) => [...m, {
         id: nextId.current++,
