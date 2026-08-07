@@ -9,8 +9,8 @@ import {
   Copy,
   Download,
   WhatsAppSolid,
-  Telegram,
-  XTwitter,
+  InstagramSolid,
+  FacebookSolid,
   Check,
   Sparkles,
   Play,
@@ -1081,6 +1081,11 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   }
 
   function handleShare() {
+    if (!embedded && !controllerOnly) {
+      setShowChannels((visible) => !visible);
+      return;
+    }
+
     const share = async () => {
       const caption = captionText.trim();
       const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
@@ -1154,37 +1159,61 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
   useImperativeHandle(ref, () => ({ share: handleShare }));
 
-  function shareVia(channel: "wa" | "tg" | "x") {
+  async function shareVia(channel: "wa" | "ig" | "fb") {
+    if (channel !== "wa") {
+      const files = await prepareShareFiles();
+      const caption = captionText.trim();
+      const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
+
+      if (await sharePreparedFiles(files, title, caption)) {
+        setShowChannels(false);
+        return;
+      }
+
+      if (caption) await copyToClipboard(caption);
+      if (channel === "ig") {
+        downloadFiles(files);
+        window.open("https://www.instagram.com/", "_blank", "noopener");
+      } else {
+        const facebookUrl = new URL("https://www.facebook.com/sharer/sharer.php");
+        facebookUrl.searchParams.set("u", link);
+        facebookUrl.searchParams.set("quote", caption);
+        window.open(facebookUrl.toString(), "_blank", "noopener");
+      }
+      setShowChannels(false);
+      return;
+    }
+
     const imageUrls = channel === "wa"
       ? selectedImageMedia.map((media) =>
           aiBackgroundUrls[media.id] ?? mobixImage(media.item.url, MOBIX_SHARE_WIDTH),
         ).filter((url): url is string => Boolean(url))
       : [];
-    const shareText = channel === "wa"
-      ? buildWhatsAppShareText(captionText, imageUrls)
-      : captionText;
+    const shareText = buildWhatsAppShareText(captionText, imageUrls);
     const encoded = encodeURIComponent(shareText);
     const urls: Record<string, string> = {
       wa: `https://wa.me/?text=${encoded}`,
-      tg: `https://t.me/share/url?url=${encoded}`,
-      x: `https://x.com/intent/tweet?text=${encoded}`,
     };
     window.open(urls[channel], "_blank", "noopener");
     setShowChannels(false);
   }
 
-  function handleDownload() {
-    composedFiles.forEach((f, i) => {
+  function downloadFiles(files: File[]) {
+    files.forEach((f, i) => {
       const url = URL.createObjectURL(f);
       const a = document.createElement("a");
       a.href = url;
       const ext = f.type.startsWith("video/")
         ? f.name.split(".").pop() || "mp4"
         : "jpg";
-      a.download = composedFiles.length > 1 ? `unit-${i + 1}.${ext}` : `unit.${ext}`;
+      a.download = files.length > 1 ? `unit-${i + 1}.${ext}` : `unit.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
     });
+  }
+
+  function handleDownload() {
+    downloadFiles(composedFiles);
   }
 
   const backHref = embedded ? "#simulasi-kredit" : unit ? `/unit/${unit.slug}` : "/katalog";
@@ -1415,25 +1444,25 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
                 </div>
                 <div className="grid grid-cols-4 divide-x divide-line">
                   <button
-                    onClick={() => shareVia("wa")}
+                    onClick={() => void shareVia("wa")}
                     className="flex flex-col items-center gap-1.5 py-4 text-[#25D366] transition-colors hover:bg-[#25D366]/10"
                   >
                     <WhatsAppSolid size={24} />
                     <span className="text-[10px] font-semibold text-ink">WhatsApp</span>
                   </button>
                   <button
-                    onClick={() => shareVia("tg")}
-                    className="flex flex-col items-center gap-1.5 py-4 text-[#229ED9] transition-colors hover:bg-[#229ED9]/10"
+                    onClick={() => void shareVia("ig")}
+                    className="flex flex-col items-center gap-1.5 py-4 text-[#E1306C] transition-colors hover:bg-[#E1306C]/10"
                   >
-                    <Telegram size={24} />
-                    <span className="text-[10px] font-semibold text-ink">Telegram</span>
+                    <InstagramSolid size={24} />
+                    <span className="text-[10px] font-semibold text-ink">Instagram</span>
                   </button>
                   <button
-                    onClick={() => shareVia("x")}
-                    className="flex flex-col items-center gap-1.5 py-4 text-ink transition-colors hover:bg-ink/10"
+                    onClick={() => void shareVia("fb")}
+                    className="flex flex-col items-center gap-1.5 py-4 text-[#1877F2] transition-colors hover:bg-[#1877F2]/10"
                   >
-                    <XTwitter size={24} />
-                    <span className="text-[10px] font-semibold text-ink">X / Twitter</span>
+                    <FacebookSolid size={24} />
+                    <span className="text-[10px] font-semibold text-ink">Facebook</span>
                   </button>
                   <button
                     onClick={() => {

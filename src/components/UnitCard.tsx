@@ -110,7 +110,7 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
             </div>
           </div>
           <Link
-            href={`/unit/${unit.slug}?${shareParams.toString()}`}
+            href={`/share?${shareParams.toString()}`}
             aria-label={`Share ${unit.title}`}
             className="relative z-[2] inline-flex items-center gap-1 rounded-[10px] bg-ink px-2.5 py-2 text-[11px] font-bold text-surface no-underline"
           >

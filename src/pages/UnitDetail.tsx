@@ -50,7 +50,6 @@ import {
   getCatalogReturnHref,
 } from "../lib/catalogSearch";
 import { buildJasmineWhatsAppHref } from "../lib/jasmine";
-import { ShareSheet, type ShareSheetHandle } from "./ShareSheet";
 
 const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
 const MIN_DP_PERCENT = 15;
@@ -165,7 +164,6 @@ export function UnitDetail() {
   const [smartCreditPriceError, setSmartCreditPriceError] = useState(false);
   const pageRef = useRef<HTMLElement>(null);
   const galleryRef = useRef<Splide>(null);
-  const shareSheetRef = useRef<ShareSheetHandle>(null);
 
   const originalPrice = unit?.harga ?? 0;
   const price = builderPrice > 0 ? builderPrice : originalPrice;
@@ -296,6 +294,7 @@ export function UnitDetail() {
           komisi: String(Math.round(estimatedCommission)),
         })
       : null;
+  const shareHref = shareParams ? `/share?${shareParams.toString()}` : null;
   const unitAdminMessage = unit
     ? `Halo AI Mobix Assistant! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
     : undefined;
@@ -927,15 +926,14 @@ export function UnitDetail() {
           >
             <ChevronLeft />
           </Link>
-          {shareParams ? (
-            <button
-              type="button"
-              onClick={() => shareSheetRef.current?.share()}
+          {shareHref ? (
+            <Link
+              href={shareHref}
               aria-label="Share"
               className="absolute right-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
             >
               <ShareArrow size={17} />
-            </button>
+            </Link>
           ) : (
             <button
               type="button"
@@ -1693,16 +1691,6 @@ export function UnitDetail() {
         ))}
         </div>
 
-        {shareParams && unit && (
-          <ShareSheet
-            ref={shareSheetRef}
-            controllerOnly
-            unitData={unit}
-            unitSlug={unit.slug}
-            params={shareParams.toString()}
-          />
-        )}
-
         {/* DETAIL ACCORDION — selalu berada di bawah simulasi */}
         <div className="mx-[18px] mb-4 mt-1 overflow-hidden rounded-[18px] border border-line bg-surface">
           <button
@@ -1802,15 +1790,14 @@ export function UnitDetail() {
 
       {/* STICKY ACTIONS */}
       <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-40 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
-        {shareParams ? (
-          <button
-            type="button"
-            onClick={() => shareSheetRef.current?.share()}
+        {shareHref ? (
+          <Link
+            href={shareHref}
             className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl bg-ink px-3 text-[13px] font-bold text-surface no-underline"
           >
-            <span className="truncate">Share ke klien</span>
+            <span className="truncate">Share ke social media</span>
             <ShareArrow size={14} />
-          </button>
+          </Link>
         ) : (
           <button
             type="button"

@@ -3,6 +3,7 @@ import { Route, Switch, useLocation, useSearch } from "wouter";
 import { Beranda } from "./pages/Beranda";
 import { Katalog } from "./pages/Katalog";
 import { UnitDetail } from "./pages/UnitDetail";
+import { ShareSheet } from "./pages/ShareSheet";
 import { DaftarAgen } from "./pages/DaftarAgen";
 import { AiMobix } from "./pages/AiMobix";
 import { HotDeals } from "./pages/HotDeals";
@@ -54,6 +55,7 @@ export default function App({
         <Route path="/" component={Beranda} />
         <Route path="/katalog" component={Katalog} />
         <Route path="/unit/:slug" component={UnitDetail} />
+        <Route path="/share">{() => <ShareSheet />}</Route>
         <Route path="/daftar" component={DaftarAgen} />
         <Route path="/ai" component={AiMobix} />
         <Route path="/hot-deals" component={HotDeals} />
