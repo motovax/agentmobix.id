@@ -50,6 +50,7 @@ import {
   getCatalogReturnHref,
 } from "../lib/catalogSearch";
 import { buildJasmineWhatsAppHref } from "../lib/jasmine";
+import { ShareSheet } from "./ShareSheet";
 
 const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
 const MIN_DP_PERCENT = 15;
@@ -144,6 +145,7 @@ export function UnitDetail() {
   const [lightbox, setLightbox] = useState(false);
   const [simulationOpen, setSimulationOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [dpPercentInput, setDpPercentInput] = useState(String(MIN_DP_PERCENT));
   const [dpAmountInput, setDpAmountInput] = useState("");
   const [tdpAmount, setTdpAmount] = useState(0);
@@ -927,13 +929,14 @@ export function UnitDetail() {
             <ChevronLeft />
           </Link>
           {shareHref ? (
-            <Link
-              href={shareHref}
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
               aria-label="Share"
-              className="absolute right-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
+              className="absolute right-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink backdrop-blur"
             >
               <ShareArrow size={17} />
-            </Link>
+            </button>
           ) : (
             <button
               type="button"
@@ -1197,7 +1200,7 @@ export function UnitDetail() {
             type="button"
             aria-expanded={simulationOpen}
             onClick={() => setSimulationOpen((open) => !open)}
-            className="flex w-full items-center gap-3 rounded-[18px] border border-line bg-surface px-4 py-3 text-left"
+            className={`flex w-full items-center gap-3 border border-line bg-surface px-4 py-3 text-left ${simulationOpen ? "rounded-t-[18px] border-b-0" : "rounded-[18px]"}`}
           >
             <span className="flex-1">
               <span className="flex items-center gap-2 text-[15px] font-extrabold text-ink">
@@ -1216,8 +1219,8 @@ export function UnitDetail() {
           </button>
 
           {simulationOpen && (salesContactRequired ? (
-          <div className="pt-3">
-            <div className="rounded-[18px] border border-[#E8C98B] bg-[#FFF8E8] p-4">
+          <div>
+            <div className="rounded-b-[18px] border border-t-0 border-[#E8C98B] bg-[#FFF8E8] p-4">
               <div className="inline-flex rounded-full bg-[#F7DFAC] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#7A4700]">
                 Tidak eligible DSF
               </div>
@@ -1248,8 +1251,8 @@ export function UnitDetail() {
             </div>
           </div>
         ) : (
-        <div className="pt-3">
-          <div className="rounded-[18px] border border-line bg-surface p-4">
+          <div>
+            <div className="rounded-b-[18px] border border-t-0 border-line bg-surface p-4">
             <div className="mb-3.5 flex items-center justify-between">
               <div className="-tracking-[0.01em] text-[15px] font-extrabold">
                 Simulasi Hitung Kredit
@@ -1791,13 +1794,14 @@ export function UnitDetail() {
       {/* STICKY ACTIONS */}
       <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-40 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
         {shareHref ? (
-          <Link
-            href={shareHref}
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
             className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl bg-ink px-3 text-[13px] font-bold text-surface no-underline"
           >
             <span className="truncate">Share ke social media</span>
             <ShareArrow size={14} />
-          </Link>
+          </button>
         ) : (
           <button
             type="button"
@@ -1819,6 +1823,19 @@ export function UnitDetail() {
           buttonClassName="flex h-12 w-full items-center justify-center rounded-2xl border border-teal-tint-border bg-teal text-ink"
         />
       </div>
+      {shareOpen && shareParams && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-surface-2" role="dialog" aria-modal="true" aria-label="Bagikan unit">
+          <div className="mx-auto min-h-full w-full sm:max-w-[412px]">
+            <ShareSheet
+              embedded
+              unitData={unit}
+              unitSlug={unit.slug}
+              params={`?${shareParams.toString()}`}
+              onClose={() => setShareOpen(false)}
+            />
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

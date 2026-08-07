@@ -75,6 +75,7 @@ type ShareSheetProps = {
   unitData?: ProductDetail;
   unitSlug?: string;
   params?: string;
+  onClose?: () => void;
 };
 
 /* ---- canvas overlay composition ---- */
@@ -431,7 +432,7 @@ const CAPTION_STYLE_HINTS = [
 ];
 
 export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function ShareSheet(
-  { embedded = false, controllerOnly = false, unitData, unitSlug, params },
+  { embedded = false, controllerOnly = false, unitData, unitSlug, params, onClose },
   ref,
 ) {
   const search = useSearch();
@@ -1336,13 +1337,24 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
             </button>
           </Photo>
           )}
-          <Link
-            href={backHref}
-            aria-label="Kembali"
-            className="absolute left-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
-          >
-            <ChevronLeft />
-          </Link>
+          {embedded && onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Kembali ke detail unit"
+              className="absolute left-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink backdrop-blur"
+            >
+              <ChevronLeft />
+            </button>
+          ) : (
+            <Link
+              href={backHref}
+              aria-label="Kembali"
+              className="absolute left-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
+            >
+              <ChevronLeft />
+            </Link>
+          )}
           <div className="relative px-3.5 py-3">
             {loading || !unit ? (
               <div className="space-y-2">

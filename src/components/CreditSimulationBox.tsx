@@ -607,12 +607,12 @@ export function CreditSimulationBox({
     : `Reguler · DP ${Math.round(displayDpPercent)}% · ${tenor} bln · Cicilan ${displayMonthly ? formatRupiah(displayMonthly) : "Menghitung..."}/bln`;
 
   return (
-    <div id="simulasi-kredit" className="mb-[18px] scroll-mt-4">
+    <div id="simulasi-kredit" className="mb-[18px] scroll-mt-4 overflow-hidden rounded-[18px] border border-line bg-surface">
       <button
         type="button"
         aria-expanded={simulationOpen}
         onClick={() => setSimulationOpen((open) => !open)}
-        className="flex w-full items-center gap-3 rounded-[18px] border border-line bg-surface px-4 py-3 text-left"
+        className={`flex w-full items-center gap-3 bg-surface px-4 py-3 text-left ${simulationOpen ? "border-b border-line" : ""}`}
       >
         <span className="flex-1">
           <span className="flex items-center gap-2 text-[15px] font-extrabold text-ink">
@@ -634,7 +634,7 @@ export function CreditSimulationBox({
 
       {simulationOpen &&
         (salesContactRequired ? (
-          <div className="pt-3">
+          <div className="p-3">
             <div className="rounded-[18px] border border-[#E8C98B] bg-[#FFF8E8] p-4">
               <div className="inline-flex rounded-full bg-[#F7DFAC] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#7A4700]">
                 Tidak eligible DSF
@@ -666,8 +666,8 @@ export function CreditSimulationBox({
             </div>
           </div>
         ) : (
-          <div className="pt-3">
-            <div className="rounded-[18px] border border-line bg-surface p-4">
+          <div className="p-4">
+            <div>
               <div className="mb-3.5 flex items-center justify-between">
                 <div className="-tracking-[0.01em] text-[15px] font-extrabold">
                   Simulasi Hitung Kredit
