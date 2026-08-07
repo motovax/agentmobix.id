@@ -73,6 +73,77 @@ function extractFalconListUnitReference(line: string): FalconUnitReference | nul
   };
 }
 
+const PLATE_IN_TEXT_PATTERN = /\b([A-Z]{1,2}\s*\d{1,4}\s*[A-Z]{0,3})\b/i;
+
+/**
+ * Deteksi permintaan pencarian/detail unit (bukan simulasi kredit).
+ * Saat true, AI harus jawab DETAIL UNIT + gambar dulu, lalu tanya simulasi.
+ */
+export function prefersUnitDetailFirst(message: string): boolean {
+  const text = message.trim();
+  if (!text) return false;
+
+  const asksSimulation = /(?:buat(?:kan)?|hitung(?:kan)?|minta)\s+(?:simulasi|angsuran|cicilan|\bdp\b)|simulasi\s+kredit|berapa\s+(?:dp|angsuran|cicilan)/i
+    .test(text);
+  const asksUnitSearch = /cari\s*unit|detail\s*unit|info(?:rmasi)?\s*unit|lihat\s*unit|cek\s*unit/i
+    .test(text);
+
+  // "Cari unit X" selalu detail dulu, meski user juga sebut simulasi di kalimat yang sama.
+  if (asksUnitSearch) return true;
+  // Follow-up singkat seperti "buatkan" / "simulasi kredit" → boleh langsung simulasi.
+  if (asksSimulation) return false;
+  return false;
+}
+
+/** Balasan yang melompat ke angka kredit tanpa format DETAIL UNIT / daftar rekomendasi. */
+export function looksLikeCreditSimulationOnlyReply(reply: string): boolean {
+  if (/DETAIL\s+UNIT/i.test(reply)) return false;
+  if (reply.split("\n").some((line) => extractFalconListUnitReference(line))) return false;
+
+  const simulationSignals = [
+    /\btotal\s*dp\b/i,
+    /\bangsuran\b/i,
+    /\bcicilan\b/i,
+    /\btenor\b/i,
+    /^\s*price\s*:/im,
+  ];
+  const hits = simulationSignals.filter((pattern) => pattern.test(reply)).length;
+  return hits >= 2;
+}
+
+export function extractPlateFromMessage(message: string): string | null {
+  // Prefer pola setelah "Cari unit:" / "unit" agar tidak menangkap kata lain.
+  const afterLabel = message.match(
+    /(?:cari\s*unit|detail\s*unit|unit)\s*[:\-]?\s*([A-Z]{1,2}\s*\d{1,4}\s*[A-Z]{0,3})\b/i,
+  );
+  if (afterLabel) return normalizedPlate(afterLabel[1]);
+
+  const bare = message.trim().match(/^[A-Z]{1,2}\s*\d{1,4}\s*[A-Z]{0,3}$/i);
+  if (bare) return normalizedPlate(bare[0]);
+
+  const fallback = message.match(PLATE_IN_TEXT_PATTERN);
+  return fallback ? normalizedPlate(fallback[1]) : null;
+}
+
+const UNIT_DETAIL_FIRST_GUIDANCE = [
+  "Instruksi penting untuk pencarian unit:",
+  "Pengguna sedang mencari unit, BUKAN meminta simulasi kredit.",
+  "1. Jawab dengan DETAIL UNIT dulu (bukan angka DP/angsuran).",
+  "2. Gunakan format baris pertama: DETAIL UNIT {PLAT} — {NAMA UNIT}",
+  "3. Cantumkan minimal: Plat Nomor, Status, Harga cash, tahun, transmisi, odometer, bahan bakar, warna, cabang/lokasi.",
+  "4. JANGAN menampilkan Total DP, Angsuran, Price kredit, tenor, atau hasil simulasi di jawaban ini.",
+  "5. Tutup dengan menanyakan: \"Mau dibuatkan simulasi kredit untuk unit ini?\"",
+].join("\n");
+
+function withUnitDetailGuidance(contextMessage: string, message: string): string {
+  if (!prefersUnitDetailFirst(message)) return contextMessage;
+  const plate = extractPlateFromMessage(message);
+  const plateHint = plate
+    ? `\nPlat nomor yang dimaksud: ${plate}. Sertakan plat ini di header DETAIL UNIT dan baris Plat Nomor.`
+    : "";
+  return `${UNIT_DETAIL_FIRST_GUIDANCE}${plateHint}\n\n${contextMessage}`;
+}
+
 /**
  * Falcon's external endpoint is stateless, so follow-up requests must carry
  * enough of the preceding conversation to resolve phrases such as "buatkan".
@@ -100,6 +171,7 @@ export function buildFalconContextMessage(
     "Lanjutkan percakapan berdasarkan riwayat berikut.",
     "Pertahankan unit, plat nomor, dan kebutuhan yang sudah disebut. Jangan tanyakan ulang informasi yang sudah ada di riwayat.",
     "Jika pengguna meminta simulasi atau berkata singkat seperti 'buatkan', gunakan plat nomor unit terakhir dari riwayat.",
+    "Jika pengguna mencari unit (bukan minta simulasi), jawab DETAIL UNIT dulu lalu tanyakan apakah mau simulasi kredit — jangan langsung simulasi.",
     "",
     ...lines,
     `Pengguna: ${message}`,
@@ -147,23 +219,39 @@ export function formatFalconReplyHtml(reply: string, units: FalconUnitLink[] = [
     linksAfterLine.set(endOfUnit, unit);
   });
 
-  // Detail responses use a labelled plate line instead of a recommendation
-  // heading. Preserve their existing detail link without treating them as a list.
+  // Detail responses use DETAIL UNIT / labelled plate instead of a recommendation
+  // list heading. Attach photo + detail link once per plate for the whole block.
+  const linkedDetailPlates = new Set<string>();
   lines.forEach((line, index) => {
     if (extractFalconListUnitReference(line) || hiddenLines.has(index)) return;
     const reference = extractFalconUnitReferences(line)[0];
     const unit = reference
       ? units.find(({ plateNo }) => normalizedPlate(plateNo) === reference.plateNo)
       : undefined;
-    if (!unit) return;
+    if (!unit || linkedDetailPlates.has(reference.plateNo)) return;
+    linkedDetailPlates.add(reference.plateNo);
+
+    let startOfUnit = index;
+    // Naik ke baris DETAIL UNIT di blok yang sama agar gambar di atas detail.
+    while (
+      startOfUnit > 0
+      && lines[startOfUnit - 1].trim() !== ""
+      && !extractFalconListUnitReference(lines[startOfUnit - 1])
+    ) {
+      startOfUnit -= 1;
+    }
 
     let endOfUnit = index;
     while (
       endOfUnit + 1 < lines.length
       && lines[endOfUnit + 1].trim() !== ""
-      && extractFalconUnitReferences(lines[endOfUnit + 1]).length === 0
+      && !extractFalconListUnitReference(lines[endOfUnit + 1])
     ) {
       endOfUnit += 1;
+    }
+
+    if (unit.imageSrc?.trim()) {
+      imagesBeforeLine.set(startOfUnit, { ...unit, imageSrc: unit.imageSrc });
     }
     linksAfterLine.set(endOfUnit, unit);
   });
@@ -252,6 +340,17 @@ export function extractFalconUnitReferences(reply: string): FalconUnitReference[
   }
 
   const detailTitle = reply.match(/^\s*(?:\*{1,2})?DETAIL UNIT\s+([A-Z]{1,2}\s*\d{1,4}\s*[A-Z]{0,3})\s+[—-]\s+(.+?)(?:\*{1,2})?\s*$/im);
+  if (detailTitle) {
+    const plateNo = normalizedPlate(detailTitle[1]);
+    if (!seen.has(plateNo)) {
+      seen.add(plateNo);
+      references.push({
+        title: detailTitle[2].replace(/\*+/g, "").trim() || `Unit ${plateNo}`,
+        plateNo,
+      });
+    }
+  }
+
   const labelledPlate = reply.match(/(?:Plat(?:\s+Nomor)?|Nomor\s+Polisi)\s*:\s*([A-Z]{1,2}\s*\d{1,4}\s*[A-Z]{0,3})/i);
   if (labelledPlate) {
     const plateNo = labelledPlate[1].replace(/\s+/g, "").toUpperCase();
@@ -288,7 +387,8 @@ export async function executeFalconTurn(
 ): Promise<FalconTurnResult> {
   const ask = dependencies.ask ?? askFalcon;
   const resolveLinks = dependencies.resolveLinks ?? resolveFalconUnitLinks;
-  const contextMessage = buildFalconContextMessage(message, conversation);
+  const baseContext = buildFalconContextMessage(message, conversation);
+  const contextMessage = withUnitDetailGuidance(baseContext, message);
   let { reply } = await ask(contextMessage);
 
   if (asksForKnownPlate(reply, conversation)) {
@@ -300,6 +400,27 @@ export async function executeFalconTurn(
       "",
       `Koreksi: plat nomor unit sudah diketahui, yaitu ${knownPlate}.`,
       "Jawab permintaan pengguna sekarang tanpa meminta plat nomor lagi.",
+    ].join("\n")));
+  }
+
+  // Cari unit harus detail dulu; koreksi jika model langsung ke simulasi kredit.
+  if (prefersUnitDetailFirst(message) && looksLikeCreditSimulationOnlyReply(reply)) {
+    const plate = extractPlateFromMessage(message)
+      || extractFalconUnitReferences(
+        conversation.map(({ content }) => content).join("\n"),
+      )[0]?.plateNo;
+    const plateLine = plate
+      ? `Plat nomor unit: ${plate}.`
+      : "Gunakan plat nomor unit yang disebut pengguna.";
+    ({ reply } = await ask([
+      contextMessage,
+      "",
+      "Koreksi: pengguna meminta detail unit, bukan simulasi kredit.",
+      plateLine,
+      "Jawab ulang dengan format DETAIL UNIT {PLAT} — {NAMA}.",
+      "Cantumkan Plat Nomor, Status, Harga cash, dan spesifikasi utama.",
+      "Jangan tampilkan Total DP, Angsuran, atau hasil simulasi sekarang.",
+      "Tutup dengan menanyakan apakah mau dibuatkan simulasi kredit untuk unit ini.",
     ].join("\n")));
   }
 
