@@ -3,7 +3,7 @@
  * and Web Share API capability checks.
  */
 
-export type ShareChannel = "wa" | "tg" | "x";
+export type ShareChannel = "wa" | "tg" | "x" | "fb" | "ig" | "threads";
 
 /** Caption + unit link ready to paste into chat apps. */
 export function buildShareText(caption: string, link: string): string {
@@ -16,8 +16,8 @@ export function buildShareText(caption: string, link: string): string {
 }
 
 /**
- * Prefer native Web Share on touch / mobile UAs. Desktop browsers often expose
- * navigator.share but give a poor or empty UX — use the channel picker there.
+ * Prefer native system share sheet on phones/tablets (touch or mobile UA).
+ * Desktop browsers often expose navigator.share with poor UX — use channel picker.
  */
 export function prefersNativeWebShare(): boolean {
   if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
@@ -26,7 +26,9 @@ export function prefersNativeWebShare(): boolean {
   if (typeof navigator.maxTouchPoints === "number" && navigator.maxTouchPoints > 0) {
     return true;
   }
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+  return /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent || "",
+  );
 }
 
 export function canWebShareFiles(files: File[]): boolean {
@@ -128,7 +130,15 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   }
 }
 
-/** Deep links for WhatsApp / Telegram / X with caption + unit URL. */
+/**
+ * Instagram has no public web intent that pre-fills a post caption.
+ * Caller should copy caption+link first, then open this URL.
+ */
+export function channelNeedsClipboardFirst(channel: ShareChannel): boolean {
+  return channel === "ig";
+}
+
+/** Deep links / web intents for channel picker fallback. */
 export function buildChannelShareUrl(
   channel: ShareChannel,
   caption: string,
@@ -136,7 +146,8 @@ export function buildChannelShareUrl(
 ): string {
   const text = buildShareText(caption, link);
   const encodedText = encodeURIComponent(text);
-  const encodedLink = encodeURIComponent(link.trim() || "https://agenmobix.id");
+  const safeLink = link.trim() || "https://agenmobix.id";
+  const encodedLink = encodeURIComponent(safeLink);
   const encodedCaption = encodeURIComponent(caption.trim() || text);
 
   switch (channel) {
@@ -147,6 +158,14 @@ export function buildChannelShareUrl(
       return `https://t.me/share/url?url=${encodedLink}&text=${encodedCaption}`;
     case "x":
       return `https://x.com/intent/tweet?text=${encodedText}`;
+    case "fb":
+      // Facebook sharer: link required; quote is best-effort for some clients.
+      return `https://www.facebook.com/sharer/sharer.php?u=${encodedLink}&quote=${encodedCaption}`;
+    case "ig":
+      // No prefilled caption intent — open Instagram; paste from clipboard.
+      return "https://www.instagram.com/";
+    case "threads":
+      return `https://www.threads.net/intent/post?text=${encodedText}`;
     default:
       return `https://wa.me/?text=${encodedText}`;
   }

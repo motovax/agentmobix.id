@@ -3,7 +3,9 @@ import {
   buildChannelShareUrl,
   buildNativeSharePayload,
   buildShareText,
+  channelNeedsClipboardFirst,
   isShareAbortError,
+  prefersNativeWebShare,
 } from "../src/lib/shareActions";
 
 describe("buildShareText", () => {
@@ -52,6 +54,71 @@ describe("buildChannelShareUrl", () => {
     const text = decodeURIComponent(url.split("text=")[1] ?? "");
     expect(text).toContain("Honda Mobilio");
     expect(text).toContain(link);
+  });
+
+  test("Facebook sharer uses unit URL and quote caption", () => {
+    const url = buildChannelShareUrl("fb", caption, link);
+    expect(url.startsWith("https://www.facebook.com/sharer/sharer.php?")).toBe(true);
+    const params = new URL(url).searchParams;
+    expect(params.get("u")).toBe(link);
+    expect(params.get("quote")).toBe(caption);
+  });
+
+  test("Instagram opens app/site (caption via clipboard first)", () => {
+    expect(buildChannelShareUrl("ig", caption, link)).toBe("https://www.instagram.com/");
+    expect(channelNeedsClipboardFirst("ig")).toBe(true);
+    expect(channelNeedsClipboardFirst("wa")).toBe(false);
+  });
+
+  test("Threads intent embeds full caption + link", () => {
+    const url = buildChannelShareUrl("threads", caption, link);
+    expect(url.startsWith("https://www.threads.net/intent/post?text=")).toBe(true);
+    const text = decodeURIComponent(url.split("text=")[1] ?? "");
+    expect(text).toContain("Honda Mobilio");
+    expect(text).toContain(link);
+  });
+});
+
+describe("prefersNativeWebShare", () => {
+  test("is false when navigator.share is missing", () => {
+    const original = globalThis.navigator;
+    // @ts-expect-error test stub
+    globalThis.navigator = { userAgent: "iPhone", maxTouchPoints: 5 };
+    try {
+      expect(prefersNativeWebShare()).toBe(false);
+    } finally {
+      globalThis.navigator = original;
+    }
+  });
+
+  test("is true for touch devices with navigator.share", () => {
+    const original = globalThis.navigator;
+    // @ts-expect-error test stub
+    globalThis.navigator = {
+      share: async () => {},
+      maxTouchPoints: 5,
+      userAgent: "Mozilla/5.0",
+    };
+    try {
+      expect(prefersNativeWebShare()).toBe(true);
+    } finally {
+      globalThis.navigator = original;
+    }
+  });
+
+  test("is false for desktop without touch even if share exists", () => {
+    const original = globalThis.navigator;
+    // @ts-expect-error test stub
+    globalThis.navigator = {
+      share: async () => {},
+      maxTouchPoints: 0,
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+    };
+    try {
+      expect(prefersNativeWebShare()).toBe(false);
+    } finally {
+      globalThis.navigator = original;
+    }
   });
 });
 

@@ -20,6 +20,9 @@ import {
   WhatsAppSolid,
   Telegram,
   XTwitter,
+  FacebookSolid,
+  InstagramSolid,
+  Threads,
 } from "../components/icons";
 import {
   fetchUnitDetail,
@@ -61,6 +64,7 @@ import {
   buildChannelShareUrl,
   buildNativeSharePayload,
   buildShareText,
+  channelNeedsClipboardFirst,
   copyTextToClipboard,
   isShareAbortError,
   prefersNativeWebShare,
@@ -920,7 +924,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     setShowChannels(true);
   }
 
-  function fallbackDesktopShare(caption: string) {
+  /** Desktop / unsupported browser: channel picker (not used when user cancels native sheet). */
+  function fallbackChannelShare(caption: string) {
     void copyShareCaption(caption);
     openShareChannels();
   }
@@ -928,6 +933,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   /**
    * Start native file share from the click handler (no prior await) so user
    * activation stays valid. Returns null when native share is unavailable.
+   * Smartphones: system share sheet (installed apps). Desktop: skipped.
    */
   function sharePreparedFiles(
     files: File[],
@@ -1185,7 +1191,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       }
     };
 
-    // Native share only on mobile-like devices; desktop gets channel picker.
+    // Smartphone: native system share sheet first (pick installed apps).
+    // Desktop / unsupported / failed (not user cancel): channel picker popup.
     // Call navigator.share synchronously from the click (no prior await) so
     // transient user activation remains valid.
     const sharePromise =
@@ -1193,7 +1200,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       ?? shareWithoutFiles(title, caption);
 
     if (!sharePromise) {
-      fallbackDesktopShare(caption);
+      fallbackChannelShare(caption);
       return;
     }
 
@@ -1202,15 +1209,97 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         markShareStepDone();
       })
       .catch((error: unknown) => {
+        // User dismissed the system sheet — stay silent (no channel popup).
         if (isShareAbortError(error)) return;
-        fallbackDesktopShare(caption);
+        fallbackChannelShare(caption);
       });
   }
 
   function shareVia(channel: ShareChannel) {
-    const url = buildChannelShareUrl(channel, captionText.trim(), link);
-    window.open(url, "_blank", "noopener");
-    setShowChannels(false);
+    const caption = captionText.trim();
+    const openChannel = () => {
+      const url = buildChannelShareUrl(channel, caption, link);
+      window.open(url, "_blank", "noopener");
+      setShowChannels(false);
+    };
+
+    // Instagram has no web intent with prefilled caption — copy first, then open app/site.
+    if (channelNeedsClipboardFirst(channel)) {
+      void copyShareCaption(caption).finally(openChannel);
+      return;
+    }
+
+    openChannel();
+  }
+
+  function renderChannelPicker(compact: boolean) {
+    const icon = compact ? 20 : 22;
+    const cell = compact
+      ? "flex flex-col items-center gap-1 py-3 transition-colors"
+      : "flex flex-col items-center gap-1.5 py-3.5 transition-colors";
+    const label = "text-[10px] font-semibold text-ink";
+
+    return (
+      <>
+        <div
+          className={compact ? "fixed inset-0 z-40" : "fixed inset-0 z-10"}
+          onClick={() => setShowChannels(false)}
+        />
+        <div
+          className={
+            compact
+              ? "absolute bottom-full left-0 right-0 z-50 mb-2 max-h-[70vh] overflow-y-auto overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl"
+              : "absolute bottom-full left-0 right-0 z-20 mb-2 max-h-[70vh] overflow-y-auto overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl"
+          }
+        >
+          <div className="border-b border-line px-3 py-2.5 text-center text-[11px] font-bold text-muted">
+            {shareCaptionCopied
+              ? "Caption + link tersalin — pilih channel"
+              : "Bagikan via"}
+          </div>
+          <div className="grid grid-cols-4 divide-x divide-y divide-line">
+            <button type="button" onClick={() => shareVia("wa")} className={`${cell} text-[#25D366] hover:bg-[#25D366]/10`}>
+              <WhatsAppSolid size={compact ? 22 : 24} />
+              <span className={label}>{compact ? "WA" : "WhatsApp"}</span>
+            </button>
+            <button type="button" onClick={() => shareVia("tg")} className={`${cell} text-[#229ED9] hover:bg-[#229ED9]/10`}>
+              <Telegram size={icon} />
+              <span className={label}>{compact ? "TG" : "Telegram"}</span>
+            </button>
+            <button type="button" onClick={() => shareVia("fb")} className={`${cell} text-[#1877F2] hover:bg-[#1877F2]/10`}>
+              <FacebookSolid size={compact ? 22 : 24} />
+              <span className={label}>Facebook</span>
+            </button>
+            <button type="button" onClick={() => shareVia("ig")} className={`${cell} text-[#E4405F] hover:bg-[#E4405F]/10`}>
+              <InstagramSolid size={compact ? 22 : 24} />
+              <span className={label}>{compact ? "IG" : "Instagram"}</span>
+            </button>
+            <button type="button" onClick={() => shareVia("threads")} className={`${cell} text-ink hover:bg-ink/10`}>
+              <Threads size={icon} />
+              <span className={label}>Threads</span>
+            </button>
+            <button type="button" onClick={() => shareVia("x")} className={`${cell} text-ink hover:bg-ink/10`}>
+              <XTwitter size={icon} />
+              <span className={label}>{compact ? "X" : "X / Twitter"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void copyShareCaption(captionText.trim());
+                setShowChannels(false);
+              }}
+              className={`${cell} text-teal-deep hover:bg-teal-deep/10`}
+            >
+              <Copy size={icon} />
+              <span className={label}>{compact ? "Salin" : "Salin teks"}</span>
+            </button>
+          </div>
+          <div className="border-t border-line px-3 py-2 text-center text-[10px] leading-snug text-muted">
+            Instagram: caption disalin otomatis — tempel di post/story.
+          </div>
+        </div>
+      </>
+    );
   }
 
   useImperativeHandle(ref, () => ({ share: handleShare }));
@@ -1600,58 +1689,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         <div className="flex flex-col gap-2">
           {embedded && (
             <div className="relative mb-1">
-              {showChannels && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setShowChannels(false)}
-                  />
-                  <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
-                    <div className="border-b border-line px-4 py-3 text-center text-[11px] font-bold text-muted">
-                      {shareCaptionCopied
-                        ? "Caption + link tersalin — pilih channel"
-                        : "Bagikan via"}
-                    </div>
-                    <div className="grid grid-cols-4 divide-x divide-line">
-                      <button
-                        type="button"
-                        onClick={() => shareVia("wa")}
-                        className="flex flex-col items-center gap-1.5 py-4 text-[#25D366] transition-colors hover:bg-[#25D366]/10"
-                      >
-                        <WhatsAppSolid size={24} />
-                        <span className="text-[10px] font-semibold text-ink">WhatsApp</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => shareVia("tg")}
-                        className="flex flex-col items-center gap-1.5 py-4 text-[#229ED9] transition-colors hover:bg-[#229ED9]/10"
-                      >
-                        <Telegram size={24} />
-                        <span className="text-[10px] font-semibold text-ink">Telegram</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => shareVia("x")}
-                        className="flex flex-col items-center gap-1.5 py-4 text-ink transition-colors hover:bg-ink/10"
-                      >
-                        <XTwitter size={24} />
-                        <span className="text-[10px] font-semibold text-ink">X / Twitter</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void copyShareCaption(captionText.trim());
-                          setShowChannels(false);
-                        }}
-                        className="flex flex-col items-center gap-1.5 py-4 text-teal-deep transition-colors hover:bg-teal-deep/10"
-                      >
-                        <Copy size={24} />
-                        <span className="text-[10px] font-semibold text-ink">Salin teks</span>
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
+              {showChannels && renderChannelPicker(false)}
               <button
                 type="button"
                 onClick={handleShare}
@@ -1698,58 +1736,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       {!embedded && (
         <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-50 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
           <div className="relative min-w-0">
-            {showChannels && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowChannels(false)}
-                />
-                <div className="absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
-                  <div className="border-b border-line px-3 py-2.5 text-center text-[11px] font-bold text-muted">
-                    {shareCaptionCopied
-                      ? "Caption + link tersalin — pilih channel"
-                      : "Bagikan via"}
-                  </div>
-                  <div className="grid grid-cols-4 divide-x divide-line">
-                    <button
-                      type="button"
-                      onClick={() => shareVia("wa")}
-                      className="flex flex-col items-center gap-1 py-3 text-[#25D366]"
-                    >
-                      <WhatsAppSolid size={22} />
-                      <span className="text-[10px] font-semibold text-ink">WA</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => shareVia("tg")}
-                      className="flex flex-col items-center gap-1 py-3 text-[#229ED9]"
-                    >
-                      <Telegram size={20} />
-                      <span className="text-[10px] font-semibold text-ink">TG</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => shareVia("x")}
-                      className="flex flex-col items-center gap-1 py-3 text-ink"
-                    >
-                      <XTwitter size={20} />
-                      <span className="text-[10px] font-semibold text-ink">X</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void copyShareCaption(captionText.trim());
-                        setShowChannels(false);
-                      }}
-                      className="flex flex-col items-center gap-1 py-3 text-teal-deep"
-                    >
-                      <Copy size={20} />
-                      <span className="text-[10px] font-semibold text-ink">Salin</span>
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
+            {showChannels && renderChannelPicker(true)}
             <button
               type="button"
               onClick={handleShare}
