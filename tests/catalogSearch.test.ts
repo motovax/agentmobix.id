@@ -68,7 +68,11 @@ describe("klasifikasi pencarian katalog", () => {
     expect(getCatalogReturnHref(detailHref.split("?")[1])).toBe(catalogHref);
   });
 
-  test("menolak URL kembali yang bukan katalog internal", () => {
+  test("mengembalikan detail ke Bantuan AI jika entry point berasal dari AI", () => {
+    expect(getCatalogReturnHref("u=toyota-avanza&kembali=%2Fai")).toBe("/ai");
+  });
+
+  test("menolak URL kembali yang bukan entry point internal yang diizinkan", () => {
     expect(getCatalogReturnHref("kembali=https%3A%2F%2Fexample.com")).toBe(
       "/katalog",
     );
