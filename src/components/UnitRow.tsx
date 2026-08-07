@@ -9,7 +9,7 @@ import {
 import { formatJt, formatKm } from "../lib/format";
 import { Photo, ThumbBadge } from "./ui";
 
-/** Catalog list row — whole row links to the unit detail. */
+/** Catalog list row — whole row opens the photo/caption composer by default. */
 export function UnitRow({
   unit,
   detailHref,
@@ -21,7 +21,7 @@ export function UnitRow({
   const salesContactRequired = requiresSalesContact(unit.pembiayaan);
   return (
     <Link
-      href={detailHref ?? `/unit/${unit.slug}`}
+      href={detailHref ?? `/share?u=${encodeURIComponent(unit.slug)}`}
       className="flex gap-3 rounded-2xl border border-line bg-surface p-2.5 text-inherit no-underline"
     >
       <Photo

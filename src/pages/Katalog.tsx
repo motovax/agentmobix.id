@@ -18,7 +18,6 @@ import {
 import {
   buildCatalogHref,
   buildCatalogSearchParams,
-  buildUnitDetailHref,
 } from "../lib/catalogSearch";
 import { useAsync } from "../lib/useAsync";
 
@@ -427,7 +426,7 @@ export function Katalog() {
             <UnitRow
               key={u.id}
               unit={u}
-              detailHref={buildUnitDetailHref(u.slug, catalogHref)}
+              detailHref={`/share?u=${encodeURIComponent(u.slug)}`}
             />
           ))}
 

@@ -59,7 +59,7 @@ function RecCard({ unit }: { unit: CardUnit }) {
   const salesContactRequired = requiresSalesContact(unit.pembiayaan);
   return (
     <Link
-      href={`/unit/${unit.slug}`}
+      href={`/share?u=${encodeURIComponent(unit.slug)}`}
       className="block overflow-hidden rounded-[18px] border border-line bg-surface text-inherit no-underline"
     >
       <Photo
@@ -341,7 +341,7 @@ export function Beranda() {
                 recItems.slice(0, 5).map((unit) => (
                   <Link
                     key={unit.id}
-                    href={`/unit/${unit.slug}`}
+                    href={`/share?u=${encodeURIComponent(unit.slug)}`}
                     className="flex items-center gap-2.5 border-b border-line px-3 py-2.5 text-inherit no-underline last:border-b-0"
                   >
                     <Photo
