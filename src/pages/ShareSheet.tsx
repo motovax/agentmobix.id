@@ -40,7 +40,11 @@ import {
 } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
 import { formatJt, formatOdometer, formatRupiah } from "../lib/format";
-import { estimateBuilderCommission } from "../lib/commission";
+import {
+  clampBuilderPrice,
+  estimateBuilderCommission,
+  minBuilderPrice,
+} from "../lib/commission";
 import { buildJasmineWhatsAppHref } from "../lib/jasmine";
 import {
   buildAgenMobixUnitLink,
@@ -474,9 +478,13 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const [aiPreviewMode, setAiPreviewMode] = useState<"ai" | "original">("ai");
   const [, setAiBackgroundError] = useState("");
   const [liveSimulation, setLiveSimulation] = useState<CreditSimulationResult | null>(null);
+  const [appliedSimulation, setAppliedSimulation] = useState<CreditSimulationResult | null>(null);
+  const [appliedPrice, setAppliedPrice] = useState(0);
+  const [priceInput, setPriceInput] = useState("");
 
   const blobCache = useRef<Map<string, Blob>>(new Map());
   const captionSuggestionIndex = useRef(0);
+  const forceCaptionUpdateRef = useRef(false);
   const handleSimulationChange = useCallback((result: CreditSimulationResult) => {
     setLiveSimulation(result);
   }, []);
@@ -527,39 +535,34 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const financingEligible = unit?.pembiayaan.eligible === true;
   const salesContactRequired = requiresSalesContact(unit?.pembiayaan);
   const requestedDpMinimShare =
-    liveSimulation?.simTab === "dpminim" ||
-    (!liveSimulation && searchParams.get("sim") === "dpminim");
+    appliedSimulation?.simTab === "dpminim" ||
+    (!appliedSimulation && searchParams.get("sim") === "dpminim");
   const shareTenor =
-    liveSimulation?.tenor ??
+    appliedSimulation?.tenor ??
     positiveParamNumber(searchParams, "tenor") ??
     60;
   const shareTdp =
-    liveSimulation?.tdp ??
+    appliedSimulation?.tdp ??
     positiveParamNumber(searchParams, "tdp") ??
     unit?.tdp ??
     0;
   const shareCicilan =
-    liveSimulation?.cicilan ??
+    appliedSimulation?.cicilan ??
     positiveParamNumber(searchParams, "cicilan") ??
     unit?.cicilan ??
     0;
   const shareDp =
-    liveSimulation?.dp ??
+    appliedSimulation?.dp ??
     positiveParamNumber(searchParams, "dp") ??
     null;
   const shareDpPercent =
-    liveSimulation?.dpPercent ??
+    appliedSimulation?.dpPercent ??
     positiveParamNumber(searchParams, "dp_pct") ??
     null;
   const shareHasFinancing = financingEligible && shareTdp > 0 && shareCicilan > 0;
   const isDpMinimShare = requestedDpMinimShare && shareHasFinancing;
-  const shareCreditPrice = financingEligible
-    ? liveSimulation?.hargaKredit ??
-      positiveParamNumber(searchParams, "harga_kredit") ??
-      unit?.harga_kredit ??
-      null
-    : null;
-  const sharePrice = positiveParamNumber(searchParams, "harga") ?? unit?.harga ?? 0;
+  const initialSharePrice = positiveParamNumber(searchParams, "harga") ?? unit?.harga ?? 0;
+  const sharePrice = appliedPrice || initialSharePrice;
   const unitAdminMessage = unit
     ? `Halo AI Mobix Assistant! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(sharePrice || unit.harga)}. Bisa bantu info lebih lanjut? 🙏`
     : "";
@@ -569,7 +572,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       : `Halo Admin, saya mau minta hitungan leasing untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(sharePrice || unit.harga)}.\n1. DP minim\n2. Cicilan ringan\n3. Cair All in`
     : "";
   const jasmineCalculationHref = buildJasmineWhatsAppHref(unitCalculationMessage);
-  const captionPrice = shareCreditPrice ?? sharePrice ?? unit?.harga ?? 0;
+  const captionPrice = appliedSimulation?.hargaKredit ?? sharePrice ?? unit?.harga ?? 0;
   const shouldHidePriceInCaption = isDpMinimShare;
   const packageTitle = shareHasFinancing ? (isDpMinimShare ? "DP Minim" : "Kredit") : "Unit";
   const paymentLabel = "TDP";
@@ -669,6 +672,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     );
   }
 
+  const lastAutoCaptionRef = useRef("");
+
   // init when unit loads (jangan reset caption tiap simulasi berubah)
   useEffect(() => {
     if (!unit) return;
@@ -678,8 +683,12 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     );
     setPreviewIdx(0);
     setCaptionText(autoCaption);
+    lastAutoCaptionRef.current = autoCaption;
     setPendingShareStep(null);
     setLiveSimulation(null);
+    setAppliedSimulation(null);
+    setAppliedPrice(initialSharePrice);
+    setPriceInput(new Intl.NumberFormat("id-ID").format(initialSharePrice));
     setAiBackgroundStatus("idle");
     setAiBackgroundProgress(0);
     setAiPreviewMode("ai");
@@ -689,10 +698,14 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   }, [unit?.id]);
 
   // sinkronkan caption otomatis saat hasil simulasi live siap (jika user belum edit)
-  const lastAutoCaptionRef = useRef("");
   useEffect(() => {
     if (!unit || !autoCaption) return;
     setCaptionText((current) => {
+      if (forceCaptionUpdateRef.current) {
+        forceCaptionUpdateRef.current = false;
+        lastAutoCaptionRef.current = autoCaption;
+        return autoCaption;
+      }
       if (!current || current === lastAutoCaptionRef.current) {
         lastAutoCaptionRef.current = autoCaption;
         return autoCaption;
@@ -700,6 +713,22 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       return current;
     });
   }, [unit?.id, autoCaption]);
+
+  function applyBuilderPrice() {
+    if (!unit) return;
+    const rawPrice = Number(priceInput.replace(/\D/g, ""));
+    const nextPrice = clampBuilderPrice(rawPrice || unit.harga, unit.harga);
+    forceCaptionUpdateRef.current = nextPrice !== sharePrice;
+    setAppliedPrice(nextPrice);
+    setAppliedSimulation(null);
+    setPriceInput(new Intl.NumberFormat("id-ID").format(nextPrice));
+  }
+
+  function applyCreditSimulation() {
+    if (!liveSimulation?.canShare) return;
+    forceCaptionUpdateRef.current = JSON.stringify(liveSimulation) !== JSON.stringify(appliedSimulation);
+    setAppliedSimulation(liveSimulation);
+  }
 
   // fetch raw blobs (cached) + compose download files whenever selection changes
   useEffect(() => {
@@ -1448,24 +1477,55 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
           </div>
         )}
 
-        {/* builder price */}
-        <div className="mb-3 flex items-center justify-between rounded-[14px] border border-line bg-surface px-3.5 py-3">
-          <div>
-            <div className="text-[13px] font-semibold text-mid">
-              Harga jual builder
-            </div>
-            {unit && priceDelta !== 0 && (
-              <div className="mt-0.5 text-[10px] text-muted">
-                Harga asli {formatRupiah(unit.harga)}
-              </div>
+        {/* builder price — caption hanya berubah setelah tombol centang ditekan */}
+        <div className="mb-3 rounded-[14px] border border-line bg-surface px-3.5 py-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <label htmlFor="share-builder-price" className="text-[13px] font-semibold text-mid">
+              Pengaturan harga
+            </label>
+            {unit && (
+              <span className="text-[10px] font-semibold text-muted">
+                Min. {formatRupiah(minBuilderPrice(unit.harga))}
+              </span>
             )}
           </div>
           {loading || !unit ? (
-            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-11 w-full" />
           ) : (
-            <span className="text-[15px] font-bold text-ink">
-              {formatRupiah(sharePrice || unit.harga)}
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+                <span className="mr-1.5 text-[13px] font-semibold text-muted">Rp</span>
+                <input
+                  id="share-builder-price"
+                  type="text"
+                  inputMode="numeric"
+                  value={priceInput}
+                  onChange={(event) => {
+                    const raw = event.target.value.replace(/\D/g, "");
+                    setPriceInput(raw ? new Intl.NumberFormat("id-ID").format(Number(raw)) : "");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") applyBuilderPrice();
+                  }}
+                  aria-label="Harga jual builder"
+                  className="min-w-0 flex-1 bg-transparent text-[15px] font-bold text-ink outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={applyBuilderPrice}
+                aria-label="Terapkan harga ke caption"
+                title="Terapkan harga ke caption"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal text-ink"
+              >
+                <Check size={18} strokeWidth={2.8} />
+              </button>
+            </div>
+          )}
+          {unit && priceDelta !== 0 && (
+            <div className="mt-1.5 text-[10px] text-muted">
+              Harga asli {formatRupiah(unit.harga)} · harga aktif {formatRupiah(sharePrice)}
+            </div>
           )}
         </div>
 
@@ -1496,13 +1556,38 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
         {/* simulasi kredit — collapsible seperti detail unit */}
         {unit && (
-          <CreditSimulationBox
-            unit={unit}
-            price={sharePrice || unit.harga}
-            initialTenor={positiveParamNumber(searchParams, "tenor") ?? 60}
-            initialDpPercent={positiveParamNumber(searchParams, "dp_pct") ?? undefined}
-            onSimulationChange={handleSimulationChange}
-          />
+          <div className="mb-[18px]">
+            <CreditSimulationBox
+              unit={unit}
+              price={sharePrice || unit.harga}
+              initialTenor={positiveParamNumber(searchParams, "tenor") ?? 60}
+              initialDpPercent={positiveParamNumber(searchParams, "dp_pct") ?? undefined}
+              onSimulationChange={handleSimulationChange}
+            />
+            {!salesContactRequired && (
+              <button
+                type="button"
+                onClick={applyCreditSimulation}
+                disabled={!liveSimulation?.canShare}
+                className="-mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-b-[18px] border border-t-0 border-line bg-teal px-4 text-[12px] font-extrabold text-ink disabled:bg-field disabled:text-muted"
+              >
+                <Check size={16} strokeWidth={2.8} />
+                {liveSimulation?.canShare
+                  ? "Terapkan simulasi ke caption"
+                  : "Menunggu hasil simulasi"}
+              </button>
+            )}
+          </div>
+        )}
+
+        {unit && (
+          <Link
+            href={`/unit/${encodeURIComponent(unit.slug)}`}
+            className="mb-[18px] flex min-h-12 items-center justify-between rounded-[14px] border border-line bg-surface px-4 text-[13px] font-bold text-ink no-underline"
+          >
+            <span>Cek unit lengkapnya</span>
+            <span className="text-[20px] leading-none text-muted">›</span>
+          </Link>
         )}
 
         {/* secondary actions */}

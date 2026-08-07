@@ -12,6 +12,7 @@ import { PromoDetail } from "./pages/PromoDetail";
 import { JualMobil } from "./pages/JualMobil";
 import { JualMobilHasil } from "./pages/JualMobilHasil";
 import { Login } from "./pages/Login";
+import { ShareSheet } from "./pages/ShareSheet";
 import { useAuth } from "./lib/auth";
 import { InstallAppPrompt } from "./components/InstallAppPrompt";
 
@@ -31,21 +32,12 @@ function ScrollToTopOnRouteChange() {
 function ShareUnitDetail() {
   const search = useSearch();
   const slug = new URLSearchParams(search).get("u") ?? "";
-  return <UnitDetail unitSlug={slug} />;
+  return <ShareSheet unitSlug={slug} params={search} />;
 }
 
-function LegacyUnitRedirect() {
+function FullUnitDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const search = useSearch();
-  const [, navigate] = useLocation();
-
-  useEffect(() => {
-    const params = new URLSearchParams(search);
-    params.set("u", slug);
-    navigate(`/share?${params.toString()}${window.location.hash}`, { replace: true });
-  }, [navigate, search, slug]);
-
-  return null;
+  return <UnitDetail unitSlug={slug} />;
 }
 
 export default function App({
@@ -73,7 +65,7 @@ export default function App({
       <Switch>
         <Route path="/" component={Beranda} />
         <Route path="/katalog" component={Katalog} />
-        <Route path="/unit/:slug" component={LegacyUnitRedirect} />
+        <Route path="/unit/:slug" component={FullUnitDetail} />
         <Route path="/share" component={ShareUnitDetail} />
         <Route path="/daftar" component={DaftarAgen} />
         <Route path="/ai" component={AiMobix} />
