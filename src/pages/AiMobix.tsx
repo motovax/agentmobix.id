@@ -63,6 +63,7 @@ export function AiMobix() {
     if (url.origin !== window.location.origin || url.pathname !== "/share") return;
 
     event.preventDefault();
+    url.searchParams.set("kembali", "/ai");
     navigate(`${url.pathname}${url.search}${url.hash}`);
   }
 

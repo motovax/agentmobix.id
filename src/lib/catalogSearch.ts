@@ -102,6 +102,7 @@ export function buildUnitDetailHref(
 
 export function getCatalogReturnHref(search: string): string {
   const href = new URLSearchParams(search).get("kembali");
+  if (href === "/ai") return href;
   if (href === "/katalog" || href?.startsWith("/katalog?")) return href;
   return "/katalog";
 }

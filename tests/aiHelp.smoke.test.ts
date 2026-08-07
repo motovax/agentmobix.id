@@ -25,6 +25,7 @@ describe("smoke test Bantuan AI", () => {
         title: "MITSUBISHI Xpander 1.5L Ultimate 2024",
         plateNo: "B2302KRJ",
         href: "https://agenmobix.id/unit/mitsubishi-xpander-b2302krj",
+        imageSrc: "https://mobix.test/xpander.jpg",
       }];
     });
 
