@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   buildChannelShareUrl,
   buildNativeSharePayload,
+  buildOpenGraphShareUrl,
   buildShareText,
   channelNeedsClipboardFirst,
   isShareAbortError,
@@ -57,12 +58,21 @@ describe("buildChannelShareUrl", () => {
     expect(text).toContain(link);
   });
 
-  test("Facebook sharer uses unit URL and quote caption", () => {
+  test("Facebook sharer points at Open Graph preview URL (not raw SPA link)", () => {
     const url = buildChannelShareUrl("fb", caption, link);
     expect(url.startsWith("https://www.facebook.com/sharer/sharer.php?")).toBe(true);
     const params = new URL(url).searchParams;
-    expect(params.get("u")).toBe(link);
-    expect(params.get("quote")).toBe(caption);
+    const shared = params.get("u") || "";
+    expect(shared).toContain("agentmobix-api.margi-landshark.workers.dev/og");
+    expect(shared).toContain("honda-mobilio");
+    expect(params.get("quote")).toBeNull();
+  });
+
+  test("buildOpenGraphShareUrl extracts slug from share link", () => {
+    expect(buildOpenGraphShareUrl("https://agenmobix.id/share?u=toyota-calya-2019")).toBe(
+      "https://agentmobix-api.margi-landshark.workers.dev/og?u=toyota-calya-2019",
+    );
+    expect(buildOpenGraphShareUrl("toyota-calya-2019")).toContain("u=toyota-calya-2019");
   });
 
   test("Instagram opens app/site (caption via clipboard first)", () => {

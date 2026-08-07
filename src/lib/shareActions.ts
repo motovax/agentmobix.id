@@ -5,6 +5,42 @@
 
 export type ShareChannel = "wa" | "tg" | "x" | "fb" | "ig" | "threads" | "tt";
 
+/** Cloudflare Worker endpoint that serves per-unit Open Graph HTML for crawlers. */
+export const OPEN_GRAPH_SHARE_BASE =
+  "https://agentmobix-api.margi-landshark.workers.dev/og";
+
+/**
+ * Facebook (and other link scrapers) need server-rendered og: meta.
+ * Map a unit share/unit URL (or raw slug) to the OG preview URL.
+ */
+export function buildOpenGraphShareUrl(unitLinkOrSlug: string): string {
+  let slug = (unitLinkOrSlug || "").trim();
+  if (!slug) {
+    return `${OPEN_GRAPH_SHARE_BASE}`;
+  }
+  try {
+    if (slug.includes("://") || slug.startsWith("/") || slug.includes("?")) {
+      const parsed = new URL(slug, "https://agenmobix.id");
+      const fromQuery = parsed.searchParams.get("u");
+      if (fromQuery) {
+        slug = fromQuery;
+      } else {
+        const parts = parsed.pathname.split("/").filter(Boolean);
+        const unitIdx = parts.indexOf("unit");
+        slug = unitIdx >= 0 && parts[unitIdx + 1] ? parts[unitIdx + 1] : parts.at(-1) || slug;
+      }
+    }
+  } catch {
+    /* keep slug as-is */
+  }
+  try {
+    slug = decodeURIComponent(slug);
+  } catch {
+    /* keep */
+  }
+  return `${OPEN_GRAPH_SHARE_BASE}?u=${encodeURIComponent(slug)}`;
+}
+
 /** Caption + unit link ready to paste into chat apps. */
 export function buildShareText(caption: string, link: string): string {
   const body = caption.trim();
@@ -185,9 +221,12 @@ export function buildChannelShareUrl(
       return `https://t.me/share/url?url=${encodedLink}&text=${encodedCaption}`;
     case "x":
       return `https://x.com/intent/tweet?text=${encodedText}`;
-    case "fb":
-      // Facebook sharer: link required; quote is best-effort for some clients.
-      return `https://www.facebook.com/sharer/sharer.php?u=${encodedLink}&quote=${encodedCaption}`;
+    case "fb": {
+      // Facebook only scrapes Open Graph from the shared URL (quote is ignored).
+      // Point `u` at the Worker OG page so crawlers get title + unit photo.
+      const ogUrl = buildOpenGraphShareUrl(link);
+      return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(ogUrl)}`;
+    }
     case "ig":
       // No prefilled caption intent — open Instagram; paste from clipboard.
       return "https://www.instagram.com/";
