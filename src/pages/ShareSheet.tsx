@@ -14,8 +14,12 @@ import {
   Download,
   Check,
   Close,
+  Copy,
   Sparkles,
   Play,
+  WhatsAppSolid,
+  Telegram,
+  XTwitter,
 } from "../components/icons";
 import {
   fetchUnitDetail,
@@ -53,6 +57,15 @@ import {
   removeCaptionParagraphsContaining,
   type RequiredCaptionSection,
 } from "../lib/shareCaption";
+import {
+  buildChannelShareUrl,
+  buildNativeSharePayload,
+  buildShareText,
+  copyTextToClipboard,
+  isShareAbortError,
+  prefersNativeWebShare,
+  type ShareChannel,
+} from "../lib/shareActions";
 
 const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
 
@@ -471,6 +484,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const [captionText, setCaptionText] = useState("");
   const [captionSuggesting, setCaptionSuggesting] = useState(false);
   const [pendingShareStep, setPendingShareStep] = useState<PendingShareStep | null>(null);
+  const [showChannels, setShowChannels] = useState(false);
+  const [shareCaptionCopied, setShareCaptionCopied] = useState(false);
 
   // multi-select share media
   const [selectedIdxes, setSelectedIdxes] = useState<number[]>([]);
@@ -480,10 +495,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const [composedFiles, setComposedFiles] = useState<File[]>([]);
   const [composing, setComposing] = useState(false);
 
-  // canvas-composed files without overlay — for social media share
-  const [shareFiles, setShareFiles] = useState<File[]>([]);
-  const [shareComposing, setShareComposing] = useState(false);
-  const [shareFilesSignature, setShareFilesSignature] = useState("");
   const [aiBackgroundStatus, setAiBackgroundStatus] = useState<AiBackgroundStatus>("idle");
   const [, setAiBackgroundProgress] = useState(0);
   const [aiBackgroundFiles, setAiBackgroundFiles] = useState<Record<string, File>>({});
@@ -789,42 +800,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     Object.keys(aiBackgroundFiles).join(","),
   ]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function prepareShareFiles() {
-    if (!unit || !mediaItems.length) return [];
-
-    const selectedMedia = selectedIdxes
-      .map((i) => mediaItems[i])
-      .filter(Boolean);
-    const selectedImages = selectedMedia
-      .filter((media): media is Extract<ShareMedia, { kind: "image" }> => media.kind === "image");
-    const selectedVideos = selectedMedia
-      .filter((media): media is Extract<ShareMedia, { kind: "video" }> => media.kind === "video")
-      .map((media) => media.item);
-    const signature = `${selectedIdxes.join(",")}:${sharePrice}:${shareTdp}:${aiBackgroundStatus}:${aiPreviewMode}:${Object.keys(aiBackgroundFiles).sort().join(",")}`;
-
-    if (shareFiles.length > 0 && shareFilesSignature === signature) {
-      return shareFiles;
-    }
-
-    setShareComposing(true);
-
-    try {
-      const imageFiles = selectedImages.length
-        ? await buildImageFilesForShare(selectedImages)
-        : [];
-      const videoFiles = selectedVideos.length
-        ? await buildShareVideos(selectedVideos, blobCache.current)
-        : [];
-      const files = [...imageFiles, ...videoFiles];
-
-      setShareFiles(files);
-      setShareFilesSignature(signature);
-      return files;
-    } finally {
-      setShareComposing(false);
-    }
-  }
-
   function handleGalleryTap(i: number) {
     setPendingShareStep(null);
     setPreviewIdx(i);
@@ -927,44 +902,64 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     }
   }
 
-  async function sharePreparedFiles(
+  function showShareCaptionCopied() {
+    setShareCaptionCopied(true);
+    window.setTimeout(() => setShareCaptionCopied(false), 2500);
+  }
+
+  async function copyShareCaption(caption: string) {
+    const text = buildShareText(caption, link);
+    if (await copyTextToClipboard(text)) {
+      showShareCaptionCopied();
+      return true;
+    }
+    return false;
+  }
+
+  function openShareChannels() {
+    setShowChannels(true);
+  }
+
+  function fallbackDesktopShare(caption: string) {
+    void copyShareCaption(caption);
+    openShareChannels();
+  }
+
+  /**
+   * Start native file share from the click handler (no prior await) so user
+   * activation stays valid. Returns null when native share is unavailable.
+   */
+  function sharePreparedFiles(
     files: File[],
     title: string,
     caption: string,
-  ) {
-    if (!navigator.share || files.length === 0) return false;
+  ): Promise<void> | null {
+    if (!prefersNativeWebShare() || files.length === 0) return null;
 
-    const payloadWithCaption: ShareData = {
-      files,
-      title,
-      ...(caption ? { text: caption } : {}),
-    };
-    const payloadFilesOnly: ShareData = { files, title };
-    const payload = navigator.canShare?.(payloadWithCaption)
-      ? payloadWithCaption
-      : navigator.canShare?.(payloadFilesOnly)
-        ? payloadFilesOnly
-        : null;
+    const shareText = buildShareText(caption, link);
+    const payload = buildNativeSharePayload(files, title, shareText);
+    if (!payload) return null;
 
-    if (!payload) return false;
-
-    await navigator.share(payload);
-    return true;
-  }
-
-  async function shareWithoutFiles(title: string, caption: string) {
-    if (navigator.share) {
-      await navigator.share({
-        title,
-        text: caption,
-        ...(link ? { url: link } : {}),
-      });
-      return;
+    // Backup: many apps drop caption when receiving files.
+    if (shareText) {
+      void copyShareCaption(caption);
     }
 
-    const shareText = [caption, link].filter(Boolean).join("\n\n");
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
-    window.location.assign(whatsappUrl);
+    return navigator.share(payload);
+  }
+
+  /** Native text share (mobile) — caption + link in `text`, no separate `url`. */
+  function shareWithoutFiles(title: string, caption: string): Promise<void> | null {
+    if (!prefersNativeWebShare()) return null;
+    const shareText = buildShareText(caption, link);
+    const payload = buildNativeSharePayload([], title, shareText);
+    if (!payload) return null;
+
+    if (shareText) {
+      void copyShareCaption(caption);
+    }
+
+    return navigator.share(payload);
   }
 
   async function handleCaptionAiHelp() {
@@ -1167,55 +1162,55 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   }
 
   function handleShare() {
-    const share = async () => {
-      const caption = captionText.trim();
-      const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
+    const caption = captionText.trim();
+    const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
+    const filesToShare = pendingShareStep?.files ?? composedFiles;
+    const imageFiles = filesToShare.filter((file) => file.type.startsWith("image/"));
+    const videoFiles = filesToShare.filter((file) => file.type.startsWith("video/"));
+    const hasMixedMediaFiles = imageFiles.length > 0 && videoFiles.length > 0;
+    const filesForCurrentStep = hasMixedMediaFiles ? videoFiles : filesToShare;
+    const captionForCurrentStep = pendingShareStep?.includeCaption === false ? "" : caption;
 
+    const markShareStepDone = () => {
       if (pendingShareStep) {
-        const shared = await sharePreparedFiles(
-          pendingShareStep.files,
-          title,
-          pendingShareStep.includeCaption === false ? "" : caption,
-        );
-        if (shared) {
-          setPendingShareStep(null);
-          return;
-        }
+        setPendingShareStep(null);
+      } else if (hasMixedMediaFiles) {
+        setPendingShareStep({
+          files: imageFiles,
+          label: imageFiles.length > 1
+            ? `Lanjut bagikan ${imageFiles.length} foto`
+            : "Lanjut bagikan foto",
+          includeCaption: false,
+        });
       }
-
-      const filesToShare = await prepareShareFiles();
-      const imageFiles = filesToShare.filter((file) => file.type.startsWith("image/"));
-      const videoFiles = filesToShare.filter((file) => file.type.startsWith("video/"));
-      const hasMixedMediaFiles = imageFiles.length > 0 && videoFiles.length > 0;
-
-      if (hasMixedMediaFiles) {
-        const shared = await sharePreparedFiles(videoFiles, title, caption);
-        if (shared) {
-          setPendingShareStep({
-            files: imageFiles,
-            label: imageFiles.length > 1
-              ? `Lanjut bagikan ${imageFiles.length} foto`
-              : "Lanjut bagikan foto",
-            includeCaption: false,
-          });
-          return;
-        }
-        await shareWithoutFiles(title, caption);
-        return;
-      }
-
-      if (filesToShare.length > 0 && await sharePreparedFiles(filesToShare, title, caption)) {
-        return;
-      }
-
-      await shareWithoutFiles(title, caption);
     };
 
-    void share().catch((error: unknown) => {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      const fallbackText = [captionText.trim(), link].filter(Boolean).join("\n\n");
-      window.location.assign(`https://wa.me/?text=${encodeURIComponent(fallbackText)}`);
-    });
+    // Native share only on mobile-like devices; desktop gets channel picker.
+    // Call navigator.share synchronously from the click (no prior await) so
+    // transient user activation remains valid.
+    const sharePromise =
+      sharePreparedFiles(filesForCurrentStep, title, captionForCurrentStep)
+      ?? shareWithoutFiles(title, caption);
+
+    if (!sharePromise) {
+      fallbackDesktopShare(caption);
+      return;
+    }
+
+    void sharePromise
+      .then(() => {
+        markShareStepDone();
+      })
+      .catch((error: unknown) => {
+        if (isShareAbortError(error)) return;
+        fallbackDesktopShare(caption);
+      });
+  }
+
+  function shareVia(channel: ShareChannel) {
+    const url = buildChannelShareUrl(channel, captionText.trim(), link);
+    window.open(url, "_blank", "noopener");
+    setShowChannels(false);
   }
 
   useImperativeHandle(ref, () => ({ share: handleShare }));
@@ -1604,15 +1599,72 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         {/* secondary actions */}
         <div className="flex flex-col gap-2">
           {embedded && (
-            <div className="mb-1">
+            <div className="relative mb-1">
+              {showChannels && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowChannels(false)}
+                  />
+                  <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
+                    <div className="border-b border-line px-4 py-3 text-center text-[11px] font-bold text-muted">
+                      {shareCaptionCopied
+                        ? "Caption + link tersalin — pilih channel"
+                        : "Bagikan via"}
+                    </div>
+                    <div className="grid grid-cols-4 divide-x divide-line">
+                      <button
+                        type="button"
+                        onClick={() => shareVia("wa")}
+                        className="flex flex-col items-center gap-1.5 py-4 text-[#25D366] transition-colors hover:bg-[#25D366]/10"
+                      >
+                        <WhatsAppSolid size={24} />
+                        <span className="text-[10px] font-semibold text-ink">WhatsApp</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => shareVia("tg")}
+                        className="flex flex-col items-center gap-1.5 py-4 text-[#229ED9] transition-colors hover:bg-[#229ED9]/10"
+                      >
+                        <Telegram size={24} />
+                        <span className="text-[10px] font-semibold text-ink">Telegram</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => shareVia("x")}
+                        className="flex flex-col items-center gap-1.5 py-4 text-ink transition-colors hover:bg-ink/10"
+                      >
+                        <XTwitter size={24} />
+                        <span className="text-[10px] font-semibold text-ink">X / Twitter</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void copyShareCaption(captionText.trim());
+                          setShowChannels(false);
+                        }}
+                        className="flex flex-col items-center gap-1.5 py-4 text-teal-deep transition-colors hover:bg-teal-deep/10"
+                      >
+                        <Copy size={24} />
+                        <span className="text-[10px] font-semibold text-ink">Salin teks</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
               <button
                 type="button"
                 onClick={handleShare}
-                disabled={!unit || composing || shareComposing}
+                disabled={!unit || (composing && composedFiles.length === 0)}
                 className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-[18px] bg-ink px-3 py-3 text-[14px] font-bold text-surface disabled:opacity-50"
               >
-                {(composing || shareComposing) ? (
+                {composing && composedFiles.length === 0 ? (
                   <span className="text-[13px] opacity-80">Menyiapkan media...</span>
+                ) : shareCaptionCopied ? (
+                  <>
+                    <Check className="shrink-0" size={16} strokeWidth={2.4} />
+                    <span>Caption + link tersalin</span>
+                  </>
                 ) : (
                   <>
                     <ShareArrow className="shrink-0" size={16} />
@@ -1645,15 +1697,72 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       {/* sticky action bar — selalu on top (fixed), pola sama seperti detail unit */}
       {!embedded && (
         <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-50 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
-          <div className="min-w-0">
+          <div className="relative min-w-0">
+            {showChannels && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowChannels(false)}
+                />
+                <div className="absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
+                  <div className="border-b border-line px-3 py-2.5 text-center text-[11px] font-bold text-muted">
+                    {shareCaptionCopied
+                      ? "Caption + link tersalin — pilih channel"
+                      : "Bagikan via"}
+                  </div>
+                  <div className="grid grid-cols-4 divide-x divide-line">
+                    <button
+                      type="button"
+                      onClick={() => shareVia("wa")}
+                      className="flex flex-col items-center gap-1 py-3 text-[#25D366]"
+                    >
+                      <WhatsAppSolid size={22} />
+                      <span className="text-[10px] font-semibold text-ink">WA</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => shareVia("tg")}
+                      className="flex flex-col items-center gap-1 py-3 text-[#229ED9]"
+                    >
+                      <Telegram size={20} />
+                      <span className="text-[10px] font-semibold text-ink">TG</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => shareVia("x")}
+                      className="flex flex-col items-center gap-1 py-3 text-ink"
+                    >
+                      <XTwitter size={20} />
+                      <span className="text-[10px] font-semibold text-ink">X</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void copyShareCaption(captionText.trim());
+                        setShowChannels(false);
+                      }}
+                      className="flex flex-col items-center gap-1 py-3 text-teal-deep"
+                    >
+                      <Copy size={20} />
+                      <span className="text-[10px] font-semibold text-ink">Salin</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
             <button
               type="button"
               onClick={handleShare}
-              disabled={!unit || composing || shareComposing}
+              disabled={!unit || (composing && composedFiles.length === 0)}
               className="flex h-12 min-w-0 w-full items-center justify-center gap-2 rounded-2xl bg-ink px-3 text-[13px] font-bold text-surface disabled:opacity-50"
             >
-              {(composing || shareComposing) ? (
+              {composing && composedFiles.length === 0 ? (
                 <span className="truncate text-[12px] opacity-80">Menyiapkan media...</span>
+              ) : shareCaptionCopied ? (
+                <>
+                  <Check className="shrink-0" size={14} strokeWidth={2.4} />
+                  <span className="truncate">Caption + link tersalin</span>
+                </>
               ) : pendingShareStep ? (
                 <>
                   <ShareArrow className="shrink-0" size={14} />
