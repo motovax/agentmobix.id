@@ -1,7 +1,11 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
-import { FloatingPicAgentCta } from "../components/FloatingPicAgentCta";
+import { ContactActionMenu } from "../components/FloatingContactCta";
+import {
+  CreditSimulationBox,
+  type CreditSimulationResult,
+} from "../components/CreditSimulationBox";
 import { Photo, Skeleton } from "../components/ui";
 import {
   ChevronLeft,
@@ -27,6 +31,7 @@ import {
   generateAIBackground,
   fetchAIBackgroundStatus,
   prettyTransmisi,
+  requiresSalesContact,
   titleCase,
   type GalleryItem,
   type ProductDetail,
@@ -36,6 +41,7 @@ import {
 import { useAsync } from "../lib/useAsync";
 import { formatJt, formatOdometer, formatRupiah } from "../lib/format";
 import { estimateBuilderCommission } from "../lib/commission";
+import { buildJasmineWhatsAppHref } from "../lib/jasmine";
 import {
   buildAgenMobixUnitLink,
   buildWhatsAppShareText,
@@ -466,9 +472,13 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const [aiBackgroundUrls, setAiBackgroundUrls] = useState<Record<string, string>>({});
   const [aiPreviewMode, setAiPreviewMode] = useState<"ai" | "original">("ai");
   const [, setAiBackgroundError] = useState("");
+  const [liveSimulation, setLiveSimulation] = useState<CreditSimulationResult | null>(null);
 
   const blobCache = useRef<Map<string, Blob>>(new Map());
   const captionSuggestionIndex = useRef(0);
+  const handleSimulationChange = useCallback((result: CreditSimulationResult) => {
+    setLiveSimulation(result);
+  }, []);
 
   const gallery = unit?.galeri ?? [];
   const videos = unit?.video ?? [];
@@ -512,20 +522,52 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     ? pendingShareStep.label
     : isMixedMediaSelected
       ? "Share bertahap: video dulu"
-      : "Bagikan Sekarang";
+      : "Share ke social media";
   const financingEligible = unit?.pembiayaan.eligible === true;
-  const requestedDpMinimShare = searchParams.get("sim") === "dpminim";
-  const shareTenor = positiveParamNumber(searchParams, "tenor") ?? 60;
-  const shareTdp = positiveParamNumber(searchParams, "tdp") ?? unit?.tdp ?? 0;
-  const shareCicilan = positiveParamNumber(searchParams, "cicilan") ?? unit?.cicilan ?? 0;
-  const shareDp = positiveParamNumber(searchParams, "dp") ?? null;
-  const shareDpPercent = positiveParamNumber(searchParams, "dp_pct") ?? null;
+  const salesContactRequired = requiresSalesContact(unit?.pembiayaan);
+  const requestedDpMinimShare =
+    liveSimulation?.simTab === "dpminim" ||
+    (!liveSimulation && searchParams.get("sim") === "dpminim");
+  const shareTenor =
+    liveSimulation?.tenor ??
+    positiveParamNumber(searchParams, "tenor") ??
+    60;
+  const shareTdp =
+    liveSimulation?.tdp ??
+    positiveParamNumber(searchParams, "tdp") ??
+    unit?.tdp ??
+    0;
+  const shareCicilan =
+    liveSimulation?.cicilan ??
+    positiveParamNumber(searchParams, "cicilan") ??
+    unit?.cicilan ??
+    0;
+  const shareDp =
+    liveSimulation?.dp ??
+    positiveParamNumber(searchParams, "dp") ??
+    null;
+  const shareDpPercent =
+    liveSimulation?.dpPercent ??
+    positiveParamNumber(searchParams, "dp_pct") ??
+    null;
   const shareHasFinancing = financingEligible && shareTdp > 0 && shareCicilan > 0;
   const isDpMinimShare = requestedDpMinimShare && shareHasFinancing;
   const shareCreditPrice = financingEligible
-    ? positiveParamNumber(searchParams, "harga_kredit") ?? unit?.harga_kredit ?? null
+    ? liveSimulation?.hargaKredit ??
+      positiveParamNumber(searchParams, "harga_kredit") ??
+      unit?.harga_kredit ??
+      null
     : null;
   const sharePrice = positiveParamNumber(searchParams, "harga") ?? unit?.harga ?? 0;
+  const unitAdminMessage = unit
+    ? `Halo AI Mobix Assistant! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(sharePrice || unit.harga)}. Bisa bantu info lebih lanjut? 🙏`
+    : "";
+  const unitCalculationMessage = unit
+    ? salesContactRequired
+      ? `Halo Jasmine, saya mau menanyakan opsi pembiayaan lain untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(sharePrice || unit.harga)}. Pembiayaan DSF tidak tersedia untuk unit ini.`
+      : `Halo Admin, saya mau minta hitungan leasing untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(sharePrice || unit.harga)}.\n1. DP minim\n2. Cicilan ringan\n3. Cair All in`
+    : "";
+  const jasmineCalculationHref = buildJasmineWhatsAppHref(unitCalculationMessage);
   const captionPrice = shareCreditPrice ?? sharePrice ?? unit?.harga ?? 0;
   const shouldHidePriceInCaption = isDpMinimShare;
   const packageTitle = shareHasFinancing ? (isDpMinimShare ? "DP Minim" : "Kredit") : "Unit";
@@ -626,7 +668,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     );
   }
 
-  // init when unit loads
+  // init when unit loads (jangan reset caption tiap simulasi berubah)
   useEffect(() => {
     if (!unit) return;
     const allPhotoIndexes = unit.galeri.map((_, index) => index);
@@ -636,11 +678,26 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     setPreviewIdx(0);
     setCaptionText(autoCaption);
     setPendingShareStep(null);
+    setLiveSimulation(null);
     setAiBackgroundStatus("idle");
     setAiBackgroundProgress(0);
     setAiPreviewMode("ai");
     setAiBackgroundError("");
     replaceAiBackgroundFiles([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hanya re-init saat unit berganti
+  }, [unit?.id]);
+
+  // sinkronkan caption otomatis saat hasil simulasi live siap (jika user belum edit)
+  const lastAutoCaptionRef = useRef("");
+  useEffect(() => {
+    if (!unit || !autoCaption) return;
+    setCaptionText((current) => {
+      if (!current || current === lastAutoCaptionRef.current) {
+        lastAutoCaptionRef.current = autoCaption;
+        return autoCaption;
+      }
+      return current;
+    });
   }, [unit?.id, autoCaption]);
 
   // fetch raw blobs (cached) + compose download files whenever selection changes
@@ -1233,7 +1290,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   return (
     <AppShell overlay={embedded} bare={embedded}>
       {/* sheet */}
-      <div className="min-h-[560px] bg-surface-2 px-4 pb-24 pt-[18px]">
+      <div className={`min-h-[560px] bg-surface-2 px-4 ${embedded ? "pb-24 pt-[18px]" : "pb-[120px] pt-[18px]"}`}>
         {/* shareable preview */}
         <div className="relative mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
           {activeMedia?.kind === "video" ? (
@@ -1425,90 +1482,93 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
           )}
         </div>
 
-        {/* share button */}
-        <div className="relative mb-[18px]">
-          {showChannels && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowChannels(false)}
-              />
-              <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
-                <div className="border-b border-line px-4 py-3 text-center text-[11px] font-bold text-muted">
-                  Bagikan via
-                </div>
-                <div className="grid grid-cols-4 divide-x divide-line">
-                  <button
-                    onClick={() => void shareVia("wa")}
-                    className="flex flex-col items-center gap-1.5 py-4 text-[#25D366] transition-colors hover:bg-[#25D366]/10"
-                  >
-                    <WhatsAppSolid size={24} />
-                    <span className="text-[10px] font-semibold text-ink">WhatsApp</span>
-                  </button>
-                  <button
-                    onClick={() => void shareVia("ig")}
-                    className="flex flex-col items-center gap-1.5 py-4 text-[#E1306C] transition-colors hover:bg-[#E1306C]/10"
-                  >
-                    <InstagramSolid size={24} />
-                    <span className="text-[10px] font-semibold text-ink">Instagram</span>
-                  </button>
-                  <button
-                    onClick={() => void shareVia("fb")}
-                    className="flex flex-col items-center gap-1.5 py-4 text-[#1877F2] transition-colors hover:bg-[#1877F2]/10"
-                  >
-                    <FacebookSolid size={24} />
-                    <span className="text-[10px] font-semibold text-ink">Facebook</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      void copy("link", link);
-                      setShowChannels(false);
-                    }}
-                    className="flex flex-col items-center gap-1.5 py-4 text-teal-deep transition-colors hover:bg-teal-deep/10"
-                  >
-                    <Copy size={24} />
-                    <span className="text-[10px] font-semibold text-ink">Salin Link</span>
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-          <button
-            onClick={handleShare}
-            disabled={!unit || composing || shareComposing}
-            className="flex min-h-[66px] w-full items-center justify-center gap-2.5 rounded-[18px] bg-teal-deep px-3 py-3.5 text-[15px] font-bold leading-tight text-surface disabled:opacity-50"
-          >
-            {(composing || shareComposing) ? (
-              <span className="text-[13px] opacity-80">Menyiapkan media...</span>
-            ) : pendingShareStep ? (
-              <>
-                <ShareArrow className="shrink-0" size={18} />
-                <span className="min-w-0 text-center">{shareButtonLabel}</span>
-              </>
-            ) : shareCaptionCopied ? (
-              <>
-                <Check className="shrink-0" size={18} strokeWidth={2.4} />
-                <span className="min-w-0 text-center">Caption tersalin</span>
-              </>
-            ) : (
-              <>
-                <ShareArrow className="shrink-0" size={18} />
-                <span className="flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center">
-                  <span>{shareButtonLabel}</span>
-                  {selectedIdxes.length > 0 && (
-                    <span className="text-[12px] opacity-80">
-                      ({selectedMediaButtonLabel})
-                    </span>
-                  )}
-                </span>
-              </>
-            )}
-          </button>
-        </div>
+        {/* simulasi kredit — collapsible seperti detail unit */}
+        {unit && (
+          <CreditSimulationBox
+            unit={unit}
+            price={sharePrice || unit.harga}
+            initialTenor={positiveParamNumber(searchParams, "tenor") ?? 60}
+            initialDpPercent={positiveParamNumber(searchParams, "dp_pct") ?? undefined}
+            onSimulationChange={handleSimulationChange}
+          />
+        )}
 
         {/* secondary actions */}
         <div className="flex flex-col gap-2">
+          {embedded && (
+            <div className="relative mb-1">
+              {showChannels && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowChannels(false)}
+                  />
+                  <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
+                    <div className="border-b border-line px-4 py-3 text-center text-[11px] font-bold text-muted">
+                      Bagikan via
+                    </div>
+                    <div className="grid grid-cols-4 divide-x divide-line">
+                      <button
+                        type="button"
+                        onClick={() => void shareVia("wa")}
+                        className="flex flex-col items-center gap-1.5 py-4 text-[#25D366] transition-colors hover:bg-[#25D366]/10"
+                      >
+                        <WhatsAppSolid size={24} />
+                        <span className="text-[10px] font-semibold text-ink">WhatsApp</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void shareVia("ig")}
+                        className="flex flex-col items-center gap-1.5 py-4 text-[#E1306C] transition-colors hover:bg-[#E1306C]/10"
+                      >
+                        <InstagramSolid size={24} />
+                        <span className="text-[10px] font-semibold text-ink">Instagram</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void shareVia("fb")}
+                        className="flex flex-col items-center gap-1.5 py-4 text-[#1877F2] transition-colors hover:bg-[#1877F2]/10"
+                      >
+                        <FacebookSolid size={24} />
+                        <span className="text-[10px] font-semibold text-ink">Facebook</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void copy("link", link);
+                          setShowChannels(false);
+                        }}
+                        className="flex flex-col items-center gap-1.5 py-4 text-teal-deep transition-colors hover:bg-teal-deep/10"
+                      >
+                        <Copy size={24} />
+                        <span className="text-[10px] font-semibold text-ink">Salin Link</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={handleShare}
+                disabled={!unit || composing || shareComposing}
+                className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-[18px] bg-ink px-3 py-3 text-[14px] font-bold text-surface disabled:opacity-50"
+              >
+                {(composing || shareComposing) ? (
+                  <span className="text-[13px] opacity-80">Menyiapkan media...</span>
+                ) : (
+                  <>
+                    <ShareArrow className="shrink-0" size={16} />
+                    <span>{shareButtonLabel}</span>
+                    {selectedIdxes.length > 0 && !pendingShareStep && (
+                      <span className="text-[12px] opacity-80">({selectedMediaButtonLabel})</span>
+                    )}
+                  </>
+                )}
+              </button>
+            </div>
+          )}
           <button
+            type="button"
             onClick={handleDownload}
             disabled={!unit || composedFiles.length === 0}
             className="flex items-center gap-3 rounded-[14px] border border-line bg-surface p-3.5 text-ink disabled:opacity-50"
@@ -1523,7 +1583,97 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
           </button>
         </div>
       </div>
-      <FloatingPicAgentCta unit={unit} />
+
+      {/* sticky action bar — selalu on top (fixed), pola sama seperti detail unit */}
+      {!embedded && (
+        <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-50 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
+          <div className="relative min-w-0">
+            {showChannels && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowChannels(false)}
+                />
+                <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
+                  <div className="border-b border-line px-4 py-3 text-center text-[11px] font-bold text-muted">
+                    Bagikan via
+                  </div>
+                  <div className="grid grid-cols-4 divide-x divide-line">
+                    <button
+                      type="button"
+                      onClick={() => void shareVia("wa")}
+                      className="flex flex-col items-center gap-1.5 py-4 text-[#25D366] transition-colors hover:bg-[#25D366]/10"
+                    >
+                      <WhatsAppSolid size={24} />
+                      <span className="text-[10px] font-semibold text-ink">WhatsApp</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void shareVia("ig")}
+                      className="flex flex-col items-center gap-1.5 py-4 text-[#E1306C] transition-colors hover:bg-[#E1306C]/10"
+                    >
+                      <InstagramSolid size={24} />
+                      <span className="text-[10px] font-semibold text-ink">Instagram</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void shareVia("fb")}
+                      className="flex flex-col items-center gap-1.5 py-4 text-[#1877F2] transition-colors hover:bg-[#1877F2]/10"
+                    >
+                      <FacebookSolid size={24} />
+                      <span className="text-[10px] font-semibold text-ink">Facebook</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void copy("link", link);
+                        setShowChannels(false);
+                      }}
+                      className="flex flex-col items-center gap-1.5 py-4 text-teal-deep transition-colors hover:bg-teal-deep/10"
+                    >
+                      <Copy size={24} />
+                      <span className="text-[10px] font-semibold text-ink">Salin Link</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={handleShare}
+              disabled={!unit || composing || shareComposing}
+              className="flex h-12 min-w-0 w-full items-center justify-center gap-2 rounded-2xl bg-ink px-3 text-[13px] font-bold text-surface disabled:opacity-50"
+            >
+              {(composing || shareComposing) ? (
+                <span className="truncate text-[12px] opacity-80">Menyiapkan media...</span>
+              ) : pendingShareStep ? (
+                <>
+                  <ShareArrow className="shrink-0" size={14} />
+                  <span className="truncate">{shareButtonLabel}</span>
+                </>
+              ) : shareCaptionCopied ? (
+                <>
+                  <Check className="shrink-0" size={14} strokeWidth={2.4} />
+                  <span className="truncate">Caption tersalin</span>
+                </>
+              ) : (
+                <>
+                  <span className="truncate">Share ke social media</span>
+                  <ShareArrow size={14} />
+                </>
+              )}
+            </button>
+          </div>
+          <ContactActionMenu
+            adminMessage={unitAdminMessage}
+            calculationMessage={unitCalculationMessage}
+            calculationHref={salesContactRequired ? jasmineCalculationHref : undefined}
+            adminLabel="Tanya Admin"
+            calculationLabel={salesContactRequired ? "Tanya Opsi Pembiayaan" : "Minta Hitungan"}
+            buttonClassName="flex h-12 w-full items-center justify-center rounded-2xl border border-teal-tint-border bg-teal text-ink"
+          />
+        </div>
+      )}
     </AppShell>
   );
 });
