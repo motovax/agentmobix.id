@@ -8,11 +8,69 @@ export interface RequiredCaptionSection {
   facts: RequiredCaptionFact[];
 }
 
+/** Fixed sales hook di depan caption share. */
+export const CAPTION_HOOK_PREFIX = "Dijual cepat unit istimewa";
+
+/** CTA penutup caption share. */
+export const CAPTION_CTA = "tertarik bisa langsung DM ya.";
+
 export function buildAgenMobixUnitLink(slug?: string | null) {
   const normalizedSlug = slug?.trim();
   return normalizedSlug
     ? `https://agenmobix.id/share?u=${encodeURIComponent(normalizedSlug)}`
     : "https://agenmobix.id";
+}
+
+/**
+ * Pastikan caption diawali prefix kanonis (tanpa mendobel jika sudah ada).
+ */
+export function ensureCaptionPrefix(
+  caption: string,
+  prefix: string = CAPTION_HOOK_PREFIX,
+) {
+  const trimmed = caption.trim();
+  if (!trimmed) return prefix;
+
+  const lines = trimmed.split(/\n+/);
+  const first = (lines[0] ?? "").trim();
+  const firstNorm = first.toLocaleLowerCase("id-ID");
+  const prefixNorm = prefix.toLocaleLowerCase("id-ID");
+
+  if (firstNorm === prefixNorm || firstNorm.startsWith(prefixNorm)) {
+    const rest = lines.slice(1).join("\n").trim();
+    return rest ? `${prefix}\n\n${rest}` : prefix;
+  }
+
+  return `${prefix}\n\n${trimmed}`;
+}
+
+const TRAILING_CTA_RE =
+  /(?:\n{1,2})?(?:chat saya(?:\s+ya)?[^.!\n]*[.!]?|tertarik bisa langsung dm(?:\s+ya)?[.!]?|minat\?[^.!\n]*[.!]?|mau saya bantu[^.!\n]*[.!]?|langsung chat saya[^.!\n]*[.!]?)\s*$/i;
+
+/**
+ * Pastikan caption diakhiri CTA kanonis; ganti CTA lama yang mirip.
+ */
+export function ensureCaptionCta(
+  caption: string,
+  cta: string = CAPTION_CTA,
+) {
+  const trimmed = caption.trim();
+  if (!trimmed) return cta;
+
+  const withoutOld = trimmed.replace(TRAILING_CTA_RE, "").trim();
+  const ctaNorm = cta.toLocaleLowerCase("id-ID");
+  if (withoutOld.toLocaleLowerCase("id-ID").endsWith(ctaNorm)) {
+    return withoutOld;
+  }
+  return `${withoutOld}\n\n${cta}`;
+}
+
+/** Susun caption default: prefix + body + CTA. */
+export function buildShareAutoCaption(
+  bodyParts: Array<string | null | undefined | false>,
+) {
+  const body = bodyParts.filter(Boolean).join("\n\n");
+  return ensureCaptionCta(ensureCaptionPrefix(body));
 }
 
 /**

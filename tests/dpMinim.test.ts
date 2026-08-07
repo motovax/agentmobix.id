@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  fetchDpMinimPackage,
   getDsfDpMinimSummary,
   type DsfSimResult,
 } from "../src/lib/dsf";
@@ -48,6 +49,12 @@ describe("hasil DP Minim DSF", () => {
   test("menolak hasil DSF yang belum lengkap", () => {
     expect(
       getDsfDpMinimSummary(dsfResult({ allInToSupplier: 0 })),
+    ).toBeNull();
+  });
+
+  test("fetchDpMinimPackage menolak harga unit kosong", async () => {
+    expect(
+      await fetchDpMinimPackage({ unitPrice: 0, category: "MPV", year: 2022, tenor: 60 }),
     ).toBeNull();
   });
 });

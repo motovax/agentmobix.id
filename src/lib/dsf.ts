@@ -292,6 +292,64 @@ export function getDsfDpMinimSummary(
   };
 }
 
+export interface DpMinimPackage {
+  tdp: number;
+  cicilan: number;
+  tenor: number;
+  dpPercent: number;
+}
+
+/**
+ * Fetch paket DP Minim untuk tenor tertentu (default 60).
+ * Dipakai caption share default agar di bawah harga selalu ada DP Minim 60.
+ */
+export async function fetchDpMinimPackage(
+  params: {
+    unitPrice: number;
+    brand?: string;
+    model?: string;
+    year?: number;
+    category?: string;
+    tenor?: number;
+  },
+  signal?: AbortSignal,
+): Promise<DpMinimPackage | null> {
+  const tenor = params.tenor ?? 60;
+  if (!params.unitPrice || params.unitPrice <= 0) return null;
+
+  const rules = getDsfSimulationRules({
+    category: params.category,
+    year: params.year,
+    tenor,
+  });
+  if (!rules.eligible) return null;
+
+  const result = await simulateKreditWithSignal(
+    {
+      unitPrice: params.unitPrice,
+      dpPercent: rules.minDpPercent,
+      simulationType: "DP",
+      simulationValue: rules.minDpPercent,
+      paymentType: "ADDB",
+      tenor,
+      brand: params.brand,
+      model: params.model,
+      year: params.year,
+      category: params.category,
+    },
+    signal,
+  );
+  const summary = getDsfDpMinimSummary(result);
+  if (!summary) return null;
+
+  return {
+    tdp: summary.tdp,
+    cicilan: summary.installment,
+    tenor,
+    dpPercent: rules.minDpPercent,
+  };
+}
+
 export interface DsfCreditPriceResult {
   unitPrice: number;
   allInToSupplier: number;

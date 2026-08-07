@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildAgenMobixUnitLink,
+  buildShareAutoCaption,
   buildWhatsAppShareText,
+  CAPTION_CTA,
+  CAPTION_HOOK_PREFIX,
+  ensureCaptionCta,
+  ensureCaptionPrefix,
   ensureRequiredCaptionFacts,
   formatCaptionReadability,
   removeCaptionParagraphsContaining,
@@ -126,6 +131,56 @@ describe("removeCaptionParagraphsContaining", () => {
   test("matches short terms as words instead of substrings", () => {
     expect(removeCaptionParagraphsContaining("Makin praktis untuk keluarga.", ["km"])).toBe(
       "Makin praktis untuk keluarga.",
+    );
+  });
+});
+
+describe("ensureCaptionPrefix", () => {
+  test("prepends the fixed sales hook", () => {
+    expect(ensureCaptionPrefix("Toyota Calya siap dilirik.")).toBe(
+      `${CAPTION_HOOK_PREFIX}\n\nToyota Calya siap dilirik.`,
+    );
+  });
+
+  test("does not double the prefix when already present", () => {
+    expect(
+      ensureCaptionPrefix(`${CAPTION_HOOK_PREFIX}\n\nUnit bagus.`),
+    ).toBe(`${CAPTION_HOOK_PREFIX}\n\nUnit bagus.`);
+  });
+});
+
+describe("ensureCaptionCta", () => {
+  test("appends the canonical DM CTA", () => {
+    expect(ensureCaptionCta("Unit bagus di cabang Bintaro.")).toBe(
+      `Unit bagus di cabang Bintaro.\n\n${CAPTION_CTA}`,
+    );
+  });
+
+  test("replaces the old chat CTA", () => {
+    expect(ensureCaptionCta("Unit bagus.\n\nChat saya ya")).toBe(
+      `Unit bagus.\n\n${CAPTION_CTA}`,
+    );
+  });
+});
+
+describe("buildShareAutoCaption", () => {
+  test("builds prefix + body + CTA with harga and DP minim package", () => {
+    expect(
+      buildShareAutoCaption([
+        "Toyota Calya 2019",
+        "• KM 77.166",
+        "Harga Rp 116.870.000\nPaket DP Minim 24,7jt\nCicilan 2,5jt/bln • Tenor 60 bulan",
+        "Unit tercatat di cabang Bintaro, cek ketersediaannya terlebih dahulu.",
+      ]),
+    ).toBe(
+      [
+        CAPTION_HOOK_PREFIX,
+        "Toyota Calya 2019",
+        "• KM 77.166",
+        "Harga Rp 116.870.000\nPaket DP Minim 24,7jt\nCicilan 2,5jt/bln • Tenor 60 bulan",
+        "Unit tercatat di cabang Bintaro, cek ketersediaannya terlebih dahulu.",
+        CAPTION_CTA,
+      ].join("\n\n"),
     );
   });
 });
