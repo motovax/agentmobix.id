@@ -7,6 +7,7 @@ import {
   type CreditSimulationResult,
 } from "../components/CreditSimulationBox";
 import { Photo, Skeleton } from "../components/ui";
+import { UnitRow } from "../components/UnitRow";
 import {
   ChevronLeft,
   ShareArrow,
@@ -16,6 +17,7 @@ import {
   InstagramSolid,
   FacebookSolid,
   Check,
+  Close,
   Sparkles,
   Play,
 } from "../components/icons";
@@ -33,6 +35,7 @@ import {
   prettyTransmisi,
   requiresSalesContact,
   titleCase,
+  toCardUnit,
   type GalleryItem,
   type ProductDetail,
   type VideoItem,
@@ -54,6 +57,26 @@ import {
   removeCaptionParagraphsContaining,
   type RequiredCaptionSection,
 } from "../lib/shareCaption";
+
+const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
+
+function maskBpkbName(value: string) {
+  if (!value || /^(tidak|belum)\b/i.test(value.trim())) return value;
+  const lower = value.toLowerCase();
+  if (/\b(pt|cv|coop|koperasi|persero|perseroan|limited|ltd|gmo|group|badan hukum|pt\.)\b/.test(lower) || /\bunlimited\b/.test(lower)) {
+    return "BPKB Perusahaan";
+  }
+  if (/\b(perorangan|pribadi|individu|nama pemilik|atas nama)\b/.test(lower)) {
+    return "BPKB Perorangan";
+  }
+  return value.trim().split(/\s+/).map((word) => {
+    const match = word.match(/^([^A-Za-zÀ-ÖØ-öø-ÿ']*)([A-Za-zÀ-ÖØ-öø-ÿ']+)([^A-Za-zÀ-ÖØ-öø-ÿ']*)$/u);
+    if (!match) return word;
+    const [, prefix, core, suffix] = match;
+    if (UNMASKED_BPKB_WORDS.has(core.toLowerCase()) || core.length <= 2) return word;
+    return `${prefix}${core[0]}${"*".repeat(core.length - 2)}${core[core.length - 1]}${suffix}`;
+  }).join(" ");
+}
 
 /* ---- business logic ---- */
 
@@ -481,6 +504,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const [appliedSimulation, setAppliedSimulation] = useState<CreditSimulationResult | null>(null);
   const [appliedPrice, setAppliedPrice] = useState(0);
   const [priceInput, setPriceInput] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const blobCache = useRef<Map<string, Blob>>(new Map());
   const captionSuggestionIndex = useRef(0);
@@ -1314,6 +1338,16 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const selectedAiBackgroundCount = selectedImageMedia.filter((media) => aiBackgroundUrls[media.id]).length;
   const selectedAiBackgroundComplete =
     selectedImageMedia.length > 0 && selectedAiBackgroundCount === selectedImageMedia.length;
+  const detailSpecs = unit ? [
+    { label: "Transmisi", value: titleCase(unit.transmisi || "-") },
+    { label: "Kilometer", value: formatOdometer(unit.odometer) },
+    { label: "Kategori", value: titleCase(unit.category || "-") },
+    { label: "Tahun", value: String(unit.year) },
+    { label: "Warna", value: titleCase(unit.color || "-") },
+    { label: "Plat", value: unit.plate_no || "-" },
+  ] : [];
+  const unitDocuments = Object.entries(unit?.kelengkapan_dokumen ?? {});
+  const similarUnits = (unit?.harga_sejenis ?? []).slice(0, 5).map(toCardUnit);
 
   if (controllerOnly) return null;
 
@@ -1581,13 +1615,72 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         )}
 
         {unit && (
-          <Link
-            href={`/unit/${encodeURIComponent(unit.slug)}`}
-            className="mb-[18px] flex min-h-12 items-center justify-between rounded-[14px] border border-line bg-surface px-4 text-[13px] font-bold text-ink no-underline"
-          >
-            <span>Cek unit lengkapnya</span>
-            <span className="text-[20px] leading-none text-muted">›</span>
-          </Link>
+          <div className="mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
+            <button
+              type="button"
+              aria-expanded={detailsOpen}
+              onClick={() => setDetailsOpen((open) => !open)}
+              className="flex min-h-[64px] w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+            >
+              <span className="flex-1 text-[15px] font-extrabold text-ink">Cek detail unit lengkapnya</span>
+              <span className={`text-[22px] leading-none text-muted transition-transform ${detailsOpen ? "rotate-90" : ""}`}>›</span>
+            </button>
+
+            {detailsOpen && (
+              <div className="border-t border-line pb-1">
+                <div className="px-3.5 py-4">
+                  <div className="grid grid-cols-3 gap-2">
+                    {detailSpecs.map((spec) => (
+                      <div key={spec.label} className="rounded-xl bg-field p-3 text-center">
+                        <div className="text-[11px] text-muted">{spec.label}</div>
+                        <div className="mt-0.5 truncate text-[13px] font-bold text-ink">{spec.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {unitDocuments.length > 0 && (
+                  <div className="px-[18px] pb-4">
+                    <div className="mb-2 text-[15px] font-extrabold text-ink">Kelengkapan dokumen</div>
+                    <div className="flex flex-col gap-2">
+                      {unitDocuments.map(([key, value]) => {
+                        const isBpkb = key.toLowerCase() === "bpkb";
+                        const available = isBpkb || (/\b(ada|tersedia)\b/i.test(value) && !/^(tidak|belum)\b/i.test(value));
+                        const displayValue = isBpkb ? maskBpkbName(value) : value;
+                        return (
+                          <div key={key} className="flex items-center gap-2.5 rounded-xl bg-field px-3.5 py-2.5">
+                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${available ? "bg-teal text-ink" : "bg-danger-bg text-danger"}`}>
+                              {available ? <Check size={11} /> : <Close size={10} />}
+                            </span>
+                            <span className="text-[13px] font-semibold uppercase text-ink">{key}</span>
+                            <span className="ml-auto text-right text-[12px] text-muted">
+                              {isBpkb && /^(tidak|belum)\b/i.test(value) ? "Ada" : displayValue}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {unit.deskripsi && (
+                  <div className="px-[18px] pb-4">
+                    <div className="mb-2 text-[15px] font-extrabold text-ink">Deskripsi unit</div>
+                    <p className="m-0 whitespace-pre-line text-[13px] leading-[1.6] text-mid">{unit.deskripsi}</p>
+                  </div>
+                )}
+
+                {similarUnits.length > 0 && (
+                  <div className="px-[18px] pb-4">
+                    <div className="mb-2 text-[15px] font-extrabold text-ink">Rekomendasi lain</div>
+                    <div className="flex flex-col gap-2.5">
+                      {similarUnits.map((similar) => <UnitRow key={similar.id} unit={similar} />)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         {/* secondary actions */}
