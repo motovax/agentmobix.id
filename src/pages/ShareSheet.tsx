@@ -49,6 +49,7 @@ import {
   minBuilderPrice,
 } from "../lib/commission";
 import { buildJasmineWhatsAppHref } from "../lib/jasmine";
+import { getCatalogReturnHref } from "../lib/catalogSearch";
 import {
   buildAgenMobixUnitLink,
   buildWhatsAppShareText,
@@ -1322,7 +1323,9 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     downloadFiles(composedFiles);
   }
 
-  const backHref = embedded ? "#simulasi-kredit" : unit ? `/share?u=${encodeURIComponent(unit.slug)}` : "/katalog";
+  const backHref = embedded
+    ? "#simulasi-kredit"
+    : getCatalogReturnHref(searchParams.toString());
   const aiActiveUrl = activeMedia?.kind === "image" && aiPreviewMode === "ai"
     ? aiBackgroundUrls[activeMedia.id]
     : undefined;
