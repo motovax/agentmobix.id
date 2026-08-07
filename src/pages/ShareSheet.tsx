@@ -470,7 +470,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
   const [captionText, setCaptionText] = useState("");
   const [captionSuggesting, setCaptionSuggesting] = useState(false);
-  const [shareCaptionCopied, setShareCaptionCopied] = useState(false);
   const [pendingShareStep, setPendingShareStep] = useState<PendingShareStep | null>(null);
 
   // multi-select share media
@@ -840,22 +839,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
   const link = buildAgenMobixUnitLink(unit?.slug);
 
-  function showCopiedState(fromShare = false) {
-    if (fromShare) setShareCaptionCopied(true);
-    window.setTimeout(() => {
-      if (fromShare) setShareCaptionCopied(false);
-    }, fromShare ? 2500 : 1500);
-  }
-
-  async function copyToClipboard(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   async function waitForAIBackgroundJob(
     initial: AIBackgroundResponse,
     onProgress: (progress: number) => void,
@@ -965,14 +948,23 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
     if (!payload) return false;
 
-    if (caption) {
-      void copyToClipboard(caption).then((ok) => {
-        if (ok) showCopiedState(true);
-      });
-    }
-
     await navigator.share(payload);
     return true;
+  }
+
+  async function shareWithoutFiles(title: string, caption: string) {
+    if (navigator.share) {
+      await navigator.share({
+        title,
+        text: caption,
+        ...(link ? { url: link } : {}),
+      });
+      return;
+    }
+
+    const shareText = [caption, link].filter(Boolean).join("\n\n");
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+    window.location.assign(whatsappUrl);
   }
 
   async function handleCaptionAiHelp() {
@@ -1178,12 +1170,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     const share = async () => {
       const caption = captionText.trim();
       const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
-      const copyShareFallback = async () => {
-        const fallbackText = [caption, link].filter(Boolean).join("\n\n");
-        if (fallbackText && (await copyToClipboard(fallbackText))) {
-          showCopiedState(true);
-        }
-      };
 
       if (pendingShareStep) {
         const shared = await sharePreparedFiles(
@@ -1214,7 +1200,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
           });
           return;
         }
-        await copyShareFallback();
+        await shareWithoutFiles(title, caption);
         return;
       }
 
@@ -1222,28 +1208,13 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         return;
       }
 
-      if (navigator.share && !filesToShare.length) {
-        if (caption && (await copyToClipboard(caption))) {
-          showCopiedState(true);
-        }
-        await navigator.share({
-          title,
-          text: caption,
-        });
-        return;
-      }
-
-      await copyShareFallback();
+      await shareWithoutFiles(title, caption);
     };
 
     void share().catch((error: unknown) => {
       if (error instanceof DOMException && error.name === "AbortError") return;
       const fallbackText = [captionText.trim(), link].filter(Boolean).join("\n\n");
-      if (fallbackText) {
-        void copyToClipboard(fallbackText).then((ok) => {
-          if (ok) showCopiedState(true);
-        });
-      }
+      window.location.assign(`https://wa.me/?text=${encodeURIComponent(fallbackText)}`);
     });
   }
 
@@ -1687,11 +1658,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
                 <>
                   <ShareArrow className="shrink-0" size={14} />
                   <span className="truncate">{shareButtonLabel}</span>
-                </>
-              ) : shareCaptionCopied ? (
-                <>
-                  <Check className="shrink-0" size={14} strokeWidth={2.4} />
-                  <span className="truncate">Caption tersalin</span>
                 </>
               ) : (
                 <>
