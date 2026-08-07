@@ -1,4 +1,4 @@
-import { fetchUnits } from "./mobix";
+import { fetchUnits, mobixImage } from "./mobix";
 import { buildAgenMobixUnitLink } from "./shareCaption";
 
 const FALCON_API_BASE = (
@@ -24,6 +24,7 @@ export type FalconUnitLink = {
   title: string;
   plateNo: string;
   href: string;
+  imageSrc?: string;
 };
 
 export type FalconUnitReference = {
@@ -59,6 +60,18 @@ function normalizedPlate(value: string) {
 
 const MAX_FALCON_CONTEXT_TURNS = 6;
 const MAX_FALCON_CONTEXT_CHARACTERS = 8_000;
+export const MAX_FALCON_RECOMMENDATIONS = 5;
+
+const FALCON_LIST_UNIT_PATTERN = /^\s*(?:\d+[.)]\s*)?(?:\*{1,2})?(.+?)\s+[—-]\s+([A-Z]{1,2}\s*\d{1,4}\s*[A-Z]{0,3})(?:\*{1,2})?\s*$/i;
+
+function extractFalconListUnitReference(line: string): FalconUnitReference | null {
+  const match = line.match(FALCON_LIST_UNIT_PATTERN);
+  if (!match) return null;
+  return {
+    title: match[1].replace(/\*+/g, "").trim(),
+    plateNo: normalizedPlate(match[2]),
+  };
+}
 
 /**
  * Falcon's external endpoint is stateless, so follow-up requests must carry
@@ -94,12 +107,50 @@ export function buildFalconContextMessage(
   ].join("\n");
 }
 
-/** Render Falcon markdown and place each resolved URL after its recommendation details. */
+/** Render Falcon markdown and show at most five recommendations that have photos. */
 export function formatFalconReplyHtml(reply: string, units: FalconUnitLink[] = []) {
   const lines = reply.split("\n");
   const linksAfterLine = new Map<number, FalconUnitLink>();
+  const imagesBeforeLine = new Map<number, FalconUnitLink & { imageSrc: string }>();
+  const hiddenLines = new Set<number>();
+  const visibleUnits = units
+    .filter((unit): unit is FalconUnitLink & { imageSrc: string } => Boolean(unit.imageSrc?.trim()))
+    .slice(0, MAX_FALCON_RECOMMENDATIONS);
+  const visibleByPlate = new Map(
+    visibleUnits.map((unit) => [normalizedPlate(unit.plateNo), unit]),
+  );
+  let recommendationCount = 0;
 
   lines.forEach((line, index) => {
+    const reference = extractFalconListUnitReference(line);
+    if (!reference) return;
+    recommendationCount += 1;
+
+    let endOfUnit = index;
+    while (
+      endOfUnit + 1 < lines.length
+      && lines[endOfUnit + 1].trim() !== ""
+      && !extractFalconListUnitReference(lines[endOfUnit + 1])
+    ) {
+      endOfUnit += 1;
+    }
+
+    const unit = visibleByPlate.get(reference.plateNo);
+    if (!unit) {
+      for (let hiddenIndex = index; hiddenIndex <= endOfUnit; hiddenIndex += 1) {
+        hiddenLines.add(hiddenIndex);
+      }
+      return;
+    }
+
+    imagesBeforeLine.set(index, unit);
+    linksAfterLine.set(endOfUnit, unit);
+  });
+
+  // Detail responses use a labelled plate line instead of a recommendation
+  // heading. Preserve their existing detail link without treating them as a list.
+  lines.forEach((line, index) => {
+    if (extractFalconListUnitReference(line) || hiddenLines.has(index)) return;
     const reference = extractFalconUnitReferences(line)[0];
     const unit = reference
       ? units.find(({ plateNo }) => normalizedPlate(plateNo) === reference.plateNo)
@@ -117,15 +168,33 @@ export function formatFalconReplyHtml(reply: string, units: FalconUnitLink[] = [
     linksAfterLine.set(endOfUnit, unit);
   });
 
-  return lines.map((line, index) => {
-    const formattedLine = formatFalconLine(line);
-    const unit = linksAfterLine.get(index);
+  const formatted = lines.flatMap((line, index) => {
+    if (hiddenLines.has(index)) return [];
 
-    if (!unit) return formattedLine;
+    const formattedLine = formatFalconLine(line);
+    const imageUnit = imagesBeforeLine.get(index);
+    const unit = linksAfterLine.get(index);
+    const imageHtml = imageUnit
+      ? `<img src="${escapeHtml(imageUnit.imageSrc)}" alt="${escapeHtml(imageUnit.title)}" loading="lazy" class="mb-2 mt-1 h-32 w-full rounded-xl object-cover"/>`
+      : "";
+
+    if (!unit) return [`${imageHtml}${formattedLine}`];
 
     const href = escapeHtml(unit.href);
-    return `${formattedLine}<br/><a href="${href}" data-ai-unit-link="true" target="_blank" rel="noreferrer" class="break-all text-[11px] font-normal text-teal-deep underline">${href}</a>`;
-  }).join("<br/>");
+    return [`${imageHtml}${formattedLine}<br/><a href="${href}" data-ai-unit-link="true" target="_blank" rel="noreferrer" class="break-all text-[11px] font-normal text-teal-deep underline">${href}</a>`];
+  });
+
+  const compacted = formatted
+    .filter((line, index, allLines) => line !== "" || allLines[index - 1] !== "")
+    .join("<br/>")
+    .replace(/^(?:<br\/>)+|(?:<br\/>)+$/g, "");
+
+  if (recommendationCount > 0 && visibleUnits.length === 0) {
+    const unavailableMessage = "Belum ada unit dengan foto yang sesuai.";
+    return [compacted, unavailableMessage].filter(Boolean).join("<br/><br/>");
+  }
+
+  return compacted;
 }
 
 type FalconStreamPayload = {
@@ -173,13 +242,13 @@ function streamText(payload: FalconStreamPayload) {
 export function extractFalconUnitReferences(reply: string): FalconUnitReference[] {
   const references: FalconUnitReference[] = [];
   const seen = new Set<string>();
-  const linePattern = /^\s*(?:\d+[.)]\s*)?(?:\*{1,2})?(.+?)\s+[—-]\s+([A-Z]{1,2}\s*\d{1,4}\s*[A-Z]{0,3})(?:\*{1,2})?\s*$/gim;
-
-  for (const match of reply.matchAll(linePattern)) {
-    const plateNo = match[2].replace(/\s+/g, "").toUpperCase();
+  for (const line of reply.split("\n")) {
+    const reference = extractFalconListUnitReference(line);
+    if (!reference) continue;
+    const { plateNo } = reference;
     if (seen.has(plateNo)) continue;
     seen.add(plateNo);
-    references.push({ title: match[1].replace(/\*+/g, "").trim(), plateNo });
+    references.push(reference);
   }
 
   const detailTitle = reply.match(/^\s*(?:\*{1,2})?DETAIL UNIT\s+([A-Z]{1,2}\s*\d{1,4}\s*[A-Z]{0,3})\s+[—-]\s+(.+?)(?:\*{1,2})?\s*$/im);
@@ -246,21 +315,34 @@ export async function executeFalconTurn(
   };
 }
 
-export async function resolveFalconUnitLinks(reply: string): Promise<FalconUnitLink[]> {
+export async function resolveFalconUnitLinks(
+  reply: string,
+  dependencies: { fetch?: typeof fetchUnits } = {},
+): Promise<FalconUnitLink[]> {
   const references = extractFalconUnitReferences(reply);
+  const recommendationPlates = new Set(
+    reply.split("\n")
+      .map(extractFalconListUnitReference)
+      .filter((reference): reference is FalconUnitReference => reference !== null)
+      .map(({ plateNo }) => plateNo),
+  );
+  const fetchInventory = dependencies.fetch ?? fetchUnits;
   const resolved = await Promise.all(
-    references.map(async (reference) => {
+    references.map(async (reference): Promise<FalconUnitLink | null> => {
       try {
-        const result = await fetchUnits({ plate_no: reference.plateNo, limit: 5 });
+        const result = await fetchInventory({ plate_no: reference.plateNo, limit: 5 });
         const item = result.items.find(
           (candidate) => candidate.plate_no.replace(/\s+/g, "").toUpperCase() === reference.plateNo,
         ) ?? result.items[0];
         if (!item?.slug) return null;
+        const imageSrc = mobixImage(item.thumbnail_depan?.trim() || item.thumbnail?.trim());
+        if (!imageSrc && recommendationPlates.has(reference.plateNo)) return null;
         return {
           slug: item.slug,
           title: item.nama || reference.title,
           plateNo: item.plate_no || reference.plateNo,
           href: buildAgenMobixUnitLink(item.slug),
+          imageSrc,
         };
       } catch {
         return null;
@@ -268,7 +350,9 @@ export async function resolveFalconUnitLinks(reply: string): Promise<FalconUnitL
     }),
   );
 
-  return resolved.filter((unit): unit is FalconUnitLink => unit !== null);
+  return resolved
+    .filter((unit): unit is FalconUnitLink => unit !== null)
+    .slice(0, MAX_FALCON_RECOMMENDATIONS);
 }
 
 export async function askFalcon(message: string): Promise<FalconReply> {

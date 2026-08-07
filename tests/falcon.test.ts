@@ -3,7 +3,9 @@ import {
   buildFalconContextMessage,
   extractFalconUnitReferences,
   formatFalconReplyHtml,
+  MAX_FALCON_RECOMMENDATIONS,
   parseFalconSseFrame,
+  resolveFalconUnitLinks,
 } from "../src/lib/falcon";
 
 describe("konteks percakapan Falcon", () => {
@@ -73,12 +75,14 @@ describe("format jawaban Falcon", () => {
           title: "Toyota Calya",
           plateNo: "B2203FFE",
           href: "https://agenmobix.id/share?u=toyota-calya",
+          imageSrc: "https://mobix.test/calya.jpg",
         },
         {
           slug: "honda-mobilio",
           title: "Honda Mobilio",
           plateNo: "B 2863 KYJ",
           href: "https://agenmobix.id/share?u=honda-mobilio",
+          imageSrc: "https://mobix.test/mobilio.jpg",
         },
       ],
     );
@@ -92,13 +96,85 @@ describe("format jawaban Falcon", () => {
     expect(html.indexOf("honda-mobilio")).toBeLessThan(html.indexOf("Saya paling menyarankan"));
     expect(html.match(/<a href=/g)).toHaveLength(2);
     expect(html.match(/data-ai-unit-link="true"/g)).toHaveLength(2);
+    expect(html.match(/<img /g)).toHaveLength(2);
+    expect(html).toContain('src="https://mobix.test/calya.jpg"');
     expect(html).not.toContain("URL detail unit");
+  });
+
+  test("hanya menampilkan lima unit berfoto dan membuang blok sisanya", () => {
+    const reply = Array.from({ length: 7 }, (_, index) => (
+      `${index + 1}. *Unit ${index + 1} — B${1000 + index}XYZ*\nDetail unit ${index + 1}`
+    )).join("\n\n");
+    const units = Array.from({ length: 7 }, (_, index) => ({
+      slug: `unit-${index + 1}`,
+      title: `Unit ${index + 1}`,
+      plateNo: `B${1000 + index}XYZ`,
+      href: `https://agenmobix.id/share?u=unit-${index + 1}`,
+      imageSrc: `https://mobix.test/unit-${index + 1}.jpg`,
+    }));
+
+    const html = formatFalconReplyHtml(reply, units);
+
+    expect(html.match(/<img /g)).toHaveLength(MAX_FALCON_RECOMMENDATIONS);
+    expect(html.match(/data-ai-unit-link="true"/g)).toHaveLength(MAX_FALCON_RECOMMENDATIONS);
+    expect(html).toContain("Unit 5");
+    expect(html).not.toContain("Unit 6");
+    expect(html).not.toContain("Unit 7");
+  });
+
+  test("tidak menampilkan unit tanpa foto atau placeholder", () => {
+    const html = formatFalconReplyHtml(
+      "1. *Toyota Calya — B2203FFE*\nOtomatis, 77.166 km.",
+      [],
+    );
+
+    expect(html).not.toContain("Toyota Calya");
+    expect(html).not.toContain("<img");
+    expect(html).toBe("Belum ada unit dengan foto yang sesuai.");
   });
 
   test("tetap mengamankan HTML dari jawaban Falcon", () => {
     expect(formatFalconReplyHtml("<script>alert('xss')</script>")).toBe(
       "&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;",
     );
+  });
+});
+
+describe("resolusi inventory rekomendasi Falcon", () => {
+  test("memfilter foto kosong sebelum mengambil maksimal lima unit", async () => {
+    const reply = Array.from({ length: 7 }, (_, index) => (
+      `${index + 1}. *Unit ${index + 1} — B${2000 + index}XYZ*`
+    )).join("\n");
+    const fetch = async ({ plate_no }: { plate_no?: string }) => {
+      const unitNumber = Number(plate_no?.slice(1, 5)) - 1999;
+      const hasPhoto = unitNumber !== 2;
+      return {
+        items: [{
+          slug: `unit-${unitNumber}`,
+          nama: `Unit ${unitNumber}`,
+          plate_no: plate_no || "",
+          thumbnail_depan: hasPhoto ? `/unit-${unitNumber}.jpg` : "",
+          thumbnail: "",
+        }],
+        total: 1,
+        page: 1,
+        totalPages: 1,
+      };
+    };
+
+    const units = await resolveFalconUnitLinks(reply, {
+      fetch: fetch as Parameters<typeof resolveFalconUnitLinks>[1]["fetch"],
+    });
+
+    expect(units).toHaveLength(5);
+    expect(units.map(({ plateNo }) => plateNo)).toEqual([
+      "B2000XYZ",
+      "B2002XYZ",
+      "B2003XYZ",
+      "B2004XYZ",
+      "B2005XYZ",
+    ]);
+    expect(units.every(({ imageSrc }) => imageSrc.includes(".jpg?w=420"))).toBe(true);
   });
 });
 
