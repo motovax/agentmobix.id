@@ -3,6 +3,7 @@ import {
   applySellCarAIExtraction,
   buildLocalSellCarResult,
   normalizeStnkExpiryForQuote,
+  ownershipTypeForQuote,
   type PriceRow,
   type SellCarAIExtraction,
   type SellCarData,
@@ -17,6 +18,7 @@ const emptyForm: SellCarFormData = {
   transmission: "",
   color: "",
   mileage: "",
+  ownershipType: "",
   plate: "",
   stnk: "",
 };
@@ -68,6 +70,7 @@ describe("applySellCarAIExtraction", () => {
       transmission: "Manual",
       color: "Hitam",
       mileage: "48123",
+      ownershipType: "",
       plate: "B - DKI Jakarta",
       stnk: "2027-08",
     });
@@ -99,6 +102,7 @@ describe("buildLocalSellCarResult", () => {
       transmission: "Manual",
       color: "Biru",
       mileage: "95.000",
+      ownershipType: "Perorangan",
     }, 2026);
 
     expect(result?.basePrice).toBe(100_000_000);
@@ -137,6 +141,36 @@ describe("buildLocalSellCarResult", () => {
       variant: "E",
       year: "2022",
     }, 2026)).toBeNull();
+  });
+});
+
+describe("ownershipTypeForQuote", () => {
+  test("maps the three UI ownership labels to API values", () => {
+    expect(ownershipTypeForQuote("Perorangan")).toBe("perorangan");
+    expect(ownershipTypeForQuote("Perusahaan")).toBe("perusahaan");
+    expect(ownershipTypeForQuote("Perusahaan (Rental)")).toBe("perusahaan_rental");
+  });
+
+  test("applies company and rental deductions in the local result", () => {
+    const company = buildLocalSellCarResult(localData, {
+      ...emptyForm,
+      brand: "TOYOTA",
+      model: "AVANZA",
+      variant: "1.3 E MT",
+      year: "2022",
+      ownershipType: "Perusahaan",
+    }, 2026);
+    const rental = buildLocalSellCarResult(localData, {
+      ...emptyForm,
+      brand: "TOYOTA",
+      model: "AVANZA",
+      variant: "1.3 E MT",
+      year: "2022",
+      ownershipType: "Perusahaan (Rental)",
+    }, 2026);
+
+    expect(company?.recommendedPrice).toBe(95_000_000);
+    expect(rental?.recommendedPrice).toBe(90_000_000);
   });
 });
 

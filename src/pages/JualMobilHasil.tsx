@@ -100,12 +100,10 @@ export function JualMobilHasil() {
             <Detail label="Tahun Keluaran" value={result.year} />
             <Detail label="Transmisi" value={result.transmission} />
             <Detail label="Jarak Tempuh" value={result.mileage ? `${Number(result.mileage).toLocaleString("id-ID")} km` : "-"} />
+            <Detail label="Atas Nama" value={result.ownershipType} />
             <Detail label="Warna" value={result.color} />
             <Detail label="Masa Berlaku STNK" value={formatStnk(result.stnk)} />
             <Detail label="Plat" value={result.plate} />
-            {typeof result.annualTax === "number" && result.annualTax > 0 ? (
-              <Detail label="Estimasi Pajak / Tahun" value={formatRupiah(result.annualTax)} />
-            ) : null}
             {typeof result.taxYearsDead === "number" && result.taxYearsDead > 0 ? (
               <Detail label="Pajak Mati" value={`${result.taxYearsDead} tahun`} />
             ) : null}

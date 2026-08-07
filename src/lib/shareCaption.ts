@@ -11,8 +11,18 @@ export interface RequiredCaptionSection {
 export function buildAgenMobixUnitLink(slug?: string | null) {
   const normalizedSlug = slug?.trim();
   return normalizedSlug
-    ? `https://agenmobix.id/unit/${encodeURIComponent(normalizedSlug)}`
+    ? `https://agenmobix.id/share?u=${encodeURIComponent(normalizedSlug)}`
     : "https://agenmobix.id";
+}
+
+/**
+ * WhatsApp click-to-chat tidak dapat menerima attachment dari query string.
+ * Menyertakan URL foto di teks tetap memungkinkan WhatsApp membuat link preview.
+ */
+export function buildWhatsAppShareText(caption: string, imageUrls: string[] = []) {
+  const urls = [...new Set(imageUrls.map((url) => url.trim()).filter(Boolean))];
+  if (urls.length === 0) return caption.trim();
+  return [caption.trim(), "Foto unit:", ...urls].filter(Boolean).join("\n\n");
 }
 
 function normalizeCaptionValue(value: string) {

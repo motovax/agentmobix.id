@@ -4,7 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { BottomNav } from "../components/BottomNav";
 import { FloatingContactCta } from "../components/FloatingContactCta";
 import { UnitRow } from "../components/UnitRow";
-import { Search } from "../components/icons";
+import { Chat, Search } from "../components/icons";
 import { Photo, Skeleton, SkeletonRow } from "../components/ui";
 import {
   fetchUnits,
@@ -59,7 +59,7 @@ function RecCard({ unit }: { unit: CardUnit }) {
   const salesContactRequired = requiresSalesContact(unit.pembiayaan);
   return (
     <Link
-      href={`/unit/${unit.slug}`}
+      href={`/share?u=${encodeURIComponent(unit.slug)}`}
       className="block overflow-hidden rounded-[18px] border border-line bg-surface text-inherit no-underline"
     >
       <Photo
@@ -341,7 +341,7 @@ export function Beranda() {
                 recItems.slice(0, 5).map((unit) => (
                   <Link
                     key={unit.id}
-                    href={`/unit/${unit.slug}`}
+                    href={`/share?u=${encodeURIComponent(unit.slug)}`}
                     className="flex items-center gap-2.5 border-b border-line px-3 py-2.5 text-inherit no-underline last:border-b-0"
                   >
                     <Photo
@@ -404,6 +404,13 @@ export function Beranda() {
               </Link>
             ))}
           </div>
+          <Link
+            href="/ai"
+            className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-teal/30 bg-teal px-4 py-2.5 text-[12px] font-extrabold text-ink no-underline"
+          >
+            <Chat size={16} strokeWidth={1.8} />
+            Bantuan AI <span aria-hidden="true">→</span>
+          </Link>
         </header>
 
         {/* CARI PER MEREK */}

@@ -63,12 +63,16 @@ describe("klasifikasi pencarian katalog", () => {
     const detailHref = buildUnitDetailHref("toyota-avanza", catalogHref);
 
     expect(detailHref).toBe(
-      "/unit/toyota-avanza?kembali=%2Fkatalog%3Fq%3DToyota%26kategori%3DMPV",
+      "/share?u=toyota-avanza&kembali=%2Fkatalog%3Fq%3DToyota%26kategori%3DMPV",
     );
     expect(getCatalogReturnHref(detailHref.split("?")[1])).toBe(catalogHref);
   });
 
-  test("menolak URL kembali yang bukan katalog internal", () => {
+  test("mengembalikan detail ke Bantuan AI jika entry point berasal dari AI", () => {
+    expect(getCatalogReturnHref("u=toyota-avanza&kembali=%2Fai")).toBe("/ai");
+  });
+
+  test("menolak URL kembali yang bukan entry point internal yang diizinkan", () => {
     expect(getCatalogReturnHref("kembali=https%3A%2F%2Fexample.com")).toBe(
       "/katalog",
     );

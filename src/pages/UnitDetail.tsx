@@ -50,6 +50,7 @@ import {
   getCatalogReturnHref,
 } from "../lib/catalogSearch";
 import { buildJasmineWhatsAppHref } from "../lib/jasmine";
+import { ShareSheet } from "./ShareSheet";
 
 const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
 const MIN_DP_PERCENT = 15;
@@ -126,9 +127,11 @@ function maskBpkbValue(value: string) {
   return maskPersonName(value);
 }
 
-export function UnitDetail() {
-  const { slug } = useParams<{ slug: string }>();
-  const returnHref = getCatalogReturnHref(useSearch());
+export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
+  const { slug: routeSlug } = useParams<{ slug?: string }>();
+  const slug = unitSlug ?? routeSlug ?? "";
+  const search = useSearch();
+  const returnHref = getCatalogReturnHref(search);
   const { data: unit, loading, error } = useAsync(
     () => fetchUnitDetail(slug),
     [slug],
@@ -141,6 +144,9 @@ export function UnitDetail() {
   const [activeThumb, setActiveThumb] = useState(0);
   const [showAllThumbs, setShowAllThumbs] = useState(false);
   const [lightbox, setLightbox] = useState(false);
+  const [simulationOpen, setSimulationOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [dpPercentInput, setDpPercentInput] = useState(String(MIN_DP_PERCENT));
   const [dpAmountInput, setDpAmountInput] = useState("");
   const [tdpAmount, setTdpAmount] = useState(0);
@@ -269,8 +275,8 @@ export function UnitDetail() {
     creditPriceForDisplay !== null;
   const currencyFormatter = new Intl.NumberFormat("id-ID");
   const shareTenor = simTab === "dpminim" ? dpMinimInstallmentCount(tenor) : tenor;
-  const shareHref = canShareSimulation
-    ? `/share?${new URLSearchParams({
+  const shareParams = canShareSimulation
+    ? new URLSearchParams({
         u: unit?.slug ?? slug ?? "",
         sim: simTab,
         harga: String(Math.round(price)),
@@ -283,16 +289,17 @@ export function UnitDetail() {
           : {}),
         cicilan: String(Math.round(displayMonthly)),
         tdp: String(Math.round(shareTdp)),
-      }).toString()}`
+        })
     : salesContactRequired && unit
-      ? `/share?${new URLSearchParams({
+      ? new URLSearchParams({
           u: unit.slug,
           harga: String(Math.round(price)),
           komisi: String(Math.round(estimatedCommission)),
-        }).toString()}`
+        })
       : null;
+  const shareHref = shareParams ? `/share?${shareParams.toString()}` : null;
   const unitAdminMessage = unit
-    ? `Halo AI Mobix! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
+    ? `Halo AI Mobix Assistant! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
     : undefined;
   const unitCalculationMessage = unit
     ? salesContactRequired
@@ -742,6 +749,8 @@ export function UnitDetail() {
     setActiveThumb(0);
     setShowAllThumbs(false);
     setLightbox(false);
+    setSimulationOpen(false);
+    setDetailsOpen(false);
     setSimTab("reguler");
     setSimulationMethod("DP");
     setDpPercent(minDsfDpPercent);
@@ -921,13 +930,14 @@ export function UnitDetail() {
             <ChevronLeft />
           </Link>
           {shareHref ? (
-            <Link
-              href={shareHref}
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
               aria-label="Share"
-              className="absolute right-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
+              className="absolute right-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink backdrop-blur"
             >
               <ShareArrow size={17} />
-            </Link>
+            </button>
           ) : (
             <button
               type="button"
@@ -938,9 +948,14 @@ export function UnitDetail() {
               <ShareArrow size={17} />
             </button>
           )}
-          <span className="absolute bottom-3.5 left-3.5 rounded-lg bg-teal px-2.5 py-1 text-[16px] font-bold text-ink">
-            {badge ?? "Stok aktif"} · {unit.plate_no}
-          </span>
+          <div className="absolute bottom-3.5 left-3.5 rounded-xl bg-ink/85 px-3 py-2 text-surface shadow-sm backdrop-blur">
+            <div className="text-[16px] font-extrabold leading-none">
+              {price ? formatRupiah(price) : "Hubungi kami"}
+            </div>
+            <div className="mt-1 text-[10px] font-semibold text-white/75">
+              {displayTdp ? `TDP ${formatRupiah(displayTdp)}` : badge ?? "Stok aktif"}
+            </div>
+          </div>
           {mediaItems.length > 0 && (
             <div className="absolute bottom-3.5 right-3.5 rounded-lg bg-ink/80 px-2.5 py-[3px] text-[11px] font-semibold text-surface">
               {activeThumb + 1} / {mediaItems.length}
@@ -1060,8 +1075,8 @@ export function UnitDetail() {
         {/* TITLE BLOCK */}
         <div className="px-[18px] pt-1">
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-            <span className="rounded-md bg-field px-1.5 py-0.5 text-[11px] font-medium text-muted">
-              🏢 Cabang: {titleCase(unit.lokasi || "Mobix")}
+              <span className="rounded-md bg-field px-1.5 py-0.5 text-[11px] font-medium text-muted">
+              Cabang: {titleCase(unit.lokasi || "Mobix")}
             </span>
             {unit.posisi && titleCase(unit.posisi) !== titleCase(unit.lokasi || "") && (
               <span className="rounded-md bg-field px-1.5 py-0.5 text-[11px] font-medium text-muted">
@@ -1075,7 +1090,7 @@ export function UnitDetail() {
           <h1 className="m-0 mt-0.5 -tracking-[0.01em] text-[22px] font-extrabold leading-[1.2]">
             {unit.nama}
           </h1>
-          <div className="mt-2.5 flex items-center justify-between">
+            <div className="mt-2.5 flex items-center justify-between">
             <div>
               <div className="-tracking-[0.02em] text-[24px] font-extrabold">
                 {price ? formatRupiah(price) : "Hubungi kami"}
@@ -1123,6 +1138,21 @@ export function UnitDetail() {
           </div>
           {originalPrice > 0 && (
             <div className="mt-3 rounded-[14px] border border-line bg-surface px-3.5 py-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-[15px] font-extrabold text-ink">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-tint text-[17px]">✎</span>
+                  Pengaturan harga
+                </div>
+                {price !== originalPrice && (
+                  <button
+                    type="button"
+                    onClick={() => commitBuilderPrice(originalPrice)}
+                    className="text-[12px] font-bold text-teal-deep"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
               <div className="mb-1.5 flex items-center justify-between gap-2">
                 <label
                   htmlFor="builder-price"
@@ -1130,15 +1160,6 @@ export function UnitDetail() {
                 >
                   Harga jual builder
                 </label>
-                {price !== originalPrice && (
-                  <button
-                    type="button"
-                    onClick={() => commitBuilderPrice(originalPrice)}
-                    className="text-[11px] font-semibold text-muted underline"
-                  >
-                    Reset
-                  </button>
-                )}
               </div>
               <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2.5">
                 <span className="shrink-0 text-[13px] font-semibold text-muted">Rp</span>
@@ -1158,26 +1179,49 @@ export function UnitDetail() {
                 <span>Minimum {formatRupiah(minimumBuilderPrice)}</span>
                 <span>Turun maks. {formatRupiah(MAX_BUILDER_PRICE_DROP)}</span>
               </div>
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-teal-tint px-3 py-2.5">
+                <div className="flex min-w-0 items-center gap-2 text-[12px] font-bold text-ink">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-teal-deep" />
+                  <span>Estimasi komisi kamu</span>
+                </div>
+                <span className="shrink-0 text-[16px] font-extrabold text-teal-deep">
+                  {formatRupiah(estimatedCommission)}
+                </span>
+              </div>
+              <p className="m-0 mt-2 text-[10px] leading-[1.45] text-muted">
+                Naikkan harga jual untuk menambah estimasi komisi.
+              </p>
             </div>
           )}
         </div>
 
-        {/* SPEC GRID */}
-        <div className="px-[18px] py-4">
-          <div className="grid grid-cols-3 gap-2">
-            {topSpecs.map((s) => (
-              <div key={s.label} className="rounded-xl bg-field p-3 text-center">
-                <div className="text-[11px] text-muted">{s.label}</div>
-                <div className="mt-0.5 truncate text-[13px] font-bold">{s.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* CALCULATOR */}
-        {salesContactRequired ? (
-          <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4">
-            <div className="rounded-[18px] border border-[#E8C98B] bg-[#FFF8E8] p-4">
+        <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4 pt-3">
+          <button
+            type="button"
+            aria-expanded={simulationOpen}
+            onClick={() => setSimulationOpen((open) => !open)}
+            className={`flex w-full items-center gap-3 border border-line bg-surface px-4 py-3 text-left ${simulationOpen ? "rounded-t-[18px] border-b-0" : "rounded-[18px]"}`}
+          >
+            <span className="flex-1">
+              <span className="flex items-center gap-2 text-[15px] font-extrabold text-ink">
+                Simulasi kredit
+                <span className="rounded-[7px] bg-teal-tint px-2 py-[3px] text-[11px] font-bold text-teal-deep">
+                  {canShareSimulation ? "Bisa di-share" : "Menunggu DSF"}
+                </span>
+              </span>
+              <span className="mt-1 block truncate text-[12px] font-semibold text-muted">
+                {salesContactRequired
+                  ? "Tanya sales untuk opsi pembiayaan"
+                  : `Reguler · DP ${Math.round(displayDpPercent)}% · ${tenor} bln · Cicilan ${displayMonthly ? formatRupiah(displayMonthly) : "Menghitung..."}/bln`}
+              </span>
+            </span>
+            <span className={`text-[22px] leading-none text-muted transition-transform ${simulationOpen ? "rotate-90" : ""}`}>›</span>
+          </button>
+
+          {simulationOpen && (salesContactRequired ? (
+          <div>
+            <div className="rounded-b-[18px] border border-t-0 border-[#E8C98B] bg-[#FFF8E8] p-4">
               <div className="inline-flex rounded-full bg-[#F7DFAC] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#7A4700]">
                 Tidak eligible DSF
               </div>
@@ -1208,8 +1252,8 @@ export function UnitDetail() {
             </div>
           </div>
         ) : (
-        <div id="simulasi-kredit" className="scroll-mt-4 px-[18px] pb-4">
-          <div className="rounded-[18px] border border-line bg-surface p-4">
+          <div>
+            <div className="rounded-b-[18px] border border-t-0 border-line bg-surface p-4">
             <div className="mb-3.5 flex items-center justify-between">
               <div className="-tracking-[0.01em] text-[15px] font-extrabold">
                 Simulasi Hitung Kredit
@@ -1648,7 +1692,34 @@ export function UnitDetail() {
             </p>
           </div>
         </div>
-        )}
+        ))}
+        </div>
+
+        {/* DETAIL ACCORDION — selalu berada di bawah simulasi */}
+        <div className="mx-[18px] mb-4 mt-1 overflow-hidden rounded-[18px] border border-line bg-surface">
+          <button
+            type="button"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((open) => !open)}
+            className="flex min-h-[76px] w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+          >
+            <span className="flex-1 text-[15px] font-extrabold text-ink">Cek detail unit lengkapnya</span>
+            <span className={`text-[24px] leading-none text-muted transition-transform ${detailsOpen ? "rotate-90" : ""}`}>›</span>
+          </button>
+
+        {detailsOpen && (
+        <>
+        {/* SPEC GRID */}
+        <div className="px-3.5 py-4">
+          <div className="grid grid-cols-3 gap-2">
+            {topSpecs.map((s) => (
+              <div key={s.label} className="rounded-xl bg-field p-3 text-center">
+                <div className="text-[11px] text-muted">{s.label}</div>
+                <div className="mt-0.5 truncate text-[13px] font-bold">{s.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* KELENGKAPAN DOKUMEN */}
         {docs.length > 0 && (
@@ -1714,19 +1785,24 @@ export function UnitDetail() {
           </div>
         )}
 
+        </>
+        )}
+        </div>
+
         <div className="h-[104px]" />
       </main>
 
       {/* STICKY ACTIONS */}
       <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-40 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
         {shareHref ? (
-          <Link
-            href={shareHref}
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
             className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl bg-ink px-3 text-[13px] font-bold text-surface no-underline"
           >
-            <span className="truncate">Share ke klien</span>
+            <span className="truncate">Share ke social media</span>
             <ShareArrow size={14} />
-          </Link>
+          </button>
         ) : (
           <button
             type="button"
@@ -1748,6 +1824,19 @@ export function UnitDetail() {
           buttonClassName="flex h-12 w-full items-center justify-center rounded-2xl border border-teal-tint-border bg-teal text-ink"
         />
       </div>
+      {shareOpen && shareParams && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-surface-2" role="dialog" aria-modal="true" aria-label="Bagikan unit">
+          <div className="mx-auto min-h-full w-full sm:max-w-[412px]">
+            <ShareSheet
+              embedded
+              unitData={unit}
+              unitSlug={unit.slug}
+              params={`?${shareParams.toString()}`}
+              onClose={() => setShareOpen(false)}
+            />
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

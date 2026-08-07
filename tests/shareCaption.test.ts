@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildAgenMobixUnitLink,
+  buildWhatsAppShareText,
   ensureRequiredCaptionFacts,
   formatCaptionReadability,
   removeCaptionParagraphsContaining,
@@ -27,18 +28,38 @@ const sections = [
 describe("buildAgenMobixUnitLink", () => {
   test("builds an absolute HTTPS unit link", () => {
     expect(buildAgenMobixUnitLink("toyota-calya-2019")).toBe(
-      "https://agenmobix.id/unit/toyota-calya-2019",
+      "https://agenmobix.id/share?u=toyota-calya-2019",
     );
   });
 
   test("trims and safely encodes the unit identifier", () => {
     expect(buildAgenMobixUnitLink(" toyota calya 2019 ")).toBe(
-      "https://agenmobix.id/unit/toyota%20calya%202019",
+      "https://agenmobix.id/share?u=toyota%20calya%202019",
     );
   });
 
   test("falls back to the absolute AgenMobix homepage", () => {
     expect(buildAgenMobixUnitLink()).toBe("https://agenmobix.id");
+  });
+});
+
+describe("buildWhatsAppShareText", () => {
+  test("appends selected photo URLs for WhatsApp link previews", () => {
+    expect(buildWhatsAppShareText("Toyota Calya siap dipinang", [
+      "https://mobix.motovax.com/photo-1.jpg?w=2560",
+    ])).toBe([
+      "Toyota Calya siap dipinang",
+      "Foto unit:",
+      "https://mobix.motovax.com/photo-1.jpg?w=2560",
+    ].join("\n\n"));
+  });
+
+  test("removes duplicate and empty photo URLs", () => {
+    expect(buildWhatsAppShareText("Caption", ["", " https://example.com/a.jpg ", "https://example.com/a.jpg"])).toBe([
+      "Caption",
+      "Foto unit:",
+      "https://example.com/a.jpg",
+    ].join("\n\n"));
   });
 });
 

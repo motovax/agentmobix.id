@@ -1,20 +1,21 @@
-import { useState, useEffect, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
-import { FloatingPicAgentCta } from "../components/FloatingPicAgentCta";
+import { ContactActionMenu } from "../components/FloatingContactCta";
+import {
+  CreditSimulationBox,
+  type CreditSimulationResult,
+} from "../components/CreditSimulationBox";
 import { Photo, Skeleton } from "../components/ui";
+import { UnitRow } from "../components/UnitRow";
 import {
   ChevronLeft,
   ShareArrow,
-  Copy,
   Download,
-  WhatsAppSolid,
-  Telegram,
-  XTwitter,
   Check,
+  Close,
   Sparkles,
   Play,
-  Info,
 } from "../components/icons";
 import {
   fetchUnitDetail,
@@ -28,7 +29,9 @@ import {
   generateAIBackground,
   fetchAIBackgroundStatus,
   prettyTransmisi,
+  requiresSalesContact,
   titleCase,
+  toCardUnit,
   type GalleryItem,
   type ProductDetail,
   type VideoItem,
@@ -36,7 +39,13 @@ import {
 } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
 import { formatJt, formatOdometer, formatRupiah } from "../lib/format";
-import { estimateBuilderCommission } from "../lib/commission";
+import {
+  clampBuilderPrice,
+  estimateBuilderCommission,
+  minBuilderPrice,
+} from "../lib/commission";
+import { buildJasmineWhatsAppHref } from "../lib/jasmine";
+import { getCatalogReturnHref } from "../lib/catalogSearch";
 import {
   buildAgenMobixUnitLink,
   ensureRequiredCaptionFacts,
@@ -54,6 +63,26 @@ import {
   type ShareChannel,
 } from "../lib/shareActions";
 
+const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
+
+function maskBpkbName(value: string) {
+  if (!value || /^(tidak|belum)\b/i.test(value.trim())) return value;
+  const lower = value.toLowerCase();
+  if (/\b(pt|cv|coop|koperasi|persero|perseroan|limited|ltd|gmo|group|badan hukum|pt\.)\b/.test(lower) || /\bunlimited\b/.test(lower)) {
+    return "BPKB Perusahaan";
+  }
+  if (/\b(perorangan|pribadi|individu|nama pemilik|atas nama)\b/.test(lower)) {
+    return "BPKB Perorangan";
+  }
+  return value.trim().split(/\s+/).map((word) => {
+    const match = word.match(/^([^A-Za-zÀ-ÖØ-öø-ÿ']*)([A-Za-zÀ-ÖØ-öø-ÿ']+)([^A-Za-zÀ-ÖØ-öø-ÿ']*)$/u);
+    if (!match) return word;
+    const [, prefix, core, suffix] = match;
+    if (UNMASKED_BPKB_WORDS.has(core.toLowerCase()) || core.length <= 2) return word;
+    return `${prefix}${core[0]}${"*".repeat(core.length - 2)}${core[core.length - 1]}${suffix}`;
+  }).join(" ");
+}
+
 /* ---- business logic ---- */
 
 type ShareMedia =
@@ -67,6 +96,19 @@ type PendingShareStep = {
 };
 
 type AiBackgroundStatus = "idle" | "generating" | "done" | "failed";
+
+export type ShareSheetHandle = {
+  share: () => void;
+};
+
+type ShareSheetProps = {
+  embedded?: boolean;
+  controllerOnly?: boolean;
+  unitData?: ProductDetail;
+  unitSlug?: string;
+  params?: string;
+  onClose?: () => void;
+};
 
 /* ---- canvas overlay composition ---- */
 
@@ -421,40 +463,50 @@ const CAPTION_STYLE_HINTS = [
   "Energetic social caption, concise, persuasive, and not exaggerated.",
 ];
 
-export function ShareSheet() {
+export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function ShareSheet(
+  { embedded = false, controllerOnly = false, unitData, unitSlug, params, onClose },
+  ref,
+) {
   const search = useSearch();
-  const searchParams = new URLSearchParams(search);
-  const slug = searchParams.get("u") ?? "";
-  const { data: unit, loading } = useAsync(() => fetchUnitDetail(slug), [slug]);
+  const searchParams = new URLSearchParams(params ?? search);
+  const slug = unitSlug ?? searchParams.get("u") ?? "";
+  const { data: fetchedUnit, loading: unitLoading } = useAsync(
+    () => unitData ? Promise.resolve(unitData) : fetchUnitDetail(slug),
+    [slug, unitData?.id],
+  );
+  const unit = unitData ?? fetchedUnit;
+  const loading = !unitData && unitLoading;
 
-  const [copied, setCopied] = useState<"" | "caption" | "link">("");
   const [captionText, setCaptionText] = useState("");
   const [captionSuggesting, setCaptionSuggesting] = useState(false);
-  const [showChannels, setShowChannels] = useState(false);
-  const [shareCaptionCopied, setShareCaptionCopied] = useState(false);
   const [pendingShareStep, setPendingShareStep] = useState<PendingShareStep | null>(null);
 
   // multi-select share media
-  const [selectedIdxes, setSelectedIdxes] = useState<number[]>([0]);
+  const [selectedIdxes, setSelectedIdxes] = useState<number[]>([]);
   const [previewIdx, setPreviewIdx] = useState(0);
 
   // canvas-composed files without price/TDP overlay — for download
   const [composedFiles, setComposedFiles] = useState<File[]>([]);
   const [composing, setComposing] = useState(false);
 
-  // canvas-composed files without overlay — for social media share
-  const [shareFiles, setShareFiles] = useState<File[]>([]);
-  const [shareComposing, setShareComposing] = useState(false);
-  const [shareFilesSignature, setShareFilesSignature] = useState("");
   const [aiBackgroundStatus, setAiBackgroundStatus] = useState<AiBackgroundStatus>("idle");
-  const [aiBackgroundProgress, setAiBackgroundProgress] = useState(0);
+  const [, setAiBackgroundProgress] = useState(0);
   const [aiBackgroundFiles, setAiBackgroundFiles] = useState<Record<string, File>>({});
   const [aiBackgroundUrls, setAiBackgroundUrls] = useState<Record<string, string>>({});
   const [aiPreviewMode, setAiPreviewMode] = useState<"ai" | "original">("ai");
-  const [aiBackgroundError, setAiBackgroundError] = useState("");
+  const [, setAiBackgroundError] = useState("");
+  const [liveSimulation, setLiveSimulation] = useState<CreditSimulationResult | null>(null);
+  const [appliedSimulation, setAppliedSimulation] = useState<CreditSimulationResult | null>(null);
+  const [appliedPrice, setAppliedPrice] = useState(0);
+  const [priceInput, setPriceInput] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const blobCache = useRef<Map<string, Blob>>(new Map());
   const captionSuggestionIndex = useRef(0);
+  const forceCaptionUpdateRef = useRef(false);
+  const handleSimulationChange = useCallback((result: CreditSimulationResult) => {
+    setLiveSimulation(result);
+  }, []);
 
   const gallery = unit?.galeri ?? [];
   const videos = unit?.video ?? [];
@@ -498,21 +550,48 @@ export function ShareSheet() {
     ? pendingShareStep.label
     : isMixedMediaSelected
       ? "Share bertahap: video dulu"
-      : "Bagikan Sekarang";
+      : "Share ke social media";
   const financingEligible = unit?.pembiayaan.eligible === true;
-  const requestedDpMinimShare = searchParams.get("sim") === "dpminim";
-  const shareTenor = positiveParamNumber(searchParams, "tenor") ?? 60;
-  const shareTdp = positiveParamNumber(searchParams, "tdp") ?? unit?.tdp ?? 0;
-  const shareCicilan = positiveParamNumber(searchParams, "cicilan") ?? unit?.cicilan ?? 0;
-  const shareDp = positiveParamNumber(searchParams, "dp") ?? null;
-  const shareDpPercent = positiveParamNumber(searchParams, "dp_pct") ?? null;
+  const salesContactRequired = requiresSalesContact(unit?.pembiayaan);
+  const requestedDpMinimShare =
+    appliedSimulation?.simTab === "dpminim" ||
+    (!appliedSimulation && searchParams.get("sim") === "dpminim");
+  const shareTenor =
+    appliedSimulation?.tenor ??
+    positiveParamNumber(searchParams, "tenor") ??
+    60;
+  const shareTdp =
+    appliedSimulation?.tdp ??
+    positiveParamNumber(searchParams, "tdp") ??
+    unit?.tdp ??
+    0;
+  const shareCicilan =
+    appliedSimulation?.cicilan ??
+    positiveParamNumber(searchParams, "cicilan") ??
+    unit?.cicilan ??
+    0;
+  const shareDp =
+    appliedSimulation?.dp ??
+    positiveParamNumber(searchParams, "dp") ??
+    null;
+  const shareDpPercent =
+    appliedSimulation?.dpPercent ??
+    positiveParamNumber(searchParams, "dp_pct") ??
+    null;
   const shareHasFinancing = financingEligible && shareTdp > 0 && shareCicilan > 0;
   const isDpMinimShare = requestedDpMinimShare && shareHasFinancing;
-  const shareCreditPrice = financingEligible
-    ? positiveParamNumber(searchParams, "harga_kredit") ?? unit?.harga_kredit ?? null
-    : null;
-  const sharePrice = positiveParamNumber(searchParams, "harga") ?? unit?.harga ?? 0;
-  const captionPrice = shareCreditPrice ?? sharePrice ?? unit?.harga ?? 0;
+  const initialSharePrice = positiveParamNumber(searchParams, "harga") ?? unit?.harga ?? 0;
+  const sharePrice = appliedPrice || initialSharePrice;
+  const unitAdminMessage = unit
+    ? `Halo AI Mobix Assistant! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(sharePrice || unit.harga)}. Bisa bantu info lebih lanjut? 🙏`
+    : "";
+  const unitCalculationMessage = unit
+    ? salesContactRequired
+      ? `Halo Jasmine, saya mau menanyakan opsi pembiayaan lain untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(sharePrice || unit.harga)}. Pembiayaan DSF tidak tersedia untuk unit ini.`
+      : `Halo Admin, saya mau minta hitungan leasing untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(sharePrice || unit.harga)}.\n1. DP minim\n2. Cicilan ringan\n3. Cair All in`
+    : "";
+  const jasmineCalculationHref = buildJasmineWhatsAppHref(unitCalculationMessage);
+  const captionPrice = appliedSimulation?.hargaKredit ?? sharePrice ?? unit?.harga ?? 0;
   const shouldHidePriceInCaption = isDpMinimShare;
   const packageTitle = shareHasFinancing ? (isDpMinimShare ? "DP Minim" : "Kredit") : "Unit";
   const paymentLabel = "TDP";
@@ -612,19 +691,63 @@ export function ShareSheet() {
     );
   }
 
-  // init when unit loads
+  const lastAutoCaptionRef = useRef("");
+
+  // init when unit loads (jangan reset caption tiap simulasi berubah)
   useEffect(() => {
     if (!unit) return;
-    setSelectedIdxes([0]);
+    const allPhotoIndexes = unit.galeri.map((_, index) => index);
+    setSelectedIdxes(
+      allPhotoIndexes.length > 0 ? allPhotoIndexes : (unit.video?.length ? [0] : []),
+    );
     setPreviewIdx(0);
     setCaptionText(autoCaption);
+    lastAutoCaptionRef.current = autoCaption;
     setPendingShareStep(null);
+    setLiveSimulation(null);
+    setAppliedSimulation(null);
+    setAppliedPrice(initialSharePrice);
+    setPriceInput(new Intl.NumberFormat("id-ID").format(initialSharePrice));
     setAiBackgroundStatus("idle");
     setAiBackgroundProgress(0);
     setAiPreviewMode("ai");
     setAiBackgroundError("");
     replaceAiBackgroundFiles([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hanya re-init saat unit berganti
+  }, [unit?.id]);
+
+  // sinkronkan caption otomatis saat hasil simulasi live siap (jika user belum edit)
+  useEffect(() => {
+    if (!unit || !autoCaption) return;
+    setCaptionText((current) => {
+      if (forceCaptionUpdateRef.current) {
+        forceCaptionUpdateRef.current = false;
+        lastAutoCaptionRef.current = autoCaption;
+        return autoCaption;
+      }
+      if (!current || current === lastAutoCaptionRef.current) {
+        lastAutoCaptionRef.current = autoCaption;
+        return autoCaption;
+      }
+      return current;
+    });
   }, [unit?.id, autoCaption]);
+
+  function applyBuilderPrice() {
+    if (!unit) return;
+    const rawPrice = Number(priceInput.replace(/\D/g, ""));
+    const nextPrice = clampBuilderPrice(rawPrice || unit.harga, unit.harga);
+    forceCaptionUpdateRef.current = nextPrice !== sharePrice;
+    setAppliedPrice(nextPrice);
+    setAppliedSimulation(null);
+    setPriceInput(new Intl.NumberFormat("id-ID").format(nextPrice));
+  }
+
+  function applyCreditSimulation() {
+    if (!liveSimulation?.canShare) return;
+    forceCaptionUpdateRef.current = JSON.stringify(liveSimulation) !== JSON.stringify(appliedSimulation);
+    setAppliedSimulation(liveSimulation);
+  }
 
   // fetch raw blobs (cached) + compose download files whenever selection changes
   useEffect(() => {
@@ -670,42 +793,6 @@ export function ShareSheet() {
     aiPreviewMode,
     Object.keys(aiBackgroundFiles).join(","),
   ]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function prepareShareFiles() {
-    if (!unit || !mediaItems.length) return [];
-
-    const selectedMedia = selectedIdxes
-      .map((i) => mediaItems[i])
-      .filter(Boolean);
-    const selectedImages = selectedMedia
-      .filter((media): media is Extract<ShareMedia, { kind: "image" }> => media.kind === "image");
-    const selectedVideos = selectedMedia
-      .filter((media): media is Extract<ShareMedia, { kind: "video" }> => media.kind === "video")
-      .map((media) => media.item);
-    const signature = `${selectedIdxes.join(",")}:${sharePrice}:${shareTdp}:${aiBackgroundStatus}:${aiPreviewMode}:${Object.keys(aiBackgroundFiles).sort().join(",")}`;
-
-    if (shareFiles.length > 0 && shareFilesSignature === signature) {
-      return shareFiles;
-    }
-
-    setShareComposing(true);
-
-    try {
-      const imageFiles = selectedImages.length
-        ? await buildImageFilesForShare(selectedImages)
-        : [];
-      const videoFiles = selectedVideos.length
-        ? await buildShareVideos(selectedVideos, blobCache.current)
-        : [];
-      const files = [...imageFiles, ...videoFiles];
-
-      setShareFiles(files);
-      setShareFilesSignature(signature);
-      return files;
-    } finally {
-      setShareComposing(false);
-    }
-  }
 
   function handleGalleryTap(i: number) {
     setPendingShareStep(null);
@@ -841,7 +928,7 @@ export function ShareSheet() {
     }
   }
 
-  async function sharePreparedFiles(
+  function sharePreparedFiles(
     files: File[],
     title: string,
     caption: string,
@@ -871,8 +958,18 @@ export function ShareSheet() {
       void copyShareCaption(caption, true);
     }
 
-    await navigator.share(payload);
-    return true;
+  /** Hanya Web Share API — tanpa fallback clipboard/download/wa.me. */
+  function shareWithoutFiles(title: string, caption: string): Promise<void> | null {
+    if (!navigator.share) return null;
+    return navigator.share({
+      title,
+      text: caption,
+      ...(link ? { url: link } : {}),
+    });
+  }
+
+  function isShareAbort(error: unknown) {
+    return error instanceof DOMException && error.name === "AbortError";
   }
 
   async function handleCaptionAiHelp() {
@@ -1075,10 +1172,16 @@ export function ShareSheet() {
   }
 
   function handleShare() {
-    const share = async () => {
-      const caption = captionText.trim();
-      const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
+    const caption = captionText.trim();
+    const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
+    const filesToShare = pendingShareStep?.files ?? composedFiles;
+    const imageFiles = filesToShare.filter((file) => file.type.startsWith("image/"));
+    const videoFiles = filesToShare.filter((file) => file.type.startsWith("video/"));
+    const hasMixedMediaFiles = imageFiles.length > 0 && videoFiles.length > 0;
+    const filesForCurrentStep = hasMixedMediaFiles ? videoFiles : filesToShare;
+    const captionForCurrentStep = pendingShareStep?.includeCaption === false ? "" : caption;
 
+    const markShareStepDone = () => {
       if (pendingShareStep) {
         const shared = await sharePreparedFiles(
           pendingShareStep.files,
@@ -1148,21 +1251,27 @@ export function ShareSheet() {
     setShowChannels(false);
   }
 
-  function handleDownload() {
-    composedFiles.forEach((f, i) => {
+  function downloadFiles(files: File[]) {
+    files.forEach((f, i) => {
       const url = URL.createObjectURL(f);
       const a = document.createElement("a");
       a.href = url;
       const ext = f.type.startsWith("video/")
         ? f.name.split(".").pop() || "mp4"
         : "jpg";
-      a.download = composedFiles.length > 1 ? `unit-${i + 1}.${ext}` : `unit.${ext}`;
+      a.download = files.length > 1 ? `unit-${i + 1}.${ext}` : `unit.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
     });
   }
 
-  const backHref = unit ? `/unit/${unit.slug}` : "/katalog";
+  function handleDownload() {
+    downloadFiles(composedFiles);
+  }
+
+  const backHref = embedded
+    ? "#simulasi-kredit"
+    : getCatalogReturnHref(searchParams.toString());
   const aiActiveUrl = activeMedia?.kind === "image" && aiPreviewMode === "ai"
     ? aiBackgroundUrls[activeMedia.id]
     : undefined;
@@ -1175,24 +1284,26 @@ export function ShareSheet() {
   const priceDelta = unit && sharePrice ? sharePrice - unit.harga : 0;
   const canGenerateAiBackground =
     Boolean(unit) && selectedImageMedia.length > 0 && aiBackgroundStatus !== "generating";
-  const aiBackgroundActiveUrl = activeMedia?.kind === "image"
-    ? aiBackgroundUrls[activeMedia.id]
-    : undefined;
-  const activeHasAiBackground = Boolean(aiBackgroundActiveUrl);
   const selectedAiBackgroundCount = selectedImageMedia.filter((media) => aiBackgroundUrls[media.id]).length;
   const selectedAiBackgroundComplete =
     selectedImageMedia.length > 0 && selectedAiBackgroundCount === selectedImageMedia.length;
-  const aiBackgroundDone = selectedAiBackgroundCount > 0 && aiBackgroundStatus !== "generating";
-  const aiBackgroundPreviewMedia =
-    activeMedia?.kind === "image" && selectedImageMedia.some((media) => media.id === activeMedia.id)
-      ? activeMedia
-      : selectedImageMedia[0];
-  const showAiOriginalToggle = activeMedia?.kind === "image" && activeHasAiBackground;
+  const detailSpecs = unit ? [
+    { label: "Transmisi", value: titleCase(unit.transmisi || "-") },
+    { label: "Kilometer", value: formatOdometer(unit.odometer) },
+    { label: "Kategori", value: titleCase(unit.category || "-") },
+    { label: "Tahun", value: String(unit.year) },
+    { label: "Warna", value: titleCase(unit.color || "-") },
+    { label: "Plat", value: unit.plate_no || "-" },
+  ] : [];
+  const unitDocuments = Object.entries(unit?.kelengkapan_dokumen ?? {});
+  const similarUnits = (unit?.harga_sejenis ?? []).slice(0, 5).map(toCardUnit);
+
+  if (controllerOnly) return null;
 
   return (
-    <AppShell>
+    <AppShell overlay={embedded} bare={embedded}>
       {/* sheet */}
-      <div className="min-h-[560px] px-4 pb-24 pt-[18px]">
+      <div className={`min-h-[560px] bg-surface-2 px-4 ${embedded ? "pb-24 pt-[18px]" : "pb-[120px] pt-[18px]"}`}>
         {/* shareable preview */}
         <div className="relative mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
           {activeMedia?.kind === "video" ? (
@@ -1223,21 +1334,40 @@ export function ShareSheet() {
                 {shareHasFinancing && <> · {paymentLabel} {formatJt(paymentValue)}</>}
               </div>
             )}
-            <img
-              src="/mobix-logo.png"
-              alt="Mobix"
-              className="absolute right-3 top-3 h-[18px] w-auto opacity-90 [filter:brightness(0)_invert(1)]"
-            />
+            <button
+              type="button"
+              onClick={() => void handleGenerateAiBackground(selectedAiBackgroundComplete)}
+              disabled={!canGenerateAiBackground}
+              className="absolute right-3 top-3 inline-flex min-h-9 items-center gap-1.5 rounded-full bg-white/90 px-3 text-[11px] font-bold text-teal-deep shadow-sm backdrop-blur disabled:opacity-60"
+            >
+              <Sparkles size={13} />
+              {aiBackgroundStatus === "generating"
+                ? "Memproses..."
+                : selectedAiBackgroundComplete
+                  ? "Foto AI ✓"
+                  : "Foto AI"}
+            </button>
           </Photo>
           )}
-          <Link
-            href={backHref}
-            aria-label="Kembali"
-            className="absolute left-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
-          >
-            <ChevronLeft />
-          </Link>
-          <div className="px-3.5 py-3">
+          {embedded && onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Kembali ke detail unit"
+              className="absolute left-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink backdrop-blur"
+            >
+              <ChevronLeft />
+            </button>
+          ) : (
+            <Link
+              href={backHref}
+              aria-label="Kembali"
+              className="absolute left-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
+            >
+              <ChevronLeft />
+            </Link>
+          )}
+          <div className="relative px-3.5 py-3">
             {loading || !unit ? (
               <div className="space-y-2">
                 <Skeleton className="h-3.5 w-48" />
@@ -1245,31 +1375,22 @@ export function ShareSheet() {
               </div>
             ) : (
               <>
-                <div className="text-[14px] font-bold">{unit.nama}</div>
-                <div className="mt-0.5 text-[12px] text-muted">
-                  {shareHasFinancing ? (
-                    <>
-                      {packageTitle} {formatRupiah(paymentValue)} · Cicilan {formatRupiah(shareCicilan)}/bln ·{" "}
-                      {shareTenor} bln · {titleCase(unit.lokasi || "Mobix")}
-                    </>
-                  ) : (
-                    <>Harga {formatRupiah(sharePrice || unit.harga)} · {titleCase(unit.lokasi || "Mobix")}</>
-                  )}
-                </div>
-                {shareHasFinancing && (shareCreditPrice || shareDp) && (
-                  <div className="mt-1 text-[11px] text-muted">
-                    {!isDpMinimShare && shareCreditPrice && <>Harga kredit {formatRupiah(shareCreditPrice)}</>}
-                    {!isDpMinimShare && shareCreditPrice && shareDp && " · "}
-                    {shareDp && (
-                      <>
-                        {isDpMinimShare ? "TDP" : "DP"} {formatRupiah(shareDp)}
-                        {!isDpMinimShare &&
-                          shareDpPercent &&
-                          ` (${Math.round(shareDpPercent * 10) / 10}%)`}
-                      </>
-                    )}
-                  </div>
-                )}
+                <textarea
+                  value={captionText}
+                  onChange={(event) => setCaptionText(event.target.value)}
+                  rows={6}
+                  aria-label="Caption share unit"
+                  className="min-h-[132px] w-full resize-y bg-transparent pr-9 text-[12px] leading-[1.65] text-mid outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleCaptionAiHelp}
+                  disabled={captionSuggesting}
+                  aria-label="Buat caption dengan AI"
+                  className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg border border-teal-tint-border bg-teal-tint text-teal-deep disabled:opacity-50"
+                >
+                  <Sparkles size={14} />
+                </button>
               </>
             )}
           </div>
@@ -1513,11 +1634,42 @@ export function ShareSheet() {
             )}
           </div>
           {loading || !unit ? (
-            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-11 w-full" />
           ) : (
-            <span className="text-[15px] font-bold text-ink">
-              {formatRupiah(sharePrice || unit.harga)}
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+                <span className="mr-1.5 text-[13px] font-semibold text-muted">Rp</span>
+                <input
+                  id="share-builder-price"
+                  type="text"
+                  inputMode="numeric"
+                  value={priceInput}
+                  onChange={(event) => {
+                    const raw = event.target.value.replace(/\D/g, "");
+                    setPriceInput(raw ? new Intl.NumberFormat("id-ID").format(Number(raw)) : "");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") applyBuilderPrice();
+                  }}
+                  aria-label="Harga jual builder"
+                  className="min-w-0 flex-1 bg-transparent text-[15px] font-bold text-ink outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={applyBuilderPrice}
+                aria-label="Terapkan harga ke caption"
+                title="Terapkan harga ke caption"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal text-ink"
+              >
+                <Check size={18} strokeWidth={2.8} />
+              </button>
+            </div>
+          )}
+          {unit && priceDelta !== 0 && (
+            <div className="mt-1.5 text-[10px] text-muted">
+              Harga asli {formatRupiah(unit.harga)} · harga aktif {formatRupiah(sharePrice)}
+            </div>
           )}
         </div>
 
@@ -1626,12 +1778,104 @@ export function ShareSheet() {
                 </span>
               </>
             )}
-          </button>
-        </div>
+          </div>
+        )}
+
+        {unit && (
+          <div className="mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
+            <button
+              type="button"
+              aria-expanded={detailsOpen}
+              onClick={() => setDetailsOpen((open) => !open)}
+              className="flex min-h-[64px] w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+            >
+              <span className="flex-1 text-[15px] font-extrabold text-ink">Cek detail unit lengkapnya</span>
+              <span className={`text-[22px] leading-none text-muted transition-transform ${detailsOpen ? "rotate-90" : ""}`}>›</span>
+            </button>
+
+            {detailsOpen && (
+              <div className="border-t border-line pb-1">
+                <div className="px-3.5 py-4">
+                  <div className="grid grid-cols-3 gap-2">
+                    {detailSpecs.map((spec) => (
+                      <div key={spec.label} className="rounded-xl bg-field p-3 text-center">
+                        <div className="text-[11px] text-muted">{spec.label}</div>
+                        <div className="mt-0.5 truncate text-[13px] font-bold text-ink">{spec.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {unitDocuments.length > 0 && (
+                  <div className="px-[18px] pb-4">
+                    <div className="mb-2 text-[15px] font-extrabold text-ink">Kelengkapan dokumen</div>
+                    <div className="flex flex-col gap-2">
+                      {unitDocuments.map(([key, value]) => {
+                        const isBpkb = key.toLowerCase() === "bpkb";
+                        const available = isBpkb || (/\b(ada|tersedia)\b/i.test(value) && !/^(tidak|belum)\b/i.test(value));
+                        const displayValue = isBpkb ? maskBpkbName(value) : value;
+                        return (
+                          <div key={key} className="flex items-center gap-2.5 rounded-xl bg-field px-3.5 py-2.5">
+                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${available ? "bg-teal text-ink" : "bg-danger-bg text-danger"}`}>
+                              {available ? <Check size={11} /> : <Close size={10} />}
+                            </span>
+                            <span className="text-[13px] font-semibold uppercase text-ink">{key}</span>
+                            <span className="ml-auto text-right text-[12px] text-muted">
+                              {isBpkb && /^(tidak|belum)\b/i.test(value) ? "Ada" : displayValue}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {unit.deskripsi && (
+                  <div className="px-[18px] pb-4">
+                    <div className="mb-2 text-[15px] font-extrabold text-ink">Deskripsi unit</div>
+                    <p className="m-0 whitespace-pre-line text-[13px] leading-[1.6] text-mid">{unit.deskripsi}</p>
+                  </div>
+                )}
+
+                {similarUnits.length > 0 && (
+                  <div className="px-[18px] pb-4">
+                    <div className="mb-2 text-[15px] font-extrabold text-ink">Rekomendasi lain</div>
+                    <div className="flex flex-col gap-2.5">
+                      {similarUnits.map((similar) => <UnitRow key={similar.id} unit={similar} />)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* secondary actions */}
         <div className="flex flex-col gap-2">
+          {embedded && (
+            <div className="mb-1">
+              <button
+                type="button"
+                onClick={handleShare}
+                disabled={!unit || composing || composedFiles.length === 0}
+                className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-[18px] bg-ink px-3 py-3 text-[14px] font-bold text-surface disabled:opacity-50"
+              >
+                {composing ? (
+                  <span className="text-[13px] opacity-80">Menyiapkan media...</span>
+                ) : (
+                  <>
+                    <ShareArrow className="shrink-0" size={16} />
+                    <span>{shareButtonLabel}</span>
+                    {selectedIdxes.length > 0 && !pendingShareStep && (
+                      <span className="text-[12px] opacity-80">({selectedMediaButtonLabel})</span>
+                    )}
+                  </>
+                )}
+              </button>
+            </div>
+          )}
           <button
+            type="button"
             onClick={handleDownload}
             disabled={!unit || composedFiles.length === 0}
             className="flex items-center gap-3 rounded-[14px] border border-line bg-surface p-3.5 text-ink disabled:opacity-50"
@@ -1646,7 +1890,42 @@ export function ShareSheet() {
           </button>
         </div>
       </div>
-      <FloatingPicAgentCta unit={unit} />
+
+      {/* sticky action bar — selalu on top (fixed), pola sama seperti detail unit */}
+      {!embedded && (
+        <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-50 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
+          <div className="min-w-0">
+            <button
+              type="button"
+              onClick={handleShare}
+              disabled={!unit || composing || composedFiles.length === 0}
+              className="flex h-12 min-w-0 w-full items-center justify-center gap-2 rounded-2xl bg-ink px-3 text-[13px] font-bold text-surface disabled:opacity-50"
+            >
+              {composing ? (
+                <span className="truncate text-[12px] opacity-80">Menyiapkan media...</span>
+              ) : pendingShareStep ? (
+                <>
+                  <ShareArrow className="shrink-0" size={14} />
+                  <span className="truncate">{shareButtonLabel}</span>
+                </>
+              ) : (
+                <>
+                  <span className="truncate">Share ke social media</span>
+                  <ShareArrow size={14} />
+                </>
+              )}
+            </button>
+          </div>
+          <ContactActionMenu
+            adminMessage={unitAdminMessage}
+            calculationMessage={unitCalculationMessage}
+            calculationHref={salesContactRequired ? jasmineCalculationHref : undefined}
+            adminLabel="Tanya Admin"
+            calculationLabel={salesContactRequired ? "Tanya Opsi Pembiayaan" : "Minta Hitungan"}
+            buttonClassName="flex h-12 w-full items-center justify-center rounded-2xl border border-teal-tint-border bg-teal text-ink"
+          />
+        </div>
+      )}
     </AppShell>
   );
-}
+});

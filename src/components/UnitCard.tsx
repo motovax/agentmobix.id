@@ -12,8 +12,8 @@ import { Calculator, ShareArrow } from "./icons";
 
 /**
  * Horizontal-scroller unit card (Beranda "siap kamu share"). Dual target: the
- * card body opens the detail; the Share button opens the share sheet without
- * also triggering card navigation.
+ * card body opens the photo/caption composer; the calculation button keeps
+ * direct access to the detailed financing view.
  */
 export function UnitCard({ unit }: { unit: CardUnit }) {
   const financingAvailable = hasAvailableFinancing(unit.pembiayaan);
@@ -31,10 +31,10 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
 
   return (
     <article className="relative flex-[0_0_200px] snap-start overflow-hidden rounded-2xl border border-line bg-surface-3">
-      {/* full-card overlay link → detail */}
+      {/* full-card overlay link → photo/caption composer */}
       <Link
-        href={`/unit/${unit.slug}`}
-        aria-label={`Lihat detail ${unit.title}`}
+        href={`/share?${shareParams.toString()}`}
+        aria-label={`Siapkan foto dan caption ${unit.title}`}
         className="absolute inset-0 z-[1]"
       />
       <Photo
@@ -93,7 +93,7 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
           </span>
         </div>
         <Link
-          href={`/unit/${unit.slug}#simulasi-kredit`}
+          href={`/share?${shareParams.toString()}#simulasi-kredit`}
           aria-label={`Tanya hitungan ${unit.title}`}
           className="relative z-[2] mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-teal-tint-border bg-teal-tint px-2.5 py-2 text-[11px] font-bold text-teal-deep no-underline"
         >

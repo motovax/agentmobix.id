@@ -25,6 +25,7 @@ export type SellCarFormData = {
   transmission: string;
   color: string;
   mileage: string;
+  ownershipType: string;
   plate: string;
   stnk: string;
 };
@@ -66,6 +67,15 @@ export type PriceAdjustment = {
   label: string;
   amount: number;
 };
+
+export function ownershipTypeForQuote(value: string): string {
+  switch (value) {
+    case "Perorangan": return "perorangan";
+    case "Perusahaan": return "perusahaan";
+    case "Perusahaan (Rental)": return "perusahaan_rental";
+    default: return "";
+  }
+}
 
 export type SellCarResult = SellCarFormData & {
   basePrice: number;
@@ -255,7 +265,7 @@ export async function fetchSellCarAIExtraction(
     body,
   });
   if (!response.ok) {
-    throw new Error(await readAPIError(response, "AIFalcon belum dapat membaca foto. Coba lagi."));
+    throw new Error(await readAPIError(response, "AI Mobix Assistant belum dapat membaca foto. Coba lagi."));
   }
   return response.json() as Promise<SellCarAIExtraction>;
 }
@@ -358,6 +368,12 @@ export function buildLocalSellCarResult(
     }
   }
 
+  if (form.ownershipType === "Perusahaan") {
+    adjustments.push({ label: "Penyesuaian kendaraan operasional perusahaan", amount: -5_000_000 });
+  } else if (form.ownershipType === "Perusahaan (Rental)") {
+    adjustments.push({ label: "Penyesuaian kendaraan rental perusahaan", amount: -10_000_000 });
+  }
+
   if (form.transmission.toLowerCase().includes("manual")) {
     adjustments.push({ label: "Penyesuaian transmisi manual", amount: -10_000_000 });
   }
@@ -404,6 +420,8 @@ export async function fetchSellCarQuote(form: SellCarFormData): Promise<SellCarR
         year: Number(form.year),
         transmission: form.transmission,
         color: form.color,
+        odometer: Number(form.mileage.replace(/\D/g, "")),
+        ownership_type: ownershipTypeForQuote(form.ownershipType),
         // Backend reduces recommended_price when tax is overdue.
         ...(stnkExpiry ? { stnk_expiry: stnkExpiry } : {}),
       }),
@@ -452,6 +470,7 @@ export function getWhatsAppUrl(result: SellCarResult): string {
     `Transmisi: ${result.transmission}`,
     `Warna: ${result.color}`,
     `Jarak tempuh: ${result.mileage || "-"} km`,
+    `Atas nama: ${result.ownershipType || "-"}`,
     `Plat: ${result.plate}`,
     `Masa berlaku STNK: ${result.stnk || "-"}`,
     `Rekomendasi harga: Rp ${new Intl.NumberFormat("id-ID").format(result.recommendedPrice)}`,
