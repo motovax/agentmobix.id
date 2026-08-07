@@ -14,8 +14,12 @@ import {
   Download,
   Check,
   Close,
+  Copy,
   Sparkles,
   Play,
+  WhatsAppSolid,
+  Telegram,
+  XTwitter,
 } from "../components/icons";
 import {
   fetchUnitDetail,
@@ -480,6 +484,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const [captionText, setCaptionText] = useState("");
   const [captionSuggesting, setCaptionSuggesting] = useState(false);
   const [pendingShareStep, setPendingShareStep] = useState<PendingShareStep | null>(null);
+  const [showChannels, setShowChannels] = useState(false);
+  const [shareCaptionCopied, setShareCaptionCopied] = useState(false);
 
   // multi-select share media
   const [selectedIdxes, setSelectedIdxes] = useState<number[]>([]);
@@ -808,38 +814,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
   const link = buildAgenMobixUnitLink(unit?.slug);
 
-  function showCopiedState(what: "caption" | "link", fromShare = false) {
-    setCopied(what);
-    if (fromShare) setShareCaptionCopied(true);
-    window.setTimeout(() => {
-      setCopied("");
-      if (fromShare) setShareCaptionCopied(false);
-    }, fromShare ? 2500 : 1500);
-  }
-
-  async function copyToClipboard(text: string) {
-    return copyTextToClipboard(text);
-  }
-
-  async function copy(what: "caption" | "link", text: string) {
-    if (await copyToClipboard(text)) {
-      showCopiedState(what);
-    }
-  }
-
-  async function copyShareCaption(caption: string, fromShare = false) {
-    const text = buildShareText(caption, link);
-    if (await copyToClipboard(text)) {
-      showCopiedState("caption", fromShare);
-      return true;
-    }
-    return false;
-  }
-
-  function openShareChannels() {
-    setShowChannels(true);
-  }
-
   async function waitForAIBackgroundJob(
     initial: AIBackgroundResponse,
     onProgress: (progress: number) => void,
@@ -928,48 +902,64 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     }
   }
 
+  function showShareCaptionCopied() {
+    setShareCaptionCopied(true);
+    window.setTimeout(() => setShareCaptionCopied(false), 2500);
+  }
+
+  async function copyShareCaption(caption: string) {
+    const text = buildShareText(caption, link);
+    if (await copyTextToClipboard(text)) {
+      showShareCaptionCopied();
+      return true;
+    }
+    return false;
+  }
+
+  function openShareChannels() {
+    setShowChannels(true);
+  }
+
+  function fallbackDesktopShare(caption: string) {
+    void copyShareCaption(caption);
+    openShareChannels();
+  }
+
+  /**
+   * Start native file share from the click handler (no prior await) so user
+   * activation stays valid. Returns null when native share is unavailable.
+   */
   function sharePreparedFiles(
     files: File[],
     title: string,
     caption: string,
-  ) {
-    if (!prefersNativeWebShare() || files.length === 0) return false;
+  ): Promise<void> | null {
+    if (!prefersNativeWebShare() || files.length === 0) return null;
 
     const shareText = buildShareText(caption, link);
     const payload = buildNativeSharePayload(files, title, shareText);
-    if (!payload) return false;
+    if (!payload) return null;
 
-    // Backup: many apps drop caption when receiving files; keep full text ready to paste.
+    // Backup: many apps drop caption when receiving files.
     if (shareText) {
-      void copyShareCaption(caption, true);
+      void copyShareCaption(caption);
     }
 
-    await navigator.share(payload);
-    return true;
+    return navigator.share(payload);
   }
 
-  async function shareTextOnly(title: string, caption: string) {
-    if (!prefersNativeWebShare()) return false;
+  /** Native text share (mobile) — caption + link in `text`, no separate `url`. */
+  function shareWithoutFiles(title: string, caption: string): Promise<void> | null {
+    if (!prefersNativeWebShare()) return null;
     const shareText = buildShareText(caption, link);
     const payload = buildNativeSharePayload([], title, shareText);
-    if (!payload) return false;
+    if (!payload) return null;
 
     if (shareText) {
-      void copyShareCaption(caption, true);
+      void copyShareCaption(caption);
     }
 
-  /** Hanya Web Share API — tanpa fallback clipboard/download/wa.me. */
-  function shareWithoutFiles(title: string, caption: string): Promise<void> | null {
-    if (!navigator.share) return null;
-    return navigator.share({
-      title,
-      text: caption,
-      ...(link ? { url: link } : {}),
-    });
-  }
-
-  function isShareAbort(error: unknown) {
-    return error instanceof DOMException && error.name === "AbortError";
+    return navigator.share(payload);
   }
 
   async function handleCaptionAiHelp() {
@@ -1183,66 +1173,38 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
     const markShareStepDone = () => {
       if (pendingShareStep) {
-        const shared = await sharePreparedFiles(
-          pendingShareStep.files,
-          title,
-          pendingShareStep.includeCaption === false ? "" : caption,
-        );
-        if (shared) {
-          setPendingShareStep(null);
-          return;
-        }
-        // Native step failed (desktop / unsupported) — keep pending step for retry after channels.
-        await copyShareCaption(
-          pendingShareStep.includeCaption === false ? "" : caption,
-          true,
-        );
-        openShareChannels();
-        return;
+        setPendingShareStep(null);
+      } else if (hasMixedMediaFiles) {
+        setPendingShareStep({
+          files: imageFiles,
+          label: imageFiles.length > 1
+            ? `Lanjut bagikan ${imageFiles.length} foto`
+            : "Lanjut bagikan foto",
+          includeCaption: false,
+        });
       }
-
-      const filesToShare = await prepareShareFiles();
-      const imageFiles = filesToShare.filter((file) => file.type.startsWith("image/"));
-      const videoFiles = filesToShare.filter((file) => file.type.startsWith("video/"));
-      const hasMixedMediaFiles = imageFiles.length > 0 && videoFiles.length > 0;
-
-      if (hasMixedMediaFiles) {
-        const shared = await sharePreparedFiles(videoFiles, title, caption);
-        if (shared) {
-          setPendingShareStep({
-            files: imageFiles,
-            label: imageFiles.length > 1
-              ? `Lanjut bagikan ${imageFiles.length} foto`
-              : "Lanjut bagikan foto",
-            includeCaption: false,
-          });
-          return;
-        }
-        await copyShareCaption(caption, true);
-        openShareChannels();
-        return;
-      }
-
-      if (filesToShare.length > 0 && await sharePreparedFiles(filesToShare, title, caption)) {
-        return;
-      }
-
-      // Text-only native share (mobile) when no files could be prepared.
-      if (filesToShare.length === 0 && await shareTextOnly(title, caption)) {
-        return;
-      }
-
-      // Desktop & fallback: always copy caption+link and open channel picker.
-      await copyShareCaption(caption, true);
-      openShareChannels();
     };
 
-    void share().catch((error) => {
-      if (isShareAbortError(error)) return;
-      void copyShareCaption(captionText.trim(), true).finally(() => {
-        openShareChannels();
+    // Native share only on mobile-like devices; desktop gets channel picker.
+    // Call navigator.share synchronously from the click (no prior await) so
+    // transient user activation remains valid.
+    const sharePromise =
+      sharePreparedFiles(filesForCurrentStep, title, captionForCurrentStep)
+      ?? shareWithoutFiles(title, caption);
+
+    if (!sharePromise) {
+      fallbackDesktopShare(caption);
+      return;
+    }
+
+    void sharePromise
+      .then(() => {
+        markShareStepDone();
+      })
+      .catch((error: unknown) => {
+        if (isShareAbortError(error)) return;
+        fallbackDesktopShare(caption);
       });
-    });
   }
 
   function shareVia(channel: ShareChannel) {
@@ -1250,6 +1212,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     window.open(url, "_blank", "noopener");
     setShowChannels(false);
   }
+
+  useImperativeHandle(ref, () => ({ share: handleShare }));
 
   function downloadFiles(files: File[]) {
     files.forEach((f, i) => {
@@ -1460,177 +1424,16 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
           </div>
         )}
 
-        {/* AI background */}
-        <div className="mb-[18px] rounded-[14px] border border-dashed border-[#8D7DFF] bg-surface px-3.5 py-3">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#D9D4FF] bg-[#F5F2FF] text-[#6B57E8]">
-              <Sparkles size={19} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <div className="text-[13px] font-bold text-ink">AI Background</div>
-                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                  aiBackgroundDone
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-[#F0ECFF] text-[#6B57E8]"
-                }`}>
-                  {aiBackgroundDone ? "Selesai" : "Baru"}
-                </span>
-              </div>
-              <div className="mt-1 text-[12px] leading-[1.45] text-mid">
-                Hapus background dan buat background profesional otomatis sesuai angle mobil.
-              </div>
-            </div>
-            {aiBackgroundDone ? (
-              <Check size={18} className="mt-1 shrink-0 text-emerald-600" />
-            ) : (
-              <Info size={18} className="mt-1 shrink-0 text-muted" />
-            )}
-          </div>
-
-          {aiBackgroundStatus === "generating" && (
-            <div className="mt-3 overflow-hidden rounded-[12px] bg-ink">
-              <div className="relative aspect-video">
-                {aiBackgroundPreviewMedia && (
-                  <Photo
-                    className="h-full w-full opacity-45"
-                    src={mobixImage(aiBackgroundPreviewMedia.url, MOBIX_SHARE_WIDTH)}
-                    alt=""
-                  />
-                )}
-                <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center text-surface">
-                  <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/55 bg-white/10">
-                    <Sparkles size={24} />
-                  </div>
-                  <div className="text-[13px] font-bold">Sedang membuat background...</div>
-                  <div className="mt-0.5 text-[12px] text-white/80">Menyesuaikan angle mobil</div>
-                  <div className="mt-3 flex w-full max-w-[250px] items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/25">
-                      <div
-                        className="h-full rounded-full bg-teal-deep transition-all"
-                        style={{ width: `${Math.max(8, aiBackgroundProgress)}%` }}
-                      />
-                    </div>
-                    <span className="w-9 text-right text-[12px] font-bold">
-                      {aiBackgroundProgress}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {aiBackgroundStatus === "failed" && aiBackgroundError && (
-            <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
-              {aiBackgroundError}
-            </div>
-          )}
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            {aiBackgroundDone && (
-              <button
-                type="button"
-                onClick={() => setAiPreviewMode("original")}
-                className="min-h-10 flex-1 rounded-lg border border-line bg-surface px-3 text-[12px] font-bold text-ink"
-              >
-                Lihat Original
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => void handleGenerateAiBackground(selectedAiBackgroundComplete)}
-              disabled={!canGenerateAiBackground}
-              className="min-h-10 flex-1 rounded-lg bg-teal-deep px-3 text-[12px] font-bold text-surface disabled:opacity-50"
-            >
-              {selectedAiBackgroundComplete ? "Generate Ulang" : "Generate Background"}
-            </button>
-          </div>
-
-          {showAiOriginalToggle && (
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="text-[12px] font-bold text-mid">Tampilkan:</span>
-              <div className="grid w-[170px] grid-cols-2 rounded-lg border border-line bg-surface p-0.5 text-[12px] font-bold">
-                <button
-                  type="button"
-                  onClick={() => setAiPreviewMode("ai")}
-                  className={`rounded-md px-3 py-2 ${
-                    aiPreviewMode === "ai" ? "bg-teal-deep text-surface" : "text-mid"
-                  }`}
-                >
-                  AI
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAiPreviewMode("original")}
-                  className={`rounded-md px-3 py-2 ${
-                    aiPreviewMode === "original" ? "bg-teal-deep text-surface" : "text-mid"
-                  }`}
-                >
-                  Original
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* caption – editable */}
-        <div className="mb-[18px] rounded-[14px] border border-line bg-surface px-3.5 py-3">
-          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[11px] font-bold text-muted">
-              Caption (bisa diedit)
-            </span>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={handleCaptionAiHelp}
-                disabled={!unit || captionSuggesting}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-indigo-50 px-2 text-[11px] font-bold text-indigo-700 disabled:opacity-50"
-              >
-                <Sparkles size={13} />
-                {captionSuggesting ? "Mengolah..." : "Bantuan AI"}
-              </button>
-              {unit && captionText !== autoCaption && (
-                <button
-                  onClick={() => setCaptionText(autoCaption)}
-                  className="text-[11px] font-semibold text-muted underline"
-                >
-                  Reset
-                </button>
-              )}
-              <button
-                onClick={() => void copy("caption", buildShareText(captionText, link))}
-                disabled={!unit}
-                className="text-[11px] font-bold text-teal-deep disabled:opacity-40"
-              >
-                {copied === "caption" ? "Tersalin ✓" : "Salin"}
-              </button>
-            </div>
-          </div>
-          {loading || !unit ? (
-            <div className="space-y-2">
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-3 w-2/3" />
-            </div>
-          ) : (
-            <textarea
-              value={captionText}
-              onChange={(e) => setCaptionText(e.target.value)}
-              rows={8}
-              className="min-h-[164px] w-full resize-y bg-transparent text-[12px] leading-[1.55] text-mid outline-none"
-            />
-          )}
-        </div>
-
-        {/* builder price */}
-        <div className="mb-3 flex items-center justify-between rounded-[14px] border border-line bg-surface px-3.5 py-3">
-          <div>
-            <div className="text-[13px] font-semibold text-mid">
-              Harga jual builder
-            </div>
-            {unit && priceDelta !== 0 && (
-              <div className="mt-0.5 text-[10px] text-muted">
-                Harga asli {formatRupiah(unit.harga)}
-              </div>
+        {/* builder price — caption hanya berubah setelah tombol centang ditekan */}
+        <div className="mb-3 rounded-[14px] border border-line bg-surface px-3.5 py-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <label htmlFor="share-builder-price" className="text-[13px] font-semibold text-mid">
+              Pengaturan harga
+            </label>
+            {unit && (
+              <span className="text-[10px] font-semibold text-muted">
+                Min. {formatRupiah(minBuilderPrice(unit.harga))}
+              </span>
             )}
           </div>
           {loading || !unit ? (
@@ -1698,85 +1501,28 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
           )}
         </div>
 
-        {/* share button */}
-        <div className="relative mb-[18px]">
-          {showChannels && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowChannels(false)}
-              />
-              <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
-                <div className="border-b border-line px-4 py-3 text-center text-[11px] font-bold text-muted">
-                  {shareCaptionCopied
-                    ? "Caption + link tersalin — pilih channel"
-                    : "Bagikan via"}
-                </div>
-                <div className="grid grid-cols-4 divide-x divide-line">
-                  <button
-                    onClick={() => shareVia("wa")}
-                    className="flex flex-col items-center gap-1.5 py-4 text-[#25D366] transition-colors hover:bg-[#25D366]/10"
-                  >
-                    <WhatsAppSolid size={24} />
-                    <span className="text-[10px] font-semibold text-ink">WhatsApp</span>
-                  </button>
-                  <button
-                    onClick={() => shareVia("tg")}
-                    className="flex flex-col items-center gap-1.5 py-4 text-[#229ED9] transition-colors hover:bg-[#229ED9]/10"
-                  >
-                    <Telegram size={24} />
-                    <span className="text-[10px] font-semibold text-ink">Telegram</span>
-                  </button>
-                  <button
-                    onClick={() => shareVia("x")}
-                    className="flex flex-col items-center gap-1.5 py-4 text-ink transition-colors hover:bg-ink/10"
-                  >
-                    <XTwitter size={24} />
-                    <span className="text-[10px] font-semibold text-ink">X / Twitter</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      void copy("link", link);
-                      setShowChannels(false);
-                    }}
-                    className="flex flex-col items-center gap-1.5 py-4 text-teal-deep transition-colors hover:bg-teal-deep/10"
-                  >
-                    <Copy size={24} />
-                    <span className="text-[10px] font-semibold text-ink">Salin Link</span>
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-          <button
-            onClick={handleShare}
-            disabled={!unit || composing || shareComposing}
-            className="flex min-h-[66px] w-full items-center justify-center gap-2.5 rounded-[18px] bg-teal-deep px-3 py-3.5 text-[15px] font-bold leading-tight text-surface disabled:opacity-50"
-          >
-            {(composing || shareComposing) ? (
-              <span className="text-[13px] opacity-80">Menyiapkan media...</span>
-            ) : pendingShareStep ? (
-              <>
-                <ShareArrow className="shrink-0" size={18} />
-                <span className="min-w-0 text-center">{shareButtonLabel}</span>
-              </>
-            ) : shareCaptionCopied ? (
-              <>
-                <Check className="shrink-0" size={18} strokeWidth={2.4} />
-                <span className="min-w-0 text-center">Caption tersalin</span>
-              </>
-            ) : (
-              <>
-                <ShareArrow className="shrink-0" size={18} />
-                <span className="flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center">
-                  <span>{shareButtonLabel}</span>
-                  {selectedIdxes.length > 0 && (
-                    <span className="text-[12px] opacity-80">
-                      ({selectedMediaButtonLabel})
-                    </span>
-                  )}
-                </span>
-              </>
+        {/* simulasi kredit — collapsible seperti detail unit */}
+        {unit && (
+          <div className="mb-[18px]">
+            <CreditSimulationBox
+              unit={unit}
+              price={sharePrice || unit.harga}
+              initialTenor={positiveParamNumber(searchParams, "tenor") ?? 60}
+              initialDpPercent={positiveParamNumber(searchParams, "dp_pct") ?? undefined}
+              onSimulationChange={handleSimulationChange}
+            />
+            {!salesContactRequired && (
+              <button
+                type="button"
+                onClick={applyCreditSimulation}
+                disabled={!liveSimulation?.canShare}
+                className="-mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-b-[18px] border border-t-0 border-line bg-teal px-4 text-[12px] font-extrabold text-ink disabled:bg-field disabled:text-muted"
+              >
+                <Check size={16} strokeWidth={2.8} />
+                {liveSimulation?.canShare
+                  ? "Terapkan simulasi ke caption"
+                  : "Menunggu hasil simulasi"}
+              </button>
             )}
           </div>
         )}
@@ -1853,15 +1599,72 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         {/* secondary actions */}
         <div className="flex flex-col gap-2">
           {embedded && (
-            <div className="mb-1">
+            <div className="relative mb-1">
+              {showChannels && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowChannels(false)}
+                  />
+                  <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
+                    <div className="border-b border-line px-4 py-3 text-center text-[11px] font-bold text-muted">
+                      {shareCaptionCopied
+                        ? "Caption + link tersalin — pilih channel"
+                        : "Bagikan via"}
+                    </div>
+                    <div className="grid grid-cols-4 divide-x divide-line">
+                      <button
+                        type="button"
+                        onClick={() => shareVia("wa")}
+                        className="flex flex-col items-center gap-1.5 py-4 text-[#25D366] transition-colors hover:bg-[#25D366]/10"
+                      >
+                        <WhatsAppSolid size={24} />
+                        <span className="text-[10px] font-semibold text-ink">WhatsApp</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => shareVia("tg")}
+                        className="flex flex-col items-center gap-1.5 py-4 text-[#229ED9] transition-colors hover:bg-[#229ED9]/10"
+                      >
+                        <Telegram size={24} />
+                        <span className="text-[10px] font-semibold text-ink">Telegram</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => shareVia("x")}
+                        className="flex flex-col items-center gap-1.5 py-4 text-ink transition-colors hover:bg-ink/10"
+                      >
+                        <XTwitter size={24} />
+                        <span className="text-[10px] font-semibold text-ink">X / Twitter</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void copyShareCaption(captionText.trim());
+                          setShowChannels(false);
+                        }}
+                        className="flex flex-col items-center gap-1.5 py-4 text-teal-deep transition-colors hover:bg-teal-deep/10"
+                      >
+                        <Copy size={24} />
+                        <span className="text-[10px] font-semibold text-ink">Salin teks</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
               <button
                 type="button"
                 onClick={handleShare}
-                disabled={!unit || composing || composedFiles.length === 0}
+                disabled={!unit || (composing && composedFiles.length === 0)}
                 className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-[18px] bg-ink px-3 py-3 text-[14px] font-bold text-surface disabled:opacity-50"
               >
-                {composing ? (
+                {composing && composedFiles.length === 0 ? (
                   <span className="text-[13px] opacity-80">Menyiapkan media...</span>
+                ) : shareCaptionCopied ? (
+                  <>
+                    <Check className="shrink-0" size={16} strokeWidth={2.4} />
+                    <span>Caption + link tersalin</span>
+                  </>
                 ) : (
                   <>
                     <ShareArrow className="shrink-0" size={16} />
@@ -1894,15 +1697,72 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       {/* sticky action bar — selalu on top (fixed), pola sama seperti detail unit */}
       {!embedded && (
         <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-50 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
-          <div className="min-w-0">
+          <div className="relative min-w-0">
+            {showChannels && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowChannels(false)}
+                />
+                <div className="absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
+                  <div className="border-b border-line px-3 py-2.5 text-center text-[11px] font-bold text-muted">
+                    {shareCaptionCopied
+                      ? "Caption + link tersalin — pilih channel"
+                      : "Bagikan via"}
+                  </div>
+                  <div className="grid grid-cols-4 divide-x divide-line">
+                    <button
+                      type="button"
+                      onClick={() => shareVia("wa")}
+                      className="flex flex-col items-center gap-1 py-3 text-[#25D366]"
+                    >
+                      <WhatsAppSolid size={22} />
+                      <span className="text-[10px] font-semibold text-ink">WA</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => shareVia("tg")}
+                      className="flex flex-col items-center gap-1 py-3 text-[#229ED9]"
+                    >
+                      <Telegram size={20} />
+                      <span className="text-[10px] font-semibold text-ink">TG</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => shareVia("x")}
+                      className="flex flex-col items-center gap-1 py-3 text-ink"
+                    >
+                      <XTwitter size={20} />
+                      <span className="text-[10px] font-semibold text-ink">X</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void copyShareCaption(captionText.trim());
+                        setShowChannels(false);
+                      }}
+                      className="flex flex-col items-center gap-1 py-3 text-teal-deep"
+                    >
+                      <Copy size={20} />
+                      <span className="text-[10px] font-semibold text-ink">Salin</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
             <button
               type="button"
               onClick={handleShare}
-              disabled={!unit || composing || composedFiles.length === 0}
+              disabled={!unit || (composing && composedFiles.length === 0)}
               className="flex h-12 min-w-0 w-full items-center justify-center gap-2 rounded-2xl bg-ink px-3 text-[13px] font-bold text-surface disabled:opacity-50"
             >
-              {composing ? (
+              {composing && composedFiles.length === 0 ? (
                 <span className="truncate text-[12px] opacity-80">Menyiapkan media...</span>
+              ) : shareCaptionCopied ? (
+                <>
+                  <Check className="shrink-0" size={14} strokeWidth={2.4} />
+                  <span className="truncate">Caption + link tersalin</span>
+                </>
               ) : pendingShareStep ? (
                 <>
                   <ShareArrow className="shrink-0" size={14} />
