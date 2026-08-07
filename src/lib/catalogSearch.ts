@@ -96,8 +96,8 @@ export function buildUnitDetailHref(
   slug: string,
   catalogHref: string,
 ): string {
-  const params = new URLSearchParams({ kembali: catalogHref });
-  return `/unit/${encodeURIComponent(slug)}?${params.toString()}`;
+  const params = new URLSearchParams({ u: slug, kembali: catalogHref });
+  return `/share?${params.toString()}`;
 }
 
 export function getCatalogReturnHref(search: string): string {

@@ -1,20 +1,21 @@
-import { useState, useEffect, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
-import { FloatingPicAgentCta } from "../components/FloatingPicAgentCta";
+import { ContactActionMenu } from "../components/FloatingContactCta";
+import {
+  CreditSimulationBox,
+  type CreditSimulationResult,
+} from "../components/CreditSimulationBox";
 import { Photo, Skeleton } from "../components/ui";
+import { UnitRow } from "../components/UnitRow";
 import {
   ChevronLeft,
   ShareArrow,
-  Copy,
   Download,
-  WhatsAppSolid,
-  Telegram,
-  XTwitter,
   Check,
+  Close,
   Sparkles,
   Play,
-  Info,
 } from "../components/icons";
 import {
   fetchUnitDetail,
@@ -28,7 +29,9 @@ import {
   generateAIBackground,
   fetchAIBackgroundStatus,
   prettyTransmisi,
+  requiresSalesContact,
   titleCase,
+  toCardUnit,
   type GalleryItem,
   type ProductDetail,
   type VideoItem,
@@ -36,15 +39,40 @@ import {
 } from "../lib/mobix";
 import { useAsync } from "../lib/useAsync";
 import { formatJt, formatOdometer, formatRupiah } from "../lib/format";
-import { estimateBuilderCommission } from "../lib/commission";
+import {
+  clampBuilderPrice,
+  estimateBuilderCommission,
+  minBuilderPrice,
+} from "../lib/commission";
+import { buildJasmineWhatsAppHref } from "../lib/jasmine";
+import { getCatalogReturnHref } from "../lib/catalogSearch";
 import {
   buildAgenMobixUnitLink,
-  buildWhatsAppShareText,
   ensureRequiredCaptionFacts,
   formatCaptionReadability,
   removeCaptionParagraphsContaining,
   type RequiredCaptionSection,
 } from "../lib/shareCaption";
+
+const UNMASKED_BPKB_WORDS = new Set(["ada", "tidak", "belum", "iya", "ya"]);
+
+function maskBpkbName(value: string) {
+  if (!value || /^(tidak|belum)\b/i.test(value.trim())) return value;
+  const lower = value.toLowerCase();
+  if (/\b(pt|cv|coop|koperasi|persero|perseroan|limited|ltd|gmo|group|badan hukum|pt\.)\b/.test(lower) || /\bunlimited\b/.test(lower)) {
+    return "BPKB Perusahaan";
+  }
+  if (/\b(perorangan|pribadi|individu|nama pemilik|atas nama)\b/.test(lower)) {
+    return "BPKB Perorangan";
+  }
+  return value.trim().split(/\s+/).map((word) => {
+    const match = word.match(/^([^A-Za-zÀ-ÖØ-öø-ÿ']*)([A-Za-zÀ-ÖØ-öø-ÿ']+)([^A-Za-zÀ-ÖØ-öø-ÿ']*)$/u);
+    if (!match) return word;
+    const [, prefix, core, suffix] = match;
+    if (UNMASKED_BPKB_WORDS.has(core.toLowerCase()) || core.length <= 2) return word;
+    return `${prefix}${core[0]}${"*".repeat(core.length - 2)}${core[core.length - 1]}${suffix}`;
+  }).join(" ");
+}
 
 /* ---- business logic ---- */
 
@@ -59,6 +87,19 @@ type PendingShareStep = {
 };
 
 type AiBackgroundStatus = "idle" | "generating" | "done" | "failed";
+
+export type ShareSheetHandle = {
+  share: () => void;
+};
+
+type ShareSheetProps = {
+  embedded?: boolean;
+  controllerOnly?: boolean;
+  unitData?: ProductDetail;
+  unitSlug?: string;
+  params?: string;
+  onClose?: () => void;
+};
 
 /* ---- canvas overlay composition ---- */
 
@@ -413,24 +454,27 @@ const CAPTION_STYLE_HINTS = [
   "Energetic social caption, concise, persuasive, and not exaggerated.",
 ];
 
-export function ShareSheet({ embedded = false }: any = {}) {
+export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function ShareSheet(
+  { embedded = false, controllerOnly = false, unitData, unitSlug, params, onClose },
+  ref,
+) {
   const search = useSearch();
-  const searchParams = new URLSearchParams(search);
-  const slug = searchParams.get("u") ?? "";
-  const { data: unit, loading } = useAsync(() => fetchUnitDetail(slug), [slug]);
+  const searchParams = new URLSearchParams(params ?? search);
+  const slug = unitSlug ?? searchParams.get("u") ?? "";
+  const { data: fetchedUnit, loading: unitLoading } = useAsync(
+    () => unitData ? Promise.resolve(unitData) : fetchUnitDetail(slug),
+    [slug, unitData?.id],
+  );
+  const unit = unitData ?? fetchedUnit;
+  const loading = !unitData && unitLoading;
 
-  const [copied, setCopied] = useState<"" | "caption" | "link">("");
   const [captionText, setCaptionText] = useState("");
   const [captionSuggesting, setCaptionSuggesting] = useState(false);
-  // Pada embed di halaman detail, pilihan kanal harus langsung terlihat setelah
-  // pengguna masuk ke alur share. Pada halaman share penuh, tetap gunakan
-  // tombol utama agar layout tidak terlalu padat.
-  const [showChannels, setShowChannels] = useState<boolean>(Boolean(embedded));
   const [shareCaptionCopied, setShareCaptionCopied] = useState(false);
   const [pendingShareStep, setPendingShareStep] = useState<PendingShareStep | null>(null);
 
   // multi-select share media
-  const [selectedIdxes, setSelectedIdxes] = useState<number[]>([0]);
+  const [selectedIdxes, setSelectedIdxes] = useState<number[]>([]);
   const [previewIdx, setPreviewIdx] = useState(0);
 
   // canvas-composed files without price/TDP overlay — for download
@@ -442,14 +486,23 @@ export function ShareSheet({ embedded = false }: any = {}) {
   const [shareComposing, setShareComposing] = useState(false);
   const [shareFilesSignature, setShareFilesSignature] = useState("");
   const [aiBackgroundStatus, setAiBackgroundStatus] = useState<AiBackgroundStatus>("idle");
-  const [aiBackgroundProgress, setAiBackgroundProgress] = useState(0);
+  const [, setAiBackgroundProgress] = useState(0);
   const [aiBackgroundFiles, setAiBackgroundFiles] = useState<Record<string, File>>({});
   const [aiBackgroundUrls, setAiBackgroundUrls] = useState<Record<string, string>>({});
   const [aiPreviewMode, setAiPreviewMode] = useState<"ai" | "original">("ai");
-  const [aiBackgroundError, setAiBackgroundError] = useState("");
+  const [, setAiBackgroundError] = useState("");
+  const [liveSimulation, setLiveSimulation] = useState<CreditSimulationResult | null>(null);
+  const [appliedSimulation, setAppliedSimulation] = useState<CreditSimulationResult | null>(null);
+  const [appliedPrice, setAppliedPrice] = useState(0);
+  const [priceInput, setPriceInput] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const blobCache = useRef<Map<string, Blob>>(new Map());
   const captionSuggestionIndex = useRef(0);
+  const forceCaptionUpdateRef = useRef(false);
+  const handleSimulationChange = useCallback((result: CreditSimulationResult) => {
+    setLiveSimulation(result);
+  }, []);
 
   const gallery = unit?.galeri ?? [];
   const videos = unit?.video ?? [];
@@ -493,21 +546,48 @@ export function ShareSheet({ embedded = false }: any = {}) {
     ? pendingShareStep.label
     : isMixedMediaSelected
       ? "Share bertahap: video dulu"
-      : "Bagikan Sekarang";
+      : "Share ke social media";
   const financingEligible = unit?.pembiayaan.eligible === true;
-  const requestedDpMinimShare = searchParams.get("sim") === "dpminim";
-  const shareTenor = positiveParamNumber(searchParams, "tenor") ?? 60;
-  const shareTdp = positiveParamNumber(searchParams, "tdp") ?? unit?.tdp ?? 0;
-  const shareCicilan = positiveParamNumber(searchParams, "cicilan") ?? unit?.cicilan ?? 0;
-  const shareDp = positiveParamNumber(searchParams, "dp") ?? null;
-  const shareDpPercent = positiveParamNumber(searchParams, "dp_pct") ?? null;
+  const salesContactRequired = requiresSalesContact(unit?.pembiayaan);
+  const requestedDpMinimShare =
+    appliedSimulation?.simTab === "dpminim" ||
+    (!appliedSimulation && searchParams.get("sim") === "dpminim");
+  const shareTenor =
+    appliedSimulation?.tenor ??
+    positiveParamNumber(searchParams, "tenor") ??
+    60;
+  const shareTdp =
+    appliedSimulation?.tdp ??
+    positiveParamNumber(searchParams, "tdp") ??
+    unit?.tdp ??
+    0;
+  const shareCicilan =
+    appliedSimulation?.cicilan ??
+    positiveParamNumber(searchParams, "cicilan") ??
+    unit?.cicilan ??
+    0;
+  const shareDp =
+    appliedSimulation?.dp ??
+    positiveParamNumber(searchParams, "dp") ??
+    null;
+  const shareDpPercent =
+    appliedSimulation?.dpPercent ??
+    positiveParamNumber(searchParams, "dp_pct") ??
+    null;
   const shareHasFinancing = financingEligible && shareTdp > 0 && shareCicilan > 0;
   const isDpMinimShare = requestedDpMinimShare && shareHasFinancing;
-  const shareCreditPrice = financingEligible
-    ? positiveParamNumber(searchParams, "harga_kredit") ?? unit?.harga_kredit ?? null
-    : null;
-  const sharePrice = positiveParamNumber(searchParams, "harga") ?? unit?.harga ?? 0;
-  const captionPrice = shareCreditPrice ?? sharePrice ?? unit?.harga ?? 0;
+  const initialSharePrice = positiveParamNumber(searchParams, "harga") ?? unit?.harga ?? 0;
+  const sharePrice = appliedPrice || initialSharePrice;
+  const unitAdminMessage = unit
+    ? `Halo AI Mobix Assistant! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(sharePrice || unit.harga)}. Bisa bantu info lebih lanjut? 🙏`
+    : "";
+  const unitCalculationMessage = unit
+    ? salesContactRequired
+      ? `Halo Jasmine, saya mau menanyakan opsi pembiayaan lain untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(sharePrice || unit.harga)}. Pembiayaan DSF tidak tersedia untuk unit ini.`
+      : `Halo Admin, saya mau minta hitungan leasing untuk unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(sharePrice || unit.harga)}.\n1. DP minim\n2. Cicilan ringan\n3. Cair All in`
+    : "";
+  const jasmineCalculationHref = buildJasmineWhatsAppHref(unitCalculationMessage);
+  const captionPrice = appliedSimulation?.hargaKredit ?? sharePrice ?? unit?.harga ?? 0;
   const shouldHidePriceInCaption = isDpMinimShare;
   const packageTitle = shareHasFinancing ? (isDpMinimShare ? "DP Minim" : "Kredit") : "Unit";
   const paymentLabel = "TDP";
@@ -607,19 +687,63 @@ export function ShareSheet({ embedded = false }: any = {}) {
     );
   }
 
-  // init when unit loads
+  const lastAutoCaptionRef = useRef("");
+
+  // init when unit loads (jangan reset caption tiap simulasi berubah)
   useEffect(() => {
     if (!unit) return;
-    setSelectedIdxes([0]);
+    const allPhotoIndexes = unit.galeri.map((_, index) => index);
+    setSelectedIdxes(
+      allPhotoIndexes.length > 0 ? allPhotoIndexes : (unit.video?.length ? [0] : []),
+    );
     setPreviewIdx(0);
     setCaptionText(autoCaption);
+    lastAutoCaptionRef.current = autoCaption;
     setPendingShareStep(null);
+    setLiveSimulation(null);
+    setAppliedSimulation(null);
+    setAppliedPrice(initialSharePrice);
+    setPriceInput(new Intl.NumberFormat("id-ID").format(initialSharePrice));
     setAiBackgroundStatus("idle");
     setAiBackgroundProgress(0);
     setAiPreviewMode("ai");
     setAiBackgroundError("");
     replaceAiBackgroundFiles([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hanya re-init saat unit berganti
+  }, [unit?.id]);
+
+  // sinkronkan caption otomatis saat hasil simulasi live siap (jika user belum edit)
+  useEffect(() => {
+    if (!unit || !autoCaption) return;
+    setCaptionText((current) => {
+      if (forceCaptionUpdateRef.current) {
+        forceCaptionUpdateRef.current = false;
+        lastAutoCaptionRef.current = autoCaption;
+        return autoCaption;
+      }
+      if (!current || current === lastAutoCaptionRef.current) {
+        lastAutoCaptionRef.current = autoCaption;
+        return autoCaption;
+      }
+      return current;
+    });
   }, [unit?.id, autoCaption]);
+
+  function applyBuilderPrice() {
+    if (!unit) return;
+    const rawPrice = Number(priceInput.replace(/\D/g, ""));
+    const nextPrice = clampBuilderPrice(rawPrice || unit.harga, unit.harga);
+    forceCaptionUpdateRef.current = nextPrice !== sharePrice;
+    setAppliedPrice(nextPrice);
+    setAppliedSimulation(null);
+    setPriceInput(new Intl.NumberFormat("id-ID").format(nextPrice));
+  }
+
+  function applyCreditSimulation() {
+    if (!liveSimulation?.canShare) return;
+    forceCaptionUpdateRef.current = JSON.stringify(liveSimulation) !== JSON.stringify(appliedSimulation);
+    setAppliedSimulation(liveSimulation);
+  }
 
   // fetch raw blobs (cached) + compose download files whenever selection changes
   useEffect(() => {
@@ -716,11 +840,9 @@ export function ShareSheet({ embedded = false }: any = {}) {
 
   const link = buildAgenMobixUnitLink(unit?.slug);
 
-  function showCopiedState(what: "caption" | "link", fromShare = false) {
-    setCopied(what);
+  function showCopiedState(fromShare = false) {
     if (fromShare) setShareCaptionCopied(true);
     window.setTimeout(() => {
-      setCopied("");
       if (fromShare) setShareCaptionCopied(false);
     }, fromShare ? 2500 : 1500);
   }
@@ -731,12 +853,6 @@ export function ShareSheet({ embedded = false }: any = {}) {
       return true;
     } catch {
       return false;
-    }
-  }
-
-  async function copy(what: "caption" | "link", text: string) {
-    if (await copyToClipboard(text)) {
-      showCopiedState(what);
     }
   }
 
@@ -851,7 +967,7 @@ export function ShareSheet({ embedded = false }: any = {}) {
 
     if (caption) {
       void copyToClipboard(caption).then((ok) => {
-        if (ok) showCopiedState("caption", true);
+        if (ok) showCopiedState(true);
       });
     }
 
@@ -1059,14 +1175,15 @@ export function ShareSheet({ embedded = false }: any = {}) {
   }
 
   function handleShare() {
-    if (embedded) {
-      setShowChannels(true);
-      return;
-    }
-
     const share = async () => {
       const caption = captionText.trim();
       const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
+      const copyShareFallback = async () => {
+        const fallbackText = [caption, link].filter(Boolean).join("\n\n");
+        if (fallbackText && (await copyToClipboard(fallbackText))) {
+          showCopiedState(true);
+        }
+      };
 
       if (pendingShareStep) {
         const shared = await sharePreparedFiles(
@@ -1097,10 +1214,7 @@ export function ShareSheet({ embedded = false }: any = {}) {
           });
           return;
         }
-        if (caption && (await copyToClipboard(caption))) {
-          showCopiedState("caption", true);
-        }
-        setShowChannels((v) => !v);
+        await copyShareFallback();
         return;
       }
 
@@ -1110,7 +1224,7 @@ export function ShareSheet({ embedded = false }: any = {}) {
 
       if (navigator.share && !filesToShare.length) {
         if (caption && (await copyToClipboard(caption))) {
-          showCopiedState("caption", true);
+          showCopiedState(true);
         }
         await navigator.share({
           title,
@@ -1119,52 +1233,43 @@ export function ShareSheet({ embedded = false }: any = {}) {
         return;
       }
 
-      if (caption && (await copyToClipboard(caption))) {
-        showCopiedState("caption", true);
-      }
-
-      setShowChannels((v) => !v);
+      await copyShareFallback();
     };
 
-    void share().catch(() => {
-      setShowChannels((v) => !v);
+    void share().catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      const fallbackText = [captionText.trim(), link].filter(Boolean).join("\n\n");
+      if (fallbackText) {
+        void copyToClipboard(fallbackText).then((ok) => {
+          if (ok) showCopiedState(true);
+        });
+      }
     });
   }
 
-  function shareVia(channel: "wa" | "tg" | "x") {
-    const imageUrls = channel === "wa"
-      ? selectedImageMedia.map((media) =>
-          aiBackgroundUrls[media.id] ?? mobixImage(media.item.url, MOBIX_SHARE_WIDTH),
-        ).filter((url): url is string => Boolean(url))
-      : [];
-    const shareText = channel === "wa"
-      ? buildWhatsAppShareText(captionText, imageUrls)
-      : captionText;
-    const encoded = encodeURIComponent(shareText);
-    const urls: Record<string, string> = {
-      wa: `https://wa.me/?text=${encoded}`,
-      tg: `https://t.me/share/url?url=${encoded}`,
-      x: `https://x.com/intent/tweet?text=${encoded}`,
-    };
-    window.open(urls[channel], "_blank", "noopener");
-    setShowChannels(false);
-  }
+  useImperativeHandle(ref, () => ({ share: handleShare }));
 
-  function handleDownload() {
-    composedFiles.forEach((f, i) => {
+  function downloadFiles(files: File[]) {
+    files.forEach((f, i) => {
       const url = URL.createObjectURL(f);
       const a = document.createElement("a");
       a.href = url;
       const ext = f.type.startsWith("video/")
         ? f.name.split(".").pop() || "mp4"
         : "jpg";
-      a.download = composedFiles.length > 1 ? `unit-${i + 1}.${ext}` : `unit.${ext}`;
+      a.download = files.length > 1 ? `unit-${i + 1}.${ext}` : `unit.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
     });
   }
 
-  const backHref = embedded ? "#simulasi-kredit" : unit ? `/unit/${unit.slug}` : "/katalog";
+  function handleDownload() {
+    downloadFiles(composedFiles);
+  }
+
+  const backHref = embedded
+    ? "#simulasi-kredit"
+    : getCatalogReturnHref(searchParams.toString());
   const aiActiveUrl = activeMedia?.kind === "image" && aiPreviewMode === "ai"
     ? aiBackgroundUrls[activeMedia.id]
     : undefined;
@@ -1177,24 +1282,26 @@ export function ShareSheet({ embedded = false }: any = {}) {
   const priceDelta = unit && sharePrice ? sharePrice - unit.harga : 0;
   const canGenerateAiBackground =
     Boolean(unit) && selectedImageMedia.length > 0 && aiBackgroundStatus !== "generating";
-  const aiBackgroundActiveUrl = activeMedia?.kind === "image"
-    ? aiBackgroundUrls[activeMedia.id]
-    : undefined;
-  const activeHasAiBackground = Boolean(aiBackgroundActiveUrl);
   const selectedAiBackgroundCount = selectedImageMedia.filter((media) => aiBackgroundUrls[media.id]).length;
   const selectedAiBackgroundComplete =
     selectedImageMedia.length > 0 && selectedAiBackgroundCount === selectedImageMedia.length;
-  const aiBackgroundDone = selectedAiBackgroundCount > 0 && aiBackgroundStatus !== "generating";
-  const aiBackgroundPreviewMedia =
-    activeMedia?.kind === "image" && selectedImageMedia.some((media) => media.id === activeMedia.id)
-      ? activeMedia
-      : selectedImageMedia[0];
-  const showAiOriginalToggle = activeMedia?.kind === "image" && activeHasAiBackground;
+  const detailSpecs = unit ? [
+    { label: "Transmisi", value: titleCase(unit.transmisi || "-") },
+    { label: "Kilometer", value: formatOdometer(unit.odometer) },
+    { label: "Kategori", value: titleCase(unit.category || "-") },
+    { label: "Tahun", value: String(unit.year) },
+    { label: "Warna", value: titleCase(unit.color || "-") },
+    { label: "Plat", value: unit.plate_no || "-" },
+  ] : [];
+  const unitDocuments = Object.entries(unit?.kelengkapan_dokumen ?? {});
+  const similarUnits = (unit?.harga_sejenis ?? []).slice(0, 5).map(toCardUnit);
+
+  if (controllerOnly) return null;
 
   return (
     <AppShell overlay={embedded} bare={embedded}>
       {/* sheet */}
-      <div className="min-h-[560px] bg-surface-2 px-4 pb-24 pt-[18px]">
+      <div className={`min-h-[560px] bg-surface-2 px-4 ${embedded ? "pb-24 pt-[18px]" : "pb-[120px] pt-[18px]"}`}>
         {/* shareable preview */}
         <div className="relative mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
           {activeMedia?.kind === "video" ? (
@@ -1225,21 +1332,40 @@ export function ShareSheet({ embedded = false }: any = {}) {
                 {shareHasFinancing && <> · {paymentLabel} {formatJt(paymentValue)}</>}
               </div>
             )}
-            <img
-              src="/mobix-logo.png"
-              alt="Mobix"
-              className="absolute right-3 top-3 h-[18px] w-auto opacity-90 [filter:brightness(0)_invert(1)]"
-            />
+            <button
+              type="button"
+              onClick={() => void handleGenerateAiBackground(selectedAiBackgroundComplete)}
+              disabled={!canGenerateAiBackground}
+              className="absolute right-3 top-3 inline-flex min-h-9 items-center gap-1.5 rounded-full bg-white/90 px-3 text-[11px] font-bold text-teal-deep shadow-sm backdrop-blur disabled:opacity-60"
+            >
+              <Sparkles size={13} />
+              {aiBackgroundStatus === "generating"
+                ? "Memproses..."
+                : selectedAiBackgroundComplete
+                  ? "Foto AI ✓"
+                  : "Foto AI"}
+            </button>
           </Photo>
           )}
-          <Link
-            href={backHref}
-            aria-label="Kembali"
-            className="absolute left-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
-          >
-            <ChevronLeft />
-          </Link>
-          <div className="px-3.5 py-3">
+          {embedded && onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Kembali ke detail unit"
+              className="absolute left-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink backdrop-blur"
+            >
+              <ChevronLeft />
+            </button>
+          ) : (
+            <Link
+              href={backHref}
+              aria-label="Kembali"
+              className="absolute left-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
+            >
+              <ChevronLeft />
+            </Link>
+          )}
+          <div className="relative px-3.5 py-3">
             {loading || !unit ? (
               <div className="space-y-2">
                 <Skeleton className="h-3.5 w-48" />
@@ -1247,31 +1373,22 @@ export function ShareSheet({ embedded = false }: any = {}) {
               </div>
             ) : (
               <>
-                <div className="text-[14px] font-bold">{unit.nama}</div>
-                <div className="mt-0.5 text-[12px] text-muted">
-                  {shareHasFinancing ? (
-                    <>
-                      {packageTitle} {formatRupiah(paymentValue)} · Cicilan {formatRupiah(shareCicilan)}/bln ·{" "}
-                      {shareTenor} bln · {titleCase(unit.lokasi || "Mobix")}
-                    </>
-                  ) : (
-                    <>Harga {formatRupiah(sharePrice || unit.harga)} · {titleCase(unit.lokasi || "Mobix")}</>
-                  )}
-                </div>
-                {shareHasFinancing && (shareCreditPrice || shareDp) && (
-                  <div className="mt-1 text-[11px] text-muted">
-                    {!isDpMinimShare && shareCreditPrice && <>Harga kredit {formatRupiah(shareCreditPrice)}</>}
-                    {!isDpMinimShare && shareCreditPrice && shareDp && " · "}
-                    {shareDp && (
-                      <>
-                        {isDpMinimShare ? "TDP" : "DP"} {formatRupiah(shareDp)}
-                        {!isDpMinimShare &&
-                          shareDpPercent &&
-                          ` (${Math.round(shareDpPercent * 10) / 10}%)`}
-                      </>
-                    )}
-                  </div>
-                )}
+                <textarea
+                  value={captionText}
+                  onChange={(event) => setCaptionText(event.target.value)}
+                  rows={6}
+                  aria-label="Caption share unit"
+                  className="min-h-[132px] w-full resize-y bg-transparent pr-9 text-[12px] leading-[1.65] text-mid outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleCaptionAiHelp}
+                  disabled={captionSuggesting}
+                  aria-label="Buat caption dengan AI"
+                  className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg border border-teal-tint-border bg-teal-tint text-teal-deep disabled:opacity-50"
+                >
+                  <Sparkles size={14} />
+                </button>
               </>
             )}
           </div>
@@ -1341,185 +1458,55 @@ export function ShareSheet({ embedded = false }: any = {}) {
           </div>
         )}
 
-        {/* AI background */}
-        <div className="mb-[18px] rounded-[14px] border border-dashed border-teal-tint-border bg-surface px-3.5 py-3">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-teal-tint-border bg-teal-tint text-teal-deep">
-              <Sparkles size={19} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <div className="text-[13px] font-bold text-ink">AI Background</div>
-                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                  aiBackgroundDone
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-teal-tint text-teal-deep"
-                }`}>
-                  {aiBackgroundDone ? "Selesai" : "Baru"}
-                </span>
-              </div>
-              <div className="mt-1 text-[12px] leading-[1.45] text-mid">
-                Hapus background dan buat background profesional otomatis sesuai angle mobil.
-              </div>
-            </div>
-            {aiBackgroundDone ? (
-              <Check size={18} className="mt-1 shrink-0 text-emerald-600" />
-            ) : (
-              <Info size={18} className="mt-1 shrink-0 text-muted" />
-            )}
-          </div>
-
-          {aiBackgroundStatus === "generating" && (
-            <div className="mt-3 overflow-hidden rounded-[12px] bg-ink">
-              <div className="relative aspect-video">
-                {aiBackgroundPreviewMedia && (
-                  <Photo
-                    className="h-full w-full opacity-45"
-                    src={mobixImage(aiBackgroundPreviewMedia.url, MOBIX_SHARE_WIDTH)}
-                    alt=""
-                  />
-                )}
-                <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center text-surface">
-                  <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/55 bg-white/10">
-                    <Sparkles size={24} />
-                  </div>
-                  <div className="text-[13px] font-bold">Sedang membuat background...</div>
-                  <div className="mt-0.5 text-[12px] text-white/80">Menyesuaikan angle mobil</div>
-                  <div className="mt-3 flex w-full max-w-[250px] items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/25">
-                      <div
-                        className="h-full rounded-full bg-teal-deep transition-all"
-                        style={{ width: `${Math.max(8, aiBackgroundProgress)}%` }}
-                      />
-                    </div>
-                    <span className="w-9 text-right text-[12px] font-bold">
-                      {aiBackgroundProgress}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {aiBackgroundStatus === "failed" && aiBackgroundError && (
-            <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
-              {aiBackgroundError}
-            </div>
-          )}
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            {aiBackgroundDone && (
-              <button
-                type="button"
-                onClick={() => setAiPreviewMode("original")}
-                className="min-h-10 flex-1 rounded-lg border border-line bg-surface px-3 text-[12px] font-bold text-ink"
-              >
-                Lihat Original
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => void handleGenerateAiBackground(selectedAiBackgroundComplete)}
-              disabled={!canGenerateAiBackground}
-              className="min-h-10 flex-1 rounded-lg bg-teal-deep px-3 text-[12px] font-bold text-surface disabled:opacity-50"
-            >
-              {selectedAiBackgroundComplete ? "Generate Ulang" : "Generate Background"}
-            </button>
-          </div>
-
-          {showAiOriginalToggle && (
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="text-[12px] font-bold text-mid">Tampilkan:</span>
-              <div className="grid w-[170px] grid-cols-2 rounded-lg border border-line bg-surface p-0.5 text-[12px] font-bold">
-                <button
-                  type="button"
-                  onClick={() => setAiPreviewMode("ai")}
-                  className={`rounded-md px-3 py-2 ${
-                    aiPreviewMode === "ai" ? "bg-teal-deep text-surface" : "text-mid"
-                  }`}
-                >
-                  AI
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAiPreviewMode("original")}
-                  className={`rounded-md px-3 py-2 ${
-                    aiPreviewMode === "original" ? "bg-teal-deep text-surface" : "text-mid"
-                  }`}
-                >
-                  Original
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* caption – editable */}
-        <div className="mb-[18px] rounded-[14px] border border-line bg-surface px-3.5 py-3">
-          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[11px] font-bold text-muted">
-              Caption (bisa diedit)
-            </span>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={handleCaptionAiHelp}
-                disabled={!unit || captionSuggesting}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-teal-tint px-2 text-[11px] font-bold text-teal-deep disabled:opacity-50"
-              >
-                <Sparkles size={13} />
-                {captionSuggesting ? "Mengolah..." : "Bantuan AI Mobix Assistant"}
-              </button>
-              {unit && captionText !== autoCaption && (
-                <button
-                  onClick={() => setCaptionText(autoCaption)}
-                  className="text-[11px] font-semibold text-muted underline"
-                >
-                  Reset
-                </button>
-              )}
-              <button
-                onClick={() => copy("caption", captionText)}
-                disabled={!unit}
-                className="text-[11px] font-bold text-teal-deep disabled:opacity-40"
-              >
-                {copied === "caption" ? "Tersalin ✓" : "Salin"}
-              </button>
-            </div>
-          </div>
-          {loading || !unit ? (
-            <div className="space-y-2">
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-3 w-2/3" />
-            </div>
-          ) : (
-            <textarea
-              value={captionText}
-              onChange={(e) => setCaptionText(e.target.value)}
-              rows={8}
-              className="min-h-[164px] w-full resize-y bg-transparent text-[12px] leading-[1.55] text-mid outline-none"
-            />
-          )}
-        </div>
-
-        {/* builder price */}
-        <div className="mb-3 flex items-center justify-between rounded-[14px] border border-line bg-surface px-3.5 py-3">
-          <div>
-            <div className="text-[13px] font-semibold text-mid">
-              Harga jual builder
-            </div>
-            {unit && priceDelta !== 0 && (
-              <div className="mt-0.5 text-[10px] text-muted">
-                Harga asli {formatRupiah(unit.harga)}
-              </div>
+        {/* builder price — caption hanya berubah setelah tombol centang ditekan */}
+        <div className="mb-3 rounded-[14px] border border-line bg-surface px-3.5 py-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <label htmlFor="share-builder-price" className="text-[13px] font-semibold text-mid">
+              Pengaturan harga
+            </label>
+            {unit && (
+              <span className="text-[10px] font-semibold text-muted">
+                Min. {formatRupiah(minBuilderPrice(unit.harga))}
+              </span>
             )}
           </div>
           {loading || !unit ? (
-            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-11 w-full" />
           ) : (
-            <span className="text-[15px] font-bold text-ink">
-              {formatRupiah(sharePrice || unit.harga)}
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+                <span className="mr-1.5 text-[13px] font-semibold text-muted">Rp</span>
+                <input
+                  id="share-builder-price"
+                  type="text"
+                  inputMode="numeric"
+                  value={priceInput}
+                  onChange={(event) => {
+                    const raw = event.target.value.replace(/\D/g, "");
+                    setPriceInput(raw ? new Intl.NumberFormat("id-ID").format(Number(raw)) : "");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") applyBuilderPrice();
+                  }}
+                  aria-label="Harga jual builder"
+                  className="min-w-0 flex-1 bg-transparent text-[15px] font-bold text-ink outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={applyBuilderPrice}
+                aria-label="Terapkan harga ke caption"
+                title="Terapkan harga ke caption"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal text-ink"
+              >
+                <Check size={18} strokeWidth={2.8} />
+              </button>
+            </div>
+          )}
+          {unit && priceDelta !== 0 && (
+            <div className="mt-1.5 text-[10px] text-muted">
+              Harga asli {formatRupiah(unit.harga)} · harga aktif {formatRupiah(sharePrice)}
+            </div>
           )}
         </div>
 
@@ -1548,90 +1535,127 @@ export function ShareSheet({ embedded = false }: any = {}) {
           )}
         </div>
 
-        {/* share button */}
-        <div className="relative mb-[18px]">
-          {showChannels && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowChannels(false)}
-              />
-              <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
-                <div className="border-b border-line px-4 py-3 text-center text-[11px] font-bold text-muted">
-                  Bagikan via
-                </div>
-                <div className="grid grid-cols-4 divide-x divide-line">
-                  <button
-                    onClick={() => shareVia("wa")}
-                    className="flex flex-col items-center gap-1.5 py-4 text-[#25D366] transition-colors hover:bg-[#25D366]/10"
-                  >
-                    <WhatsAppSolid size={24} />
-                    <span className="text-[10px] font-semibold text-ink">WhatsApp</span>
-                  </button>
-                  <button
-                    onClick={() => shareVia("tg")}
-                    className="flex flex-col items-center gap-1.5 py-4 text-[#229ED9] transition-colors hover:bg-[#229ED9]/10"
-                  >
-                    <Telegram size={24} />
-                    <span className="text-[10px] font-semibold text-ink">Telegram</span>
-                  </button>
-                  <button
-                    onClick={() => shareVia("x")}
-                    className="flex flex-col items-center gap-1.5 py-4 text-ink transition-colors hover:bg-ink/10"
-                  >
-                    <XTwitter size={24} />
-                    <span className="text-[10px] font-semibold text-ink">X / Twitter</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      void copy("link", link);
-                      setShowChannels(false);
-                    }}
-                    className="flex flex-col items-center gap-1.5 py-4 text-teal-deep transition-colors hover:bg-teal-deep/10"
-                  >
-                    <Copy size={24} />
-                    <span className="text-[10px] font-semibold text-ink">Salin Link</span>
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-          <button
-            onClick={handleShare}
-            disabled={!unit || composing || shareComposing}
-            className="flex min-h-[66px] w-full items-center justify-center gap-2.5 rounded-[18px] bg-teal-deep px-3 py-3.5 text-[15px] font-bold leading-tight text-surface disabled:opacity-50"
-          >
-            {(composing || shareComposing) ? (
-              <span className="text-[13px] opacity-80">Menyiapkan media...</span>
-            ) : pendingShareStep ? (
-              <>
-                <ShareArrow className="shrink-0" size={18} />
-                <span className="min-w-0 text-center">{shareButtonLabel}</span>
-              </>
-            ) : shareCaptionCopied ? (
-              <>
-                <Check className="shrink-0" size={18} strokeWidth={2.4} />
-                <span className="min-w-0 text-center">Caption tersalin</span>
-              </>
-            ) : (
-              <>
-                <ShareArrow className="shrink-0" size={18} />
-                <span className="flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center">
-                  <span>{shareButtonLabel}</span>
-                  {selectedIdxes.length > 0 && (
-                    <span className="text-[12px] opacity-80">
-                      ({selectedMediaButtonLabel})
-                    </span>
-                  )}
-                </span>
-              </>
+        {/* simulasi kredit — collapsible seperti detail unit */}
+        {unit && (
+          <div className="mb-[18px]">
+            <CreditSimulationBox
+              unit={unit}
+              price={sharePrice || unit.harga}
+              initialTenor={positiveParamNumber(searchParams, "tenor") ?? 60}
+              initialDpPercent={positiveParamNumber(searchParams, "dp_pct") ?? undefined}
+              onSimulationChange={handleSimulationChange}
+            />
+            {!salesContactRequired && (
+              <button
+                type="button"
+                onClick={applyCreditSimulation}
+                disabled={!liveSimulation?.canShare}
+                className="-mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-b-[18px] border border-t-0 border-line bg-teal px-4 text-[12px] font-extrabold text-ink disabled:bg-field disabled:text-muted"
+              >
+                <Check size={16} strokeWidth={2.8} />
+                {liveSimulation?.canShare
+                  ? "Terapkan simulasi ke caption"
+                  : "Menunggu hasil simulasi"}
+              </button>
             )}
-          </button>
-        </div>
+          </div>
+        )}
+
+        {unit && (
+          <div className="mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
+            <button
+              type="button"
+              aria-expanded={detailsOpen}
+              onClick={() => setDetailsOpen((open) => !open)}
+              className="flex min-h-[64px] w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+            >
+              <span className="flex-1 text-[15px] font-extrabold text-ink">Cek detail unit lengkapnya</span>
+              <span className={`text-[22px] leading-none text-muted transition-transform ${detailsOpen ? "rotate-90" : ""}`}>›</span>
+            </button>
+
+            {detailsOpen && (
+              <div className="border-t border-line pb-1">
+                <div className="px-3.5 py-4">
+                  <div className="grid grid-cols-3 gap-2">
+                    {detailSpecs.map((spec) => (
+                      <div key={spec.label} className="rounded-xl bg-field p-3 text-center">
+                        <div className="text-[11px] text-muted">{spec.label}</div>
+                        <div className="mt-0.5 truncate text-[13px] font-bold text-ink">{spec.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {unitDocuments.length > 0 && (
+                  <div className="px-[18px] pb-4">
+                    <div className="mb-2 text-[15px] font-extrabold text-ink">Kelengkapan dokumen</div>
+                    <div className="flex flex-col gap-2">
+                      {unitDocuments.map(([key, value]) => {
+                        const isBpkb = key.toLowerCase() === "bpkb";
+                        const available = isBpkb || (/\b(ada|tersedia)\b/i.test(value) && !/^(tidak|belum)\b/i.test(value));
+                        const displayValue = isBpkb ? maskBpkbName(value) : value;
+                        return (
+                          <div key={key} className="flex items-center gap-2.5 rounded-xl bg-field px-3.5 py-2.5">
+                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${available ? "bg-teal text-ink" : "bg-danger-bg text-danger"}`}>
+                              {available ? <Check size={11} /> : <Close size={10} />}
+                            </span>
+                            <span className="text-[13px] font-semibold uppercase text-ink">{key}</span>
+                            <span className="ml-auto text-right text-[12px] text-muted">
+                              {isBpkb && /^(tidak|belum)\b/i.test(value) ? "Ada" : displayValue}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {unit.deskripsi && (
+                  <div className="px-[18px] pb-4">
+                    <div className="mb-2 text-[15px] font-extrabold text-ink">Deskripsi unit</div>
+                    <p className="m-0 whitespace-pre-line text-[13px] leading-[1.6] text-mid">{unit.deskripsi}</p>
+                  </div>
+                )}
+
+                {similarUnits.length > 0 && (
+                  <div className="px-[18px] pb-4">
+                    <div className="mb-2 text-[15px] font-extrabold text-ink">Rekomendasi lain</div>
+                    <div className="flex flex-col gap-2.5">
+                      {similarUnits.map((similar) => <UnitRow key={similar.id} unit={similar} />)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* secondary actions */}
         <div className="flex flex-col gap-2">
+          {embedded && (
+            <div className="mb-1">
+              <button
+                type="button"
+                onClick={handleShare}
+                disabled={!unit || composing || shareComposing}
+                className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-[18px] bg-ink px-3 py-3 text-[14px] font-bold text-surface disabled:opacity-50"
+              >
+                {(composing || shareComposing) ? (
+                  <span className="text-[13px] opacity-80">Menyiapkan media...</span>
+                ) : (
+                  <>
+                    <ShareArrow className="shrink-0" size={16} />
+                    <span>{shareButtonLabel}</span>
+                    {selectedIdxes.length > 0 && !pendingShareStep && (
+                      <span className="text-[12px] opacity-80">({selectedMediaButtonLabel})</span>
+                    )}
+                  </>
+                )}
+              </button>
+            </div>
+          )}
           <button
+            type="button"
             onClick={handleDownload}
             disabled={!unit || composedFiles.length === 0}
             className="flex items-center gap-3 rounded-[14px] border border-line bg-surface p-3.5 text-ink disabled:opacity-50"
@@ -1646,7 +1670,47 @@ export function ShareSheet({ embedded = false }: any = {}) {
           </button>
         </div>
       </div>
-      <FloatingPicAgentCta unit={unit} />
+
+      {/* sticky action bar — selalu on top (fixed), pola sama seperti detail unit */}
+      {!embedded && (
+        <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-50 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
+          <div className="min-w-0">
+            <button
+              type="button"
+              onClick={handleShare}
+              disabled={!unit || composing || shareComposing}
+              className="flex h-12 min-w-0 w-full items-center justify-center gap-2 rounded-2xl bg-ink px-3 text-[13px] font-bold text-surface disabled:opacity-50"
+            >
+              {(composing || shareComposing) ? (
+                <span className="truncate text-[12px] opacity-80">Menyiapkan media...</span>
+              ) : pendingShareStep ? (
+                <>
+                  <ShareArrow className="shrink-0" size={14} />
+                  <span className="truncate">{shareButtonLabel}</span>
+                </>
+              ) : shareCaptionCopied ? (
+                <>
+                  <Check className="shrink-0" size={14} strokeWidth={2.4} />
+                  <span className="truncate">Caption tersalin</span>
+                </>
+              ) : (
+                <>
+                  <span className="truncate">Share ke social media</span>
+                  <ShareArrow size={14} />
+                </>
+              )}
+            </button>
+          </div>
+          <ContactActionMenu
+            adminMessage={unitAdminMessage}
+            calculationMessage={unitCalculationMessage}
+            calculationHref={salesContactRequired ? jasmineCalculationHref : undefined}
+            adminLabel="Tanya Admin"
+            calculationLabel={salesContactRequired ? "Tanya Opsi Pembiayaan" : "Minta Hitungan"}
+            buttonClassName="flex h-12 w-full items-center justify-center rounded-2xl border border-teal-tint-border bg-teal text-ink"
+          />
+        </div>
+      )}
     </AppShell>
   );
-}
+});

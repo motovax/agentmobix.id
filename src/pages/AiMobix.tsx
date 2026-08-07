@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ComponentType } from "react";
-import { Link } from "wouter";
+import { useEffect, useRef, useState, type ComponentType, type MouseEvent } from "react";
+import { Link, useLocation } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { ChevronLeft, Search, Send } from "../components/icons";
 import {
@@ -32,6 +32,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 ];
 
 export function AiMobix() {
+  const [, navigate] = useLocation();
   const [messages, setMessages] = useState<Message[]>(SEED);
   const [draft, setDraft] = useState("");
   const [isSearchingInventory, setIsSearchingInventory] = useState(false);
@@ -39,6 +40,31 @@ export function AiMobix() {
   const conversationRef = useRef<FalconConversationTurn[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  function handleMessageLinkClick(event: MouseEvent<HTMLDivElement>) {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const link = target.closest<HTMLAnchorElement>('a[data-ai-unit-link="true"]');
+    if (!link) return;
+
+    const url = new URL(link.href, window.location.origin);
+    if (url.origin !== window.location.origin || url.pathname !== "/share") return;
+
+    event.preventDefault();
+    navigate(`${url.pathname}${url.search}${url.hash}`);
+  }
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -107,9 +133,12 @@ export function AiMobix() {
         {messages.map((m) => {
           if (m.kind === "in") {
             return (
-              <div key={m.id} className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] leading-[1.5] text-ink">
-                <div dangerouslySetInnerHTML={{ __html: m.html }} />
-              </div>
+              <div
+                key={m.id}
+                onClick={handleMessageLinkClick}
+                className="max-w-[86%] break-words self-start rounded-[16px_16px_16px_5px] border border-[#EEF2F3] bg-surface px-3.5 py-3 text-[13px] leading-[1.5] text-ink"
+                dangerouslySetInnerHTML={{ __html: m.html }}
+              />
             );
           }
           if (m.kind === "out") {

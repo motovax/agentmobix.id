@@ -8,7 +8,7 @@ import { AppBar } from "../components/AppBar";
 import { ContactActionMenu } from "../components/FloatingContactCta";
 import { Photo, Skeleton } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
-import { ChevronLeft, ShareArrow, Check, Close, Play, Sparkles } from "../components/icons";
+import { ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
 import {
   fetchUnitDetail,
   mobixImage,
@@ -127,12 +127,11 @@ function maskBpkbValue(value: string) {
   return maskPersonName(value);
 }
 
-export function UnitDetail() {
-  const { slug } = useParams<{ slug: string }>();
+export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
+  const { slug: routeSlug } = useParams<{ slug?: string }>();
+  const slug = unitSlug ?? routeSlug ?? "";
   const search = useSearch();
-  const searchParams = new URLSearchParams(search);
   const returnHref = getCatalogReturnHref(search);
-  const sharePanelOpen = searchParams.get("share") === "1";
   const { data: unit, loading, error } = useAsync(
     () => fetchUnitDetail(slug),
     [slug],
@@ -147,6 +146,7 @@ export function UnitDetail() {
   const [lightbox, setLightbox] = useState(false);
   const [simulationOpen, setSimulationOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [dpPercentInput, setDpPercentInput] = useState(String(MIN_DP_PERCENT));
   const [dpAmountInput, setDpAmountInput] = useState("");
   const [tdpAmount, setTdpAmount] = useState(0);
@@ -167,15 +167,6 @@ export function UnitDetail() {
   const [smartCreditPriceError, setSmartCreditPriceError] = useState(false);
   const pageRef = useRef<HTMLElement>(null);
   const galleryRef = useRef<Splide>(null);
-  const sharePanelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!sharePanelOpen || !unit) return;
-    const frame = window.requestAnimationFrame(() => {
-      sharePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [sharePanelOpen, unit]);
 
   const originalPrice = unit?.harga ?? 0;
   const price = builderPrice > 0 ? builderPrice : originalPrice;
@@ -284,9 +275,8 @@ export function UnitDetail() {
     creditPriceForDisplay !== null;
   const currencyFormatter = new Intl.NumberFormat("id-ID");
   const shareTenor = simTab === "dpminim" ? dpMinimInstallmentCount(tenor) : tenor;
-  const shareHref = canShareSimulation
-    ? `/unit/${encodeURIComponent(unit?.slug ?? slug ?? "")}?${new URLSearchParams({
-        share: "1",
+  const shareParams = canShareSimulation
+    ? new URLSearchParams({
         u: unit?.slug ?? slug ?? "",
         sim: simTab,
         harga: String(Math.round(price)),
@@ -299,23 +289,15 @@ export function UnitDetail() {
           : {}),
         cicilan: String(Math.round(displayMonthly)),
         tdp: String(Math.round(shareTdp)),
-        }).toString()}`
+        })
     : salesContactRequired && unit
-      ? `/unit/${encodeURIComponent(unit.slug)}?${new URLSearchParams({
-          share: "1",
+      ? new URLSearchParams({
           u: unit.slug,
           harga: String(Math.round(price)),
           komisi: String(Math.round(estimatedCommission)),
-      }).toString()}`
+        })
       : null;
-  const aiShareHref = unit
-    ? shareHref ?? `/unit/${encodeURIComponent(unit.slug)}?${new URLSearchParams({
-        share: "1",
-        u: unit.slug,
-        harga: String(Math.round(price)),
-        komisi: String(Math.round(estimatedCommission)),
-      }).toString()}`
-    : null;
+  const shareHref = shareParams ? `/share?${shareParams.toString()}` : null;
   const unitAdminMessage = unit
     ? `Halo AI Mobix Assistant! Mau tanya soal unit *${unit.nama}* (plat ${unit.plate_no}) di cabang ${titleCase(unit.lokasi || "Mobix")}, harga ${formatRupiah(price)}. Bisa bantu info lebih lanjut? 🙏`
     : undefined;
@@ -948,13 +930,14 @@ export function UnitDetail() {
             <ChevronLeft />
           </Link>
           {shareHref ? (
-            <Link
-              href={shareHref}
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
               aria-label="Share"
-              className="absolute right-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink no-underline backdrop-blur"
+              className="absolute right-3.5 top-3.5 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/90 text-ink backdrop-blur"
             >
               <ShareArrow size={17} />
-            </Link>
+            </button>
           ) : (
             <button
               type="button"
@@ -964,15 +947,6 @@ export function UnitDetail() {
             >
               <ShareArrow size={17} />
             </button>
-          )}
-          {aiShareHref && (
-            <Link
-              href={aiShareHref}
-              aria-label="Buat konten dengan AI"
-              className="absolute right-3.5 top-[62px] flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/70 bg-teal-deep text-white shadow-sm backdrop-blur"
-            >
-              <Sparkles size={18} />
-            </Link>
           )}
           <div className="absolute bottom-3.5 left-3.5 rounded-xl bg-ink/85 px-3 py-2 text-surface shadow-sm backdrop-blur">
             <div className="text-[16px] font-extrabold leading-none">
@@ -1096,24 +1070,6 @@ export function UnitDetail() {
               </div>
             )}
           </>
-        )}
-
-        {aiShareHref && (
-          <Link
-            href={aiShareHref}
-            className="mx-[18px] mb-2 flex items-center gap-3 rounded-[14px] border border-teal-tint-border bg-teal-tint px-3.5 py-3 text-ink no-underline"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-teal-deep shadow-sm">
-              <Sparkles size={19} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-extrabold">Buat konten dengan AI</span>
-              <span className="mt-0.5 block text-[11px] leading-[1.4] text-mid">
-                Ganti background foto dan buat caption siap share.
-              </span>
-            </span>
-            <span className="text-[22px] leading-none text-teal-deep">›</span>
-          </Link>
         )}
 
         {/* TITLE BLOCK */}
@@ -1245,7 +1201,7 @@ export function UnitDetail() {
             type="button"
             aria-expanded={simulationOpen}
             onClick={() => setSimulationOpen((open) => !open)}
-            className="flex w-full items-center gap-3 rounded-[18px] border border-line bg-surface px-4 py-3 text-left"
+            className={`flex w-full items-center gap-3 border border-line bg-surface px-4 py-3 text-left ${simulationOpen ? "rounded-t-[18px] border-b-0" : "rounded-[18px]"}`}
           >
             <span className="flex-1">
               <span className="flex items-center gap-2 text-[15px] font-extrabold text-ink">
@@ -1264,8 +1220,8 @@ export function UnitDetail() {
           </button>
 
           {simulationOpen && (salesContactRequired ? (
-          <div className="pt-3">
-            <div className="rounded-[18px] border border-[#E8C98B] bg-[#FFF8E8] p-4">
+          <div>
+            <div className="rounded-b-[18px] border border-t-0 border-[#E8C98B] bg-[#FFF8E8] p-4">
               <div className="inline-flex rounded-full bg-[#F7DFAC] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#7A4700]">
                 Tidak eligible DSF
               </div>
@@ -1296,8 +1252,8 @@ export function UnitDetail() {
             </div>
           </div>
         ) : (
-        <div className="pt-3">
-          <div className="rounded-[18px] border border-line bg-surface p-4">
+          <div>
+            <div className="rounded-b-[18px] border border-t-0 border-line bg-surface p-4">
             <div className="mb-3.5 flex items-center justify-between">
               <div className="-tracking-[0.01em] text-[15px] font-extrabold">
                 Simulasi Hitung Kredit
@@ -1739,18 +1695,6 @@ export function UnitDetail() {
         ))}
         </div>
 
-        {sharePanelOpen && (
-          <div ref={sharePanelRef} id="share-client" className="scroll-mt-3 border-t border-line-2 pt-4">
-            <div className="px-[18px] pb-1">
-              <div className="text-[16px] font-extrabold text-ink">Generate &amp; share ke client</div>
-              <p className="m-0 mt-1 text-[12px] text-muted">
-                Gunakan hasil simulasi di atas untuk membuat caption dan membagikan unit.
-              </p>
-            </div>
-            <ShareSheet embedded />
-          </div>
-        )}
-
         {/* DETAIL ACCORDION — selalu berada di bawah simulasi */}
         <div className="mx-[18px] mb-4 mt-1 overflow-hidden rounded-[18px] border border-line bg-surface">
           <button
@@ -1851,13 +1795,14 @@ export function UnitDetail() {
       {/* STICKY ACTIONS */}
       <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-40 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
         {shareHref ? (
-          <Link
-            href={shareHref}
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
             className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl bg-ink px-3 text-[13px] font-bold text-surface no-underline"
           >
-            <span className="truncate">Share ke klien</span>
+            <span className="truncate">Share ke social media</span>
             <ShareArrow size={14} />
-          </Link>
+          </button>
         ) : (
           <button
             type="button"
@@ -1879,6 +1824,19 @@ export function UnitDetail() {
           buttonClassName="flex h-12 w-full items-center justify-center rounded-2xl border border-teal-tint-border bg-teal text-ink"
         />
       </div>
+      {shareOpen && shareParams && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-surface-2" role="dialog" aria-modal="true" aria-label="Bagikan unit">
+          <div className="mx-auto min-h-full w-full sm:max-w-[412px]">
+            <ShareSheet
+              embedded
+              unitData={unit}
+              unitSlug={unit.slug}
+              params={`?${shareParams.toString()}`}
+              onClose={() => setShareOpen(false)}
+            />
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
