@@ -88,6 +88,33 @@ export function buildNativeSharePayload(
   return textOnly;
 }
 
+/**
+ * Many phones reject large multi-file shares (canShare false or share() throws).
+ * Pick the largest prefix of `files` that canShare accepts (sync — keep user gesture).
+ * Order: all → 5 → 3 → 1.
+ */
+export function pickNativeShareableFiles(
+  files: File[],
+  title: string,
+  text: string,
+): File[] {
+  if (files.length === 0) return [];
+
+  const sizes = Array.from(
+    new Set([files.length, 5, 3, 1].filter((n) => n > 0 && n <= files.length)),
+  ).sort((a, b) => b - a);
+
+  for (const size of sizes) {
+    const batch = files.slice(0, size);
+    if (buildNativeSharePayload(batch, title, text)) {
+      return batch;
+    }
+  }
+
+  // Last resort: single file even if canShare is picky (caller may still fail).
+  return files.slice(0, 1);
+}
+
 export async function copyTextToClipboard(text: string): Promise<boolean> {
   const value = text.trim();
   if (!value) return false;

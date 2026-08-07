@@ -67,6 +67,7 @@ import {
   channelNeedsClipboardFirst,
   copyTextToClipboard,
   isShareAbortError,
+  pickNativeShareableFiles,
   prefersNativeWebShare,
   type ShareChannel,
 } from "../lib/shareActions";
@@ -706,9 +707,10 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   // init when unit loads (jangan reset caption tiap simulasi berubah)
   useEffect(() => {
     if (!unit) return;
-    const allPhotoIndexes = unit.galeri.map((_, index) => index);
+    // Default 1 foto dulu — share multi-file di Android sering ditolak (canShare/share gagal → popup).
+    // User bisa multi-select manual kalau mau.
     setSelectedIdxes(
-      allPhotoIndexes.length > 0 ? allPhotoIndexes : (unit.video?.length ? [0] : []),
+      unit.galeri.length > 0 ? [0] : unit.video?.length ? [0] : [],
     );
     setPreviewIdx(0);
     setCaptionText(autoCaption);
@@ -764,6 +766,9 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     if (!unit || !mediaItems.length) return;
     let alive = true;
     setComposing(true);
+    // Jangan share file lama saat seleksi baru masih disusun (stale multi-file → gagal native).
+    setComposedFiles([]);
+    setPendingShareStep(null);
 
     const selectedMedia = selectedIdxes
       .map((i) => mediaItems[i])
@@ -788,7 +793,10 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     }
 
     run().catch(() => {
-      if (alive) setComposing(false);
+      if (alive) {
+        setComposedFiles([]);
+        setComposing(false);
+      }
     });
 
     return () => {
@@ -934,6 +942,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
    * Start native file share from the click handler (no prior await) so user
    * activation stays valid. Returns null when native share is unavailable.
    * Smartphones: system share sheet (installed apps). Desktop: skipped.
+   * Auto-reduce file count when canShare rejects large multi-file batches.
    */
   function sharePreparedFiles(
     files: File[],
@@ -943,7 +952,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     if (!prefersNativeWebShare() || files.length === 0) return null;
 
     const shareText = buildShareText(caption, link);
-    const payload = buildNativeSharePayload(files, title, shareText);
+    const shareable = pickNativeShareableFiles(files, title, shareText);
+    const payload = buildNativeSharePayload(shareable, title, shareText);
     if (!payload) return null;
 
     // Backup: many apps drop caption when receiving files.
@@ -1170,6 +1180,10 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   function handleShare() {
     const caption = captionText.trim();
     const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
+
+    // Media masih disusun — jangan fallback popup (sering terasa "kadang popup").
+    if (composing) return;
+
     const filesToShare = pendingShareStep?.files ?? composedFiles;
     const imageFiles = filesToShare.filter((file) => file.type.startsWith("image/"));
     const videoFiles = filesToShare.filter((file) => file.type.startsWith("video/"));
@@ -1200,6 +1214,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       ?? shareWithoutFiles(title, caption);
 
     if (!sharePromise) {
+      // HP tanpa file siap: coba text native dulu sudah di atas; desktop → popup.
       fallbackChannelShare(caption);
       return;
     }
@@ -1211,6 +1226,24 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       .catch((error: unknown) => {
         // User dismissed the system sheet — stay silent (no channel popup).
         if (isShareAbortError(error)) return;
+
+        // File share sering gagal di Android (terlalu banyak/besar).
+        // Langsung retry text-only di rantai catch yang sama (masih sering diizinkan).
+        if (filesForCurrentStep.length > 0) {
+          const textOnly = shareWithoutFiles(title, caption);
+          if (textOnly) {
+            void textOnly
+              .then(() => {
+                markShareStepDone();
+              })
+              .catch((error2: unknown) => {
+                if (isShareAbortError(error2)) return;
+                fallbackChannelShare(caption);
+              });
+            return;
+          }
+        }
+
         fallbackChannelShare(caption);
       });
   }
@@ -1693,10 +1726,10 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
               <button
                 type="button"
                 onClick={handleShare}
-                disabled={!unit || (composing && composedFiles.length === 0)}
+                disabled={!unit || composing}
                 className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-[18px] bg-ink px-3 py-3 text-[14px] font-bold text-surface disabled:opacity-50"
               >
-                {composing && composedFiles.length === 0 ? (
+                {composing ? (
                   <span className="text-[13px] opacity-80">Menyiapkan media...</span>
                 ) : shareCaptionCopied ? (
                   <>
@@ -1740,10 +1773,10 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
             <button
               type="button"
               onClick={handleShare}
-              disabled={!unit || (composing && composedFiles.length === 0)}
+              disabled={!unit || composing}
               className="flex h-12 min-w-0 w-full items-center justify-center gap-2 rounded-2xl bg-ink px-3 text-[13px] font-bold text-surface disabled:opacity-50"
             >
-              {composing && composedFiles.length === 0 ? (
+              {composing ? (
                 <span className="truncate text-[12px] opacity-80">Menyiapkan media...</span>
               ) : shareCaptionCopied ? (
                 <>

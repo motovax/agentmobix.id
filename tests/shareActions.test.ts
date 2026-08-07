@@ -5,6 +5,7 @@ import {
   buildShareText,
   channelNeedsClipboardFirst,
   isShareAbortError,
+  pickNativeShareableFiles,
   prefersNativeWebShare,
 } from "../src/lib/shareActions";
 
@@ -194,5 +195,43 @@ describe("isShareAbortError", () => {
       true,
     );
     expect(isShareAbortError(new Error("other"))).toBe(false);
+  });
+});
+
+describe("pickNativeShareableFiles", () => {
+  test("returns largest batch that canShare accepts", () => {
+    const original = globalThis.navigator;
+    const files = [1, 2, 3, 4, 5, 6].map(
+      (n) => new File([`x${n}`], `unit-${n}.jpg`, { type: "image/jpeg" }),
+    );
+    // @ts-expect-error test stub
+    globalThis.navigator = {
+      share: async () => {},
+      canShare: (data: ShareData) => (data.files?.length ?? 0) <= 3,
+    };
+    try {
+      const picked = pickNativeShareableFiles(files, "T", "caption");
+      expect(picked).toHaveLength(3);
+      expect(picked[0].name).toBe("unit-1.jpg");
+    } finally {
+      globalThis.navigator = original;
+    }
+  });
+
+  test("falls back to single file when multi-file is rejected", () => {
+    const original = globalThis.navigator;
+    const files = [1, 2, 3].map(
+      (n) => new File([`x${n}`], `unit-${n}.jpg`, { type: "image/jpeg" }),
+    );
+    // @ts-expect-error test stub
+    globalThis.navigator = {
+      share: async () => {},
+      canShare: (data: ShareData) => (data.files?.length ?? 0) === 1,
+    };
+    try {
+      expect(pickNativeShareableFiles(files, "T", "c")).toHaveLength(1);
+    } finally {
+      globalThis.navigator = original;
+    }
   });
 });
