@@ -1081,11 +1081,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   }
 
   function handleShare() {
-    if (!embedded && !controllerOnly) {
-      setShowChannels((visible) => !visible);
-      return;
-    }
-
     const share = async () => {
       const caption = captionText.trim();
       const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
