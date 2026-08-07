@@ -3,7 +3,7 @@
  * and Web Share API capability checks.
  */
 
-export type ShareChannel = "wa" | "tg" | "x" | "fb" | "ig" | "threads";
+export type ShareChannel = "wa" | "tg" | "x" | "fb" | "ig" | "threads" | "tt";
 
 /** Caption + unit link ready to paste into chat apps. */
 export function buildShareText(caption: string, link: string): string {
@@ -158,11 +158,11 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
 }
 
 /**
- * Instagram has no public web intent that pre-fills a post caption.
- * Caller should copy caption+link first, then open this URL.
+ * Instagram / TikTok have no public web intent that pre-fills a post caption.
+ * Caller should copy caption+link first, then open the app/site.
  */
 export function channelNeedsClipboardFirst(channel: ShareChannel): boolean {
-  return channel === "ig";
+  return channel === "ig" || channel === "tt";
 }
 
 /** Deep links / web intents for channel picker fallback. */
@@ -191,6 +191,9 @@ export function buildChannelShareUrl(
     case "ig":
       // No prefilled caption intent — open Instagram; paste from clipboard.
       return "https://www.instagram.com/";
+    case "tt":
+      // No prefilled caption intent — open TikTok; paste caption after upload.
+      return "https://www.tiktok.com/";
     case "threads":
       return `https://www.threads.net/intent/post?text=${encodedText}`;
     default:

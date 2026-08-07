@@ -71,6 +71,11 @@ describe("buildChannelShareUrl", () => {
     expect(channelNeedsClipboardFirst("wa")).toBe(false);
   });
 
+  test("TikTok opens app/site (caption via clipboard first)", () => {
+    expect(buildChannelShareUrl("tt", caption, link)).toBe("https://www.tiktok.com/");
+    expect(channelNeedsClipboardFirst("tt")).toBe(true);
+  });
+
   test("Threads intent embeds full caption + link", () => {
     const url = buildChannelShareUrl("threads", caption, link);
     expect(url.startsWith("https://www.threads.net/intent/post?text=")).toBe(true);

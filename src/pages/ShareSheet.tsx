@@ -23,6 +23,7 @@ import {
   FacebookSolid,
   InstagramSolid,
   Threads,
+  TikTokSolid,
 } from "../components/icons";
 import {
   fetchUnitDetail,
@@ -1256,7 +1257,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       setShowChannels(false);
     };
 
-    // Instagram has no web intent with prefilled caption — copy first, then open app/site.
+    // IG/TikTok have no web intent with prefilled caption — copy first, then open app/site.
     if (channelNeedsClipboardFirst(channel)) {
       void copyShareCaption(caption).finally(openChannel);
       return;
@@ -1307,6 +1308,10 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
               <InstagramSolid size={compact ? 22 : 24} />
               <span className={label}>{compact ? "IG" : "Instagram"}</span>
             </button>
+            <button type="button" onClick={() => shareVia("tt")} className={`${cell} text-ink hover:bg-ink/10`}>
+              <TikTokSolid size={compact ? 22 : 24} />
+              <span className={label}>TikTok</span>
+            </button>
             <button type="button" onClick={() => shareVia("threads")} className={`${cell} text-ink hover:bg-ink/10`}>
               <Threads size={icon} />
               <span className={label}>Threads</span>
@@ -1328,7 +1333,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
             </button>
           </div>
           <div className="border-t border-line px-3 py-2 text-center text-[10px] leading-snug text-muted">
-            Instagram: caption disalin otomatis — tempel di post/story.
+            IG & TikTok: caption disalin otomatis — tempel di post/video.
           </div>
         </div>
       </>
