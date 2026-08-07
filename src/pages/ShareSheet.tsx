@@ -20,6 +20,10 @@ import {
   WhatsAppSolid,
   Telegram,
   XTwitter,
+  FacebookSolid,
+  InstagramSolid,
+  Threads,
+  TikTokSolid,
 } from "../components/icons";
 import {
   fetchUnitDetail,
@@ -70,8 +74,10 @@ import {
   buildChannelShareUrl,
   buildNativeSharePayload,
   buildShareText,
+  channelNeedsClipboardFirst,
   copyTextToClipboard,
   isShareAbortError,
+  pickNativeShareableFiles,
   prefersNativeWebShare,
   type ShareChannel,
 } from "../lib/shareActions";
@@ -776,9 +782,10 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   // init when unit loads (jangan reset caption tiap simulasi berubah)
   useEffect(() => {
     if (!unit) return;
-    const allPhotoIndexes = unit.galeri.map((_, index) => index);
+    // Default 1 foto dulu — share multi-file di Android sering ditolak (canShare/share gagal → popup).
+    // User bisa multi-select manual kalau mau.
     setSelectedIdxes(
-      allPhotoIndexes.length > 0 ? allPhotoIndexes : (unit.video?.length ? [0] : []),
+      unit.galeri.length > 0 ? [0] : unit.video?.length ? [0] : [],
     );
     setPreviewIdx(0);
     setCaptionText(autoCaption);
@@ -878,6 +885,9 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     if (!unit || !mediaItems.length) return;
     let alive = true;
     setComposing(true);
+    // Jangan share file lama saat seleksi baru masih disusun (stale multi-file → gagal native).
+    setComposedFiles([]);
+    setPendingShareStep(null);
 
     const selectedMedia = selectedIdxes
       .map((i) => mediaItems[i])
@@ -902,7 +912,10 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     }
 
     run().catch(() => {
-      if (alive) setComposing(false);
+      if (alive) {
+        setComposedFiles([]);
+        setComposing(false);
+      }
     });
 
     return () => {
@@ -1038,7 +1051,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     setShowChannels(true);
   }
 
-  function fallbackDesktopShare(caption: string) {
+  /** Desktop / unsupported browser: channel picker (not used when user cancels native sheet). */
+  function fallbackChannelShare(caption: string) {
     void copyShareCaption(caption);
     openShareChannels();
   }
@@ -1046,6 +1060,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   /**
    * Start native file share from the click handler (no prior await) so user
    * activation stays valid. Returns null when native share is unavailable.
+   * Smartphones: system share sheet (installed apps). Desktop: skipped.
+   * Auto-reduce file count when canShare rejects large multi-file batches.
    */
   function sharePreparedFiles(
     files: File[],
@@ -1055,7 +1071,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     if (!prefersNativeWebShare() || files.length === 0) return null;
 
     const shareText = buildShareText(caption, link);
-    const payload = buildNativeSharePayload(files, title, shareText);
+    const shareable = pickNativeShareableFiles(files, title, shareText);
+    const payload = buildNativeSharePayload(shareable, title, shareText);
     if (!payload) return null;
 
     // Backup: many apps drop caption when receiving files.
@@ -1303,6 +1320,10 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   function handleShare() {
     const caption = captionText.trim();
     const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
+
+    // Media masih disusun — jangan fallback popup (sering terasa "kadang popup").
+    if (composing) return;
+
     const filesToShare = pendingShareStep?.files ?? composedFiles;
     const imageFiles = filesToShare.filter((file) => file.type.startsWith("image/"));
     const videoFiles = filesToShare.filter((file) => file.type.startsWith("video/"));
@@ -1324,7 +1345,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       }
     };
 
-    // Native share only on mobile-like devices; desktop gets channel picker.
+    // Smartphone: native system share sheet first (pick installed apps).
+    // Desktop / unsupported / failed (not user cancel): channel picker popup.
     // Call navigator.share synchronously from the click (no prior await) so
     // transient user activation remains valid.
     const sharePromise =
@@ -1332,7 +1354,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       ?? shareWithoutFiles(title, caption);
 
     if (!sharePromise) {
-      fallbackDesktopShare(caption);
+      // HP tanpa file siap: coba text native dulu sudah di atas; desktop → popup.
+      fallbackChannelShare(caption);
       return;
     }
 
@@ -1341,15 +1364,119 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         markShareStepDone();
       })
       .catch((error: unknown) => {
+        // User dismissed the system sheet — stay silent (no channel popup).
         if (isShareAbortError(error)) return;
-        fallbackDesktopShare(caption);
+
+        // File share sering gagal di Android (terlalu banyak/besar).
+        // Langsung retry text-only di rantai catch yang sama (masih sering diizinkan).
+        if (filesForCurrentStep.length > 0) {
+          const textOnly = shareWithoutFiles(title, caption);
+          if (textOnly) {
+            void textOnly
+              .then(() => {
+                markShareStepDone();
+              })
+              .catch((error2: unknown) => {
+                if (isShareAbortError(error2)) return;
+                fallbackChannelShare(caption);
+              });
+            return;
+          }
+        }
+
+        fallbackChannelShare(caption);
       });
   }
 
   function shareVia(channel: ShareChannel) {
-    const url = buildChannelShareUrl(channel, captionText.trim(), link);
-    window.open(url, "_blank", "noopener");
-    setShowChannels(false);
+    const caption = captionText.trim();
+    const openChannel = () => {
+      const url = buildChannelShareUrl(channel, caption, link);
+      window.open(url, "_blank", "noopener");
+      setShowChannels(false);
+    };
+
+    // IG/TikTok have no web intent with prefilled caption — copy first, then open app/site.
+    if (channelNeedsClipboardFirst(channel)) {
+      void copyShareCaption(caption).finally(openChannel);
+      return;
+    }
+
+    openChannel();
+  }
+
+  function renderChannelPicker(compact: boolean) {
+    const icon = compact ? 20 : 22;
+    const cell = compact
+      ? "flex flex-col items-center gap-1 py-3 transition-colors"
+      : "flex flex-col items-center gap-1.5 py-3.5 transition-colors";
+    const label = "text-[10px] font-semibold text-ink";
+
+    return (
+      <>
+        <div
+          className={compact ? "fixed inset-0 z-40" : "fixed inset-0 z-10"}
+          onClick={() => setShowChannels(false)}
+        />
+        <div
+          className={
+            compact
+              ? "absolute bottom-full left-0 right-0 z-50 mb-2 max-h-[70vh] overflow-y-auto overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl"
+              : "absolute bottom-full left-0 right-0 z-20 mb-2 max-h-[70vh] overflow-y-auto overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl"
+          }
+        >
+          <div className="border-b border-line px-3 py-2.5 text-center text-[11px] font-bold text-muted">
+            {shareCaptionCopied
+              ? "Caption + link tersalin — pilih channel"
+              : "Bagikan via"}
+          </div>
+          <div className="grid grid-cols-4 divide-x divide-y divide-line">
+            <button type="button" onClick={() => shareVia("wa")} className={`${cell} text-[#25D366] hover:bg-[#25D366]/10`}>
+              <WhatsAppSolid size={compact ? 22 : 24} />
+              <span className={label}>{compact ? "WA" : "WhatsApp"}</span>
+            </button>
+            <button type="button" onClick={() => shareVia("tg")} className={`${cell} text-[#229ED9] hover:bg-[#229ED9]/10`}>
+              <Telegram size={icon} />
+              <span className={label}>{compact ? "TG" : "Telegram"}</span>
+            </button>
+            <button type="button" onClick={() => shareVia("fb")} className={`${cell} text-[#1877F2] hover:bg-[#1877F2]/10`}>
+              <FacebookSolid size={compact ? 22 : 24} />
+              <span className={label}>Facebook</span>
+            </button>
+            <button type="button" onClick={() => shareVia("ig")} className={`${cell} text-[#E4405F] hover:bg-[#E4405F]/10`}>
+              <InstagramSolid size={compact ? 22 : 24} />
+              <span className={label}>{compact ? "IG" : "Instagram"}</span>
+            </button>
+            <button type="button" onClick={() => shareVia("tt")} className={`${cell} text-ink hover:bg-ink/10`}>
+              <TikTokSolid size={compact ? 22 : 24} />
+              <span className={label}>TikTok</span>
+            </button>
+            <button type="button" onClick={() => shareVia("threads")} className={`${cell} text-ink hover:bg-ink/10`}>
+              <Threads size={icon} />
+              <span className={label}>Threads</span>
+            </button>
+            <button type="button" onClick={() => shareVia("x")} className={`${cell} text-ink hover:bg-ink/10`}>
+              <XTwitter size={icon} />
+              <span className={label}>{compact ? "X" : "X / Twitter"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void copyShareCaption(captionText.trim());
+                setShowChannels(false);
+              }}
+              className={`${cell} text-teal-deep hover:bg-teal-deep/10`}
+            >
+              <Copy size={icon} />
+              <span className={label}>{compact ? "Salin" : "Salin teks"}</span>
+            </button>
+          </div>
+          <div className="border-t border-line px-3 py-2 text-center text-[10px] leading-snug text-muted">
+            IG & TikTok: caption disalin otomatis — tempel di post/video.
+          </div>
+        </div>
+      </>
+    );
   }
 
   useImperativeHandle(ref, () => ({ share: handleShare }));
@@ -1741,65 +1868,14 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         <div className="flex flex-col gap-2">
           {embedded && (
             <div className="relative mb-1">
-              {showChannels && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setShowChannels(false)}
-                  />
-                  <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
-                    <div className="border-b border-line px-4 py-3 text-center text-[11px] font-bold text-muted">
-                      {shareCaptionCopied
-                        ? "Caption + link tersalin — pilih channel"
-                        : "Bagikan via"}
-                    </div>
-                    <div className="grid grid-cols-4 divide-x divide-line">
-                      <button
-                        type="button"
-                        onClick={() => shareVia("wa")}
-                        className="flex flex-col items-center gap-1.5 py-4 text-[#25D366] transition-colors hover:bg-[#25D366]/10"
-                      >
-                        <WhatsAppSolid size={24} />
-                        <span className="text-[10px] font-semibold text-ink">WhatsApp</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => shareVia("tg")}
-                        className="flex flex-col items-center gap-1.5 py-4 text-[#229ED9] transition-colors hover:bg-[#229ED9]/10"
-                      >
-                        <Telegram size={24} />
-                        <span className="text-[10px] font-semibold text-ink">Telegram</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => shareVia("x")}
-                        className="flex flex-col items-center gap-1.5 py-4 text-ink transition-colors hover:bg-ink/10"
-                      >
-                        <XTwitter size={24} />
-                        <span className="text-[10px] font-semibold text-ink">X / Twitter</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void copyShareCaption(captionText.trim());
-                          setShowChannels(false);
-                        }}
-                        className="flex flex-col items-center gap-1.5 py-4 text-teal-deep transition-colors hover:bg-teal-deep/10"
-                      >
-                        <Copy size={24} />
-                        <span className="text-[10px] font-semibold text-ink">Salin teks</span>
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
+              {showChannels && renderChannelPicker(false)}
               <button
                 type="button"
                 onClick={handleShare}
-                disabled={!unit || (composing && composedFiles.length === 0)}
+                disabled={!unit || composing}
                 className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-[18px] bg-ink px-3 py-3 text-[14px] font-bold text-surface disabled:opacity-50"
               >
-                {composing && composedFiles.length === 0 ? (
+                {composing ? (
                   <span className="text-[13px] opacity-80">Menyiapkan media...</span>
                 ) : shareCaptionCopied ? (
                   <>
@@ -1839,65 +1915,14 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       {!embedded && (
         <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-50 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
           <div className="relative min-w-0">
-            {showChannels && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowChannels(false)}
-                />
-                <div className="absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
-                  <div className="border-b border-line px-3 py-2.5 text-center text-[11px] font-bold text-muted">
-                    {shareCaptionCopied
-                      ? "Caption + link tersalin — pilih channel"
-                      : "Bagikan via"}
-                  </div>
-                  <div className="grid grid-cols-4 divide-x divide-line">
-                    <button
-                      type="button"
-                      onClick={() => shareVia("wa")}
-                      className="flex flex-col items-center gap-1 py-3 text-[#25D366]"
-                    >
-                      <WhatsAppSolid size={22} />
-                      <span className="text-[10px] font-semibold text-ink">WA</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => shareVia("tg")}
-                      className="flex flex-col items-center gap-1 py-3 text-[#229ED9]"
-                    >
-                      <Telegram size={20} />
-                      <span className="text-[10px] font-semibold text-ink">TG</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => shareVia("x")}
-                      className="flex flex-col items-center gap-1 py-3 text-ink"
-                    >
-                      <XTwitter size={20} />
-                      <span className="text-[10px] font-semibold text-ink">X</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void copyShareCaption(captionText.trim());
-                        setShowChannels(false);
-                      }}
-                      className="flex flex-col items-center gap-1 py-3 text-teal-deep"
-                    >
-                      <Copy size={20} />
-                      <span className="text-[10px] font-semibold text-ink">Salin</span>
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
+            {showChannels && renderChannelPicker(true)}
             <button
               type="button"
               onClick={handleShare}
-              disabled={!unit || (composing && composedFiles.length === 0)}
+              disabled={!unit || composing}
               className="flex h-12 min-w-0 w-full items-center justify-center gap-2 rounded-2xl bg-ink px-3 text-[13px] font-bold text-surface disabled:opacity-50"
             >
-              {composing && composedFiles.length === 0 ? (
+              {composing ? (
                 <span className="truncate text-[12px] opacity-80">Menyiapkan media...</span>
               ) : shareCaptionCopied ? (
                 <>

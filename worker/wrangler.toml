@@ -1,0 +1,9 @@
+name = "agentmobix-api"
+main = "index.js"
+compatibility_date = "2024-11-01"
+workers_dev = true
+
+# Secrets (set via wrangler / GitHub Actions — not committed):
+#   MOBIX_API_KEY
+#   STRAPI_API_KEY (optional)
+#   DSF_BEARER_TOKEN (optional)

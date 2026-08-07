@@ -2,8 +2,12 @@ import { describe, expect, test } from "bun:test";
 import {
   buildChannelShareUrl,
   buildNativeSharePayload,
+  buildOpenGraphShareUrl,
   buildShareText,
+  channelNeedsClipboardFirst,
   isShareAbortError,
+  pickNativeShareableFiles,
+  prefersNativeWebShare,
 } from "../src/lib/shareActions";
 
 describe("buildShareText", () => {
@@ -52,6 +56,85 @@ describe("buildChannelShareUrl", () => {
     const text = decodeURIComponent(url.split("text=")[1] ?? "");
     expect(text).toContain("Honda Mobilio");
     expect(text).toContain(link);
+  });
+
+  test("Facebook sharer points at Open Graph preview URL (not raw SPA link)", () => {
+    const url = buildChannelShareUrl("fb", caption, link);
+    expect(url.startsWith("https://www.facebook.com/sharer/sharer.php?")).toBe(true);
+    const params = new URL(url).searchParams;
+    const shared = params.get("u") || "";
+    expect(shared).toContain("agentmobix-api.margi-landshark.workers.dev/og");
+    expect(shared).toContain("honda-mobilio");
+    expect(params.get("quote")).toBeNull();
+  });
+
+  test("buildOpenGraphShareUrl extracts slug from share link", () => {
+    expect(buildOpenGraphShareUrl("https://agenmobix.id/share?u=toyota-calya-2019")).toBe(
+      "https://agentmobix-api.margi-landshark.workers.dev/og?u=toyota-calya-2019",
+    );
+    expect(buildOpenGraphShareUrl("toyota-calya-2019")).toContain("u=toyota-calya-2019");
+  });
+
+  test("Instagram opens app/site (caption via clipboard first)", () => {
+    expect(buildChannelShareUrl("ig", caption, link)).toBe("https://www.instagram.com/");
+    expect(channelNeedsClipboardFirst("ig")).toBe(true);
+    expect(channelNeedsClipboardFirst("wa")).toBe(false);
+  });
+
+  test("TikTok opens app/site (caption via clipboard first)", () => {
+    expect(buildChannelShareUrl("tt", caption, link)).toBe("https://www.tiktok.com/");
+    expect(channelNeedsClipboardFirst("tt")).toBe(true);
+  });
+
+  test("Threads intent embeds full caption + link", () => {
+    const url = buildChannelShareUrl("threads", caption, link);
+    expect(url.startsWith("https://www.threads.net/intent/post?text=")).toBe(true);
+    const text = decodeURIComponent(url.split("text=")[1] ?? "");
+    expect(text).toContain("Honda Mobilio");
+    expect(text).toContain(link);
+  });
+});
+
+describe("prefersNativeWebShare", () => {
+  test("is false when navigator.share is missing", () => {
+    const original = globalThis.navigator;
+    // @ts-expect-error test stub
+    globalThis.navigator = { userAgent: "iPhone", maxTouchPoints: 5 };
+    try {
+      expect(prefersNativeWebShare()).toBe(false);
+    } finally {
+      globalThis.navigator = original;
+    }
+  });
+
+  test("is true for touch devices with navigator.share", () => {
+    const original = globalThis.navigator;
+    // @ts-expect-error test stub
+    globalThis.navigator = {
+      share: async () => {},
+      maxTouchPoints: 5,
+      userAgent: "Mozilla/5.0",
+    };
+    try {
+      expect(prefersNativeWebShare()).toBe(true);
+    } finally {
+      globalThis.navigator = original;
+    }
+  });
+
+  test("is false for desktop without touch even if share exists", () => {
+    const original = globalThis.navigator;
+    // @ts-expect-error test stub
+    globalThis.navigator = {
+      share: async () => {},
+      maxTouchPoints: 0,
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+    };
+    try {
+      expect(prefersNativeWebShare()).toBe(false);
+    } finally {
+      globalThis.navigator = original;
+    }
   });
 });
 
@@ -127,5 +210,43 @@ describe("isShareAbortError", () => {
       true,
     );
     expect(isShareAbortError(new Error("other"))).toBe(false);
+  });
+});
+
+describe("pickNativeShareableFiles", () => {
+  test("returns largest batch that canShare accepts", () => {
+    const original = globalThis.navigator;
+    const files = [1, 2, 3, 4, 5, 6].map(
+      (n) => new File([`x${n}`], `unit-${n}.jpg`, { type: "image/jpeg" }),
+    );
+    // @ts-expect-error test stub
+    globalThis.navigator = {
+      share: async () => {},
+      canShare: (data: ShareData) => (data.files?.length ?? 0) <= 3,
+    };
+    try {
+      const picked = pickNativeShareableFiles(files, "T", "caption");
+      expect(picked).toHaveLength(3);
+      expect(picked[0].name).toBe("unit-1.jpg");
+    } finally {
+      globalThis.navigator = original;
+    }
+  });
+
+  test("falls back to single file when multi-file is rejected", () => {
+    const original = globalThis.navigator;
+    const files = [1, 2, 3].map(
+      (n) => new File([`x${n}`], `unit-${n}.jpg`, { type: "image/jpeg" }),
+    );
+    // @ts-expect-error test stub
+    globalThis.navigator = {
+      share: async () => {},
+      canShare: (data: ShareData) => (data.files?.length ?? 0) === 1,
+    };
+    try {
+      expect(pickNativeShareableFiles(files, "T", "c")).toHaveLength(1);
+    } finally {
+      globalThis.navigator = original;
+    }
   });
 });
