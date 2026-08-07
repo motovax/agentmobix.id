@@ -470,9 +470,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
   const [captionText, setCaptionText] = useState("");
   const [captionSuggesting, setCaptionSuggesting] = useState(false);
-  const [shareFeedback, setShareFeedback] = useState("");
   const [pendingShareStep, setPendingShareStep] = useState<PendingShareStep | null>(null);
-  const shareFeedbackTimer = useRef<number | null>(null);
 
   // multi-select share media
   const [selectedIdxes, setSelectedIdxes] = useState<number[]>([]);
@@ -801,60 +799,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
   const link = buildAgenMobixUnitLink(unit?.slug);
 
-  function showShareFeedback(message: string) {
-    setShareFeedback(message);
-    if (shareFeedbackTimer.current !== null) {
-      window.clearTimeout(shareFeedbackTimer.current);
-    }
-    shareFeedbackTimer.current = window.setTimeout(() => {
-      setShareFeedback("");
-      shareFeedbackTimer.current = null;
-    }, 2800);
-  }
-
-  async function copyShareText(text: string) {
-    if (!text) return false;
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        return true;
-      }
-    } catch {
-      // fall through to legacy copy
-    }
-    try {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      textarea.setAttribute("readonly", "");
-      textarea.style.position = "fixed";
-      textarea.style.left = "-9999px";
-      document.body.appendChild(textarea);
-      textarea.select();
-      const ok = document.execCommand("copy");
-      document.body.removeChild(textarea);
-      return ok;
-    } catch {
-      return false;
-    }
-  }
-
-  async function fallbackShareWithoutNative(caption: string, files: File[] = []) {
-    const shareText = [caption, link].filter(Boolean).join("\n\n");
-    const copied = shareText ? await copyShareText(shareText) : false;
-    if (files.length > 0) {
-      downloadFiles(files);
-    }
-    if (copied && files.length > 0) {
-      showShareFeedback("Caption disalin. Media diunduh — tempel di app pilihanmu.");
-    } else if (copied) {
-      showShareFeedback("Caption & link disalin. Tempel di app pilihanmu.");
-    } else if (files.length > 0) {
-      showShareFeedback("Media diunduh. Bagikan manual ke app pilihanmu.");
-    } else {
-      showShareFeedback("Share native tidak tersedia di browser ini.");
-    }
-  }
-
   async function waitForAIBackgroundJob(
     initial: AIBackgroundResponse,
     onProgress: (progress: number) => void,
@@ -956,8 +900,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       ...(caption ? { text: caption } : {}),
     };
     const payloadFilesOnly: ShareData = { files, title };
-    // Beberapa browser punya canShare tetapi gagal untuk file besar/mixed —
-    // tetap coba navigator.share bila API ada; canShare hanya preferensi payload.
     const payload = navigator.canShare?.(payloadWithCaption)
       ? payloadWithCaption
       : navigator.canShare?.(payloadFilesOnly)
@@ -973,7 +915,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     return navigator.share(payload);
   }
 
-  /** Native share sheet (text/url only). Tidak pernah redirect ke WhatsApp. */
+  /** Hanya Web Share API — tanpa fallback clipboard/download/wa.me. */
   function shareWithoutFiles(title: string, caption: string): Promise<void> | null {
     if (!navigator.share) return null;
     return navigator.share({
@@ -1210,44 +1152,21 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       }
     };
 
-    // 1) Coba native share dengan file (sheet OS: WA, IG, Telegram, dll.)
-    // 2) Fallback text/url native share
-    // 3) Fallback salin clipboard + unduh media — jangan pernah hard-redirect ke WA
-    const fileSharePromise = sharePreparedFiles(
-      filesForCurrentStep,
-      title,
-      captionForCurrentStep,
-    );
+    // Hanya Web Share API (file, atau text/url). Tanpa clipboard / download / wa.me.
+    const sharePromise =
+      sharePreparedFiles(filesForCurrentStep, title, captionForCurrentStep)
+      ?? shareWithoutFiles(title, caption);
 
-    const runTextOrClipboardFallback = () => {
-      const textSharePromise = shareWithoutFiles(title, caption);
-      if (textSharePromise) {
-        return textSharePromise
-          .then(() => {
-            markShareStepDone();
-          })
-          .catch(async (error: unknown) => {
-            if (isShareAbort(error)) return;
-            await fallbackShareWithoutNative(caption, filesForCurrentStep);
-          });
-      }
-      return fallbackShareWithoutNative(caption, filesForCurrentStep);
-    };
+    if (!sharePromise) return;
 
-    if (fileSharePromise) {
-      void fileSharePromise
-        .then(() => {
-          markShareStepDone();
-        })
-        .catch(async (error: unknown) => {
-          if (isShareAbort(error)) return;
-          // File share gagal (ukuran/tipe) → coba sheet native text/url dulu
-          await runTextOrClipboardFallback();
-        });
-      return;
-    }
-
-    void runTextOrClipboardFallback();
+    void sharePromise
+      .then(() => {
+        markShareStepDone();
+      })
+      .catch((error: unknown) => {
+        // User batal (AbortError) atau browser menolak — tidak ada fallback.
+        if (isShareAbort(error)) return;
+      });
   }
 
   useImperativeHandle(ref, () => ({ share: handleShare }));
@@ -1655,11 +1574,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
                   </>
                 )}
               </button>
-              {shareFeedback && (
-                <p className="mt-2 text-center text-[12px] font-semibold text-teal-deep" role="status">
-                  {shareFeedback}
-                </p>
-              )}
             </div>
           )}
           <button
@@ -1681,16 +1595,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
       {/* sticky action bar — selalu on top (fixed), pola sama seperti detail unit */}
       {!embedded && (
-        <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-50 w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2">
-          {shareFeedback && (
-            <p
-              className="mb-2 rounded-2xl border border-teal-tint-border bg-teal-tint px-3 py-2 text-center text-[12px] font-semibold text-teal-deep shadow-nav"
-              role="status"
-            >
-              {shareFeedback}
-            </p>
-          )}
-          <div className="grid grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
+        <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-50 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
           <div className="min-w-0">
             <button
               type="button"
@@ -1721,7 +1626,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
             calculationLabel={salesContactRequired ? "Tanya Opsi Pembiayaan" : "Minta Hitungan"}
             buttonClassName="flex h-12 w-full items-center justify-center rounded-2xl border border-teal-tint-border bg-teal text-ink"
           />
-          </div>
         </div>
       )}
     </AppShell>
