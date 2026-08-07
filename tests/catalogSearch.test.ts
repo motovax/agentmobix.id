@@ -63,7 +63,7 @@ describe("klasifikasi pencarian katalog", () => {
     const detailHref = buildUnitDetailHref("toyota-avanza", catalogHref);
 
     expect(detailHref).toBe(
-      "/unit/toyota-avanza?kembali=%2Fkatalog%3Fq%3DToyota%26kategori%3DMPV",
+      "/share?u=toyota-avanza&kembali=%2Fkatalog%3Fq%3DToyota%26kategori%3DMPV",
     );
     expect(getCatalogReturnHref(detailHref.split("?")[1])).toBe(catalogHref);
   });

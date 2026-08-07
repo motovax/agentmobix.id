@@ -62,7 +62,7 @@ export function AiMobix() {
     if (!link) return;
 
     const url = new URL(link.href, window.location.origin);
-    if (url.origin !== window.location.origin || !url.pathname.startsWith("/unit/")) return;
+    if (url.origin !== window.location.origin || url.pathname !== "/share") return;
 
     event.preventDefault();
     navigate(`${url.pathname}${url.search}${url.hash}`);

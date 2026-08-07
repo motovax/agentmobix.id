@@ -72,19 +72,19 @@ describe("format jawaban Falcon", () => {
           slug: "toyota-calya",
           title: "Toyota Calya",
           plateNo: "B2203FFE",
-          href: "https://agenmobix.id/unit/toyota-calya",
+          href: "https://agenmobix.id/share?u=toyota-calya",
         },
         {
           slug: "honda-mobilio",
           title: "Honda Mobilio",
           plateNo: "B 2863 KYJ",
-          href: "https://agenmobix.id/unit/honda-mobilio",
+          href: "https://agenmobix.id/share?u=honda-mobilio",
         },
       ],
     );
 
     expect(html).toContain(
-      "Otomatis, 77.166 km.<br/><a href=\"https://agenmobix.id/unit/toyota-calya\"",
+      "Otomatis, 77.166 km.<br/><a href=\"https://agenmobix.id/share?u=toyota-calya\"",
     );
     expect(html.indexOf("Otomatis, 77.166 km.")).toBeLessThan(html.indexOf("toyota-calya"));
     expect(html.indexOf("toyota-calya")).toBeLessThan(html.indexOf("Honda Mobilio"));

@@ -11,7 +11,7 @@ export interface RequiredCaptionSection {
 export function buildAgenMobixUnitLink(slug?: string | null) {
   const normalizedSlug = slug?.trim();
   return normalizedSlug
-    ? `https://agenmobix.id/unit/${encodeURIComponent(normalizedSlug)}`
+    ? `https://agenmobix.id/share?u=${encodeURIComponent(normalizedSlug)}`
     : "https://agenmobix.id";
 }
 

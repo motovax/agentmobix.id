@@ -1,9 +1,8 @@
 import { useEffect } from "react";
-import { Route, Switch, useLocation, useSearch } from "wouter";
+import { Route, Switch, useLocation, useParams, useSearch } from "wouter";
 import { Beranda } from "./pages/Beranda";
 import { Katalog } from "./pages/Katalog";
 import { UnitDetail } from "./pages/UnitDetail";
-import { ShareSheet } from "./pages/ShareSheet";
 import { DaftarAgen } from "./pages/DaftarAgen";
 import { AiMobix } from "./pages/AiMobix";
 import { HotDeals } from "./pages/HotDeals";
@@ -25,6 +24,26 @@ function ScrollToTopOnRouteChange() {
     const root = document.scrollingElement;
     if (root) root.scrollTop = 0;
   }, [location, search]);
+
+  return null;
+}
+
+function ShareUnitDetail() {
+  const search = useSearch();
+  const slug = new URLSearchParams(search).get("u") ?? "";
+  return <UnitDetail unitSlug={slug} />;
+}
+
+function LegacyUnitRedirect() {
+  const { slug } = useParams<{ slug: string }>();
+  const search = useSearch();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    params.set("u", slug);
+    navigate(`/share?${params.toString()}${window.location.hash}`, { replace: true });
+  }, [navigate, search, slug]);
 
   return null;
 }
@@ -54,8 +73,8 @@ export default function App({
       <Switch>
         <Route path="/" component={Beranda} />
         <Route path="/katalog" component={Katalog} />
-        <Route path="/unit/:slug" component={UnitDetail} />
-        <Route path="/share">{() => <ShareSheet />}</Route>
+        <Route path="/unit/:slug" component={LegacyUnitRedirect} />
+        <Route path="/share" component={ShareUnitDetail} />
         <Route path="/daftar" component={DaftarAgen} />
         <Route path="/ai" component={AiMobix} />
         <Route path="/hot-deals" component={HotDeals} />

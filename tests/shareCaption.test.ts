@@ -28,13 +28,13 @@ const sections = [
 describe("buildAgenMobixUnitLink", () => {
   test("builds an absolute HTTPS unit link", () => {
     expect(buildAgenMobixUnitLink("toyota-calya-2019")).toBe(
-      "https://agenmobix.id/unit/toyota-calya-2019",
+      "https://agenmobix.id/share?u=toyota-calya-2019",
     );
   });
 
   test("trims and safely encodes the unit identifier", () => {
     expect(buildAgenMobixUnitLink(" toyota calya 2019 ")).toBe(
-      "https://agenmobix.id/unit/toyota%20calya%202019",
+      "https://agenmobix.id/share?u=toyota%20calya%202019",
     );
   });
 

@@ -127,8 +127,9 @@ function maskBpkbValue(value: string) {
   return maskPersonName(value);
 }
 
-export function UnitDetail() {
-  const { slug } = useParams<{ slug: string }>();
+export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
+  const { slug: routeSlug } = useParams<{ slug?: string }>();
+  const slug = unitSlug ?? routeSlug ?? "";
   const search = useSearch();
   const returnHref = getCatalogReturnHref(search);
   const { data: unit, loading, error } = useAsync(
