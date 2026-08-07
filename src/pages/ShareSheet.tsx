@@ -11,11 +11,7 @@ import { UnitRow } from "../components/UnitRow";
 import {
   ChevronLeft,
   ShareArrow,
-  Copy,
   Download,
-  WhatsAppSolid,
-  InstagramSolid,
-  FacebookSolid,
   Check,
   Close,
   Sparkles,
@@ -52,7 +48,6 @@ import { buildJasmineWhatsAppHref } from "../lib/jasmine";
 import { getCatalogReturnHref } from "../lib/catalogSearch";
 import {
   buildAgenMobixUnitLink,
-  buildWhatsAppShareText,
   ensureRequiredCaptionFacts,
   formatCaptionReadability,
   removeCaptionParagraphsContaining,
@@ -473,13 +468,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const unit = unitData ?? fetchedUnit;
   const loading = !unitData && unitLoading;
 
-  const [, setCopied] = useState<"" | "caption" | "link">("");
   const [captionText, setCaptionText] = useState("");
   const [captionSuggesting, setCaptionSuggesting] = useState(false);
-  // Pada embed di halaman detail, pilihan kanal harus langsung terlihat setelah
-  // pengguna masuk ke alur share. Pada halaman share penuh, tetap gunakan
-  // tombol utama agar layout tidak terlalu padat.
-  const [showChannels, setShowChannels] = useState<boolean>(Boolean(embedded));
   const [shareCaptionCopied, setShareCaptionCopied] = useState(false);
   const [pendingShareStep, setPendingShareStep] = useState<PendingShareStep | null>(null);
 
@@ -850,11 +840,9 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
   const link = buildAgenMobixUnitLink(unit?.slug);
 
-  function showCopiedState(what: "caption" | "link", fromShare = false) {
-    setCopied(what);
+  function showCopiedState(fromShare = false) {
     if (fromShare) setShareCaptionCopied(true);
     window.setTimeout(() => {
-      setCopied("");
       if (fromShare) setShareCaptionCopied(false);
     }, fromShare ? 2500 : 1500);
   }
@@ -865,12 +853,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       return true;
     } catch {
       return false;
-    }
-  }
-
-  async function copy(what: "caption" | "link", text: string) {
-    if (await copyToClipboard(text)) {
-      showCopiedState(what);
     }
   }
 
@@ -985,7 +967,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
     if (caption) {
       void copyToClipboard(caption).then((ok) => {
-        if (ok) showCopiedState("caption", true);
+        if (ok) showCopiedState(true);
       });
     }
 
@@ -1196,6 +1178,12 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     const share = async () => {
       const caption = captionText.trim();
       const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
+      const copyShareFallback = async () => {
+        const fallbackText = [caption, link].filter(Boolean).join("\n\n");
+        if (fallbackText && (await copyToClipboard(fallbackText))) {
+          showCopiedState(true);
+        }
+      };
 
       if (pendingShareStep) {
         const shared = await sharePreparedFiles(
@@ -1226,11 +1214,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
           });
           return;
         }
-        if (caption && (await copyToClipboard(caption))) {
-          showCopiedState("caption", true);
-        }
-        if (controllerOnly) shareVia("wa");
-        else setShowChannels((v) => !v);
+        await copyShareFallback();
         return;
       }
 
@@ -1240,7 +1224,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
       if (navigator.share && !filesToShare.length) {
         if (caption && (await copyToClipboard(caption))) {
-          showCopiedState("caption", true);
+          showCopiedState(true);
         }
         await navigator.share({
           title,
@@ -1249,61 +1233,21 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         return;
       }
 
-      if (caption && (await copyToClipboard(caption))) {
-        showCopiedState("caption", true);
-      }
-
-      if (controllerOnly) shareVia("wa");
-      else setShowChannels((v) => !v);
+      await copyShareFallback();
     };
 
     void share().catch((error: unknown) => {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      if (controllerOnly) shareVia("wa");
-      else setShowChannels((v) => !v);
+      const fallbackText = [captionText.trim(), link].filter(Boolean).join("\n\n");
+      if (fallbackText) {
+        void copyToClipboard(fallbackText).then((ok) => {
+          if (ok) showCopiedState(true);
+        });
+      }
     });
   }
 
   useImperativeHandle(ref, () => ({ share: handleShare }));
-
-  async function shareVia(channel: "wa" | "ig" | "fb") {
-    if (channel !== "wa") {
-      const files = await prepareShareFiles();
-      const caption = captionText.trim();
-      const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
-
-      if (await sharePreparedFiles(files, title, caption)) {
-        setShowChannels(false);
-        return;
-      }
-
-      if (caption) await copyToClipboard(caption);
-      if (channel === "ig") {
-        downloadFiles(files);
-        window.open("https://www.instagram.com/", "_blank", "noopener");
-      } else {
-        const facebookUrl = new URL("https://www.facebook.com/sharer/sharer.php");
-        facebookUrl.searchParams.set("u", link);
-        facebookUrl.searchParams.set("quote", caption);
-        window.open(facebookUrl.toString(), "_blank", "noopener");
-      }
-      setShowChannels(false);
-      return;
-    }
-
-    const imageUrls = channel === "wa"
-      ? selectedImageMedia.map((media) =>
-          aiBackgroundUrls[media.id] ?? mobixImage(media.item.url, MOBIX_SHARE_WIDTH),
-        ).filter((url): url is string => Boolean(url))
-      : [];
-    const shareText = buildWhatsAppShareText(captionText, imageUrls);
-    const encoded = encodeURIComponent(shareText);
-    const urls: Record<string, string> = {
-      wa: `https://wa.me/?text=${encoded}`,
-    };
-    window.open(urls[channel], "_blank", "noopener");
-    setShowChannels(false);
-  }
 
   function downloadFiles(files: File[]) {
     files.forEach((f, i) => {
@@ -1689,57 +1633,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         {/* secondary actions */}
         <div className="flex flex-col gap-2">
           {embedded && (
-            <div className="relative mb-1">
-              {showChannels && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setShowChannels(false)}
-                  />
-                  <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
-                    <div className="border-b border-line px-4 py-3 text-center text-[11px] font-bold text-muted">
-                      Bagikan via
-                    </div>
-                    <div className="grid grid-cols-4 divide-x divide-line">
-                      <button
-                        type="button"
-                        onClick={() => void shareVia("wa")}
-                        className="flex flex-col items-center gap-1.5 py-4 text-[#25D366] transition-colors hover:bg-[#25D366]/10"
-                      >
-                        <WhatsAppSolid size={24} />
-                        <span className="text-[10px] font-semibold text-ink">WhatsApp</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void shareVia("ig")}
-                        className="flex flex-col items-center gap-1.5 py-4 text-[#E1306C] transition-colors hover:bg-[#E1306C]/10"
-                      >
-                        <InstagramSolid size={24} />
-                        <span className="text-[10px] font-semibold text-ink">Instagram</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void shareVia("fb")}
-                        className="flex flex-col items-center gap-1.5 py-4 text-[#1877F2] transition-colors hover:bg-[#1877F2]/10"
-                      >
-                        <FacebookSolid size={24} />
-                        <span className="text-[10px] font-semibold text-ink">Facebook</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void copy("link", link);
-                          setShowChannels(false);
-                        }}
-                        className="flex flex-col items-center gap-1.5 py-4 text-teal-deep transition-colors hover:bg-teal-deep/10"
-                      >
-                        <Copy size={24} />
-                        <span className="text-[10px] font-semibold text-ink">Salin Link</span>
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
+            <div className="mb-1">
               <button
                 type="button"
                 onClick={handleShare}
@@ -1780,57 +1674,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       {/* sticky action bar — selalu on top (fixed), pola sama seperti detail unit */}
       {!embedded && (
         <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-50 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
-          <div className="relative min-w-0">
-            {showChannels && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setShowChannels(false)}
-                />
-                <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
-                  <div className="border-b border-line px-4 py-3 text-center text-[11px] font-bold text-muted">
-                    Bagikan via
-                  </div>
-                  <div className="grid grid-cols-4 divide-x divide-line">
-                    <button
-                      type="button"
-                      onClick={() => void shareVia("wa")}
-                      className="flex flex-col items-center gap-1.5 py-4 text-[#25D366] transition-colors hover:bg-[#25D366]/10"
-                    >
-                      <WhatsAppSolid size={24} />
-                      <span className="text-[10px] font-semibold text-ink">WhatsApp</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void shareVia("ig")}
-                      className="flex flex-col items-center gap-1.5 py-4 text-[#E1306C] transition-colors hover:bg-[#E1306C]/10"
-                    >
-                      <InstagramSolid size={24} />
-                      <span className="text-[10px] font-semibold text-ink">Instagram</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void shareVia("fb")}
-                      className="flex flex-col items-center gap-1.5 py-4 text-[#1877F2] transition-colors hover:bg-[#1877F2]/10"
-                    >
-                      <FacebookSolid size={24} />
-                      <span className="text-[10px] font-semibold text-ink">Facebook</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void copy("link", link);
-                        setShowChannels(false);
-                      }}
-                      className="flex flex-col items-center gap-1.5 py-4 text-teal-deep transition-colors hover:bg-teal-deep/10"
-                    >
-                      <Copy size={24} />
-                      <span className="text-[10px] font-semibold text-ink">Salin Link</span>
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
+          <div className="min-w-0">
             <button
               type="button"
               onClick={handleShare}
