@@ -44,6 +44,15 @@ import {
   removeCaptionParagraphsContaining,
   type RequiredCaptionSection,
 } from "../lib/shareCaption";
+import {
+  buildChannelShareUrl,
+  buildNativeSharePayload,
+  buildShareText,
+  copyTextToClipboard,
+  isShareAbortError,
+  prefersNativeWebShare,
+  type ShareChannel,
+} from "../lib/shareActions";
 
 /* ---- business logic ---- */
 
@@ -722,18 +731,26 @@ export function ShareSheet() {
   }
 
   async function copyToClipboard(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      return false;
-    }
+    return copyTextToClipboard(text);
   }
 
   async function copy(what: "caption" | "link", text: string) {
     if (await copyToClipboard(text)) {
       showCopiedState(what);
     }
+  }
+
+  async function copyShareCaption(caption: string, fromShare = false) {
+    const text = buildShareText(caption, link);
+    if (await copyToClipboard(text)) {
+      showCopiedState("caption", fromShare);
+      return true;
+    }
+    return false;
+  }
+
+  function openShareChannels() {
+    setShowChannels(true);
   }
 
   async function waitForAIBackgroundJob(
@@ -829,26 +846,29 @@ export function ShareSheet() {
     title: string,
     caption: string,
   ) {
-    if (!navigator.share || files.length === 0) return false;
+    if (!prefersNativeWebShare() || files.length === 0) return false;
 
-    const payloadWithCaption: ShareData = {
-      files,
-      title,
-      ...(caption ? { text: caption } : {}),
-    };
-    const payloadFilesOnly: ShareData = { files, title };
-    const payload = navigator.canShare?.(payloadWithCaption)
-      ? payloadWithCaption
-      : navigator.canShare?.(payloadFilesOnly)
-        ? payloadFilesOnly
-        : null;
-
+    const shareText = buildShareText(caption, link);
+    const payload = buildNativeSharePayload(files, title, shareText);
     if (!payload) return false;
 
-    if (caption) {
-      void copyToClipboard(caption).then((ok) => {
-        if (ok) showCopiedState("caption", true);
-      });
+    // Backup: many apps drop caption when receiving files; keep full text ready to paste.
+    if (shareText) {
+      void copyShareCaption(caption, true);
+    }
+
+    await navigator.share(payload);
+    return true;
+  }
+
+  async function shareTextOnly(title: string, caption: string) {
+    if (!prefersNativeWebShare()) return false;
+    const shareText = buildShareText(caption, link);
+    const payload = buildNativeSharePayload([], title, shareText);
+    if (!payload) return false;
+
+    if (shareText) {
+      void copyShareCaption(caption, true);
     }
 
     await navigator.share(payload);
@@ -1069,6 +1089,13 @@ export function ShareSheet() {
           setPendingShareStep(null);
           return;
         }
+        // Native step failed (desktop / unsupported) — keep pending step for retry after channels.
+        await copyShareCaption(
+          pendingShareStep.includeCaption === false ? "" : caption,
+          true,
+        );
+        openShareChannels();
+        return;
       }
 
       const filesToShare = await prepareShareFiles();
@@ -1088,10 +1115,8 @@ export function ShareSheet() {
           });
           return;
         }
-        if (caption && (await copyToClipboard(caption))) {
-          showCopiedState("caption", true);
-        }
-        setShowChannels((v) => !v);
+        await copyShareCaption(caption, true);
+        openShareChannels();
         return;
       }
 
@@ -1099,37 +1124,27 @@ export function ShareSheet() {
         return;
       }
 
-      if (navigator.share && !filesToShare.length) {
-        if (caption && (await copyToClipboard(caption))) {
-          showCopiedState("caption", true);
-        }
-        await navigator.share({
-          title,
-          text: caption,
-        });
+      // Text-only native share (mobile) when no files could be prepared.
+      if (filesToShare.length === 0 && await shareTextOnly(title, caption)) {
         return;
       }
 
-      if (caption && (await copyToClipboard(caption))) {
-        showCopiedState("caption", true);
-      }
-
-      setShowChannels((v) => !v);
+      // Desktop & fallback: always copy caption+link and open channel picker.
+      await copyShareCaption(caption, true);
+      openShareChannels();
     };
 
-    void share().catch(() => {
-      setShowChannels((v) => !v);
+    void share().catch((error) => {
+      if (isShareAbortError(error)) return;
+      void copyShareCaption(captionText.trim(), true).finally(() => {
+        openShareChannels();
+      });
     });
   }
 
-  function shareVia(channel: "wa" | "tg" | "x") {
-    const encoded = encodeURIComponent(captionText);
-    const urls: Record<string, string> = {
-      wa: `https://wa.me/?text=${encoded}`,
-      tg: `https://t.me/share/url?url=${encoded}`,
-      x: `https://x.com/intent/tweet?text=${encoded}`,
-    };
-    window.open(urls[channel], "_blank", "noopener");
+  function shareVia(channel: ShareChannel) {
+    const url = buildChannelShareUrl(channel, captionText.trim(), link);
+    window.open(url, "_blank", "noopener");
     setShowChannels(false);
   }
 
@@ -1462,7 +1477,7 @@ export function ShareSheet() {
                 </button>
               )}
               <button
-                onClick={() => copy("caption", captionText)}
+                onClick={() => void copy("caption", buildShareText(captionText, link))}
                 disabled={!unit}
                 className="text-[11px] font-bold text-teal-deep disabled:opacity-40"
               >
@@ -1541,7 +1556,9 @@ export function ShareSheet() {
               />
               <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[18px] border border-line bg-surface shadow-xl">
                 <div className="border-b border-line px-4 py-3 text-center text-[11px] font-bold text-muted">
-                  Bagikan via
+                  {shareCaptionCopied
+                    ? "Caption + link tersalin — pilih channel"
+                    : "Bagikan via"}
                 </div>
                 <div className="grid grid-cols-4 divide-x divide-line">
                   <button
