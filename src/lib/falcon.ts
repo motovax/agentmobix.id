@@ -31,6 +31,12 @@ export type FalconUnitReference = {
   plateNo: string;
 };
 
+export type FalconTurnResult = {
+  conversation: FalconConversationTurn[];
+  html: string;
+  reply: string;
+};
+
 function escapeHtml(value: string) {
   return value.replace(/[&<>\"']/g, (character) => ({
     "&": "&amp;",
@@ -80,6 +86,7 @@ export function buildFalconContextMessage(
   return [
     "Lanjutkan percakapan berdasarkan riwayat berikut.",
     "Pertahankan unit, plat nomor, dan kebutuhan yang sudah disebut. Jangan tanyakan ulang informasi yang sudah ada di riwayat.",
+    "Jika pengguna meminta simulasi atau berkata singkat seperti 'buatkan', gunakan plat nomor unit terakhir dari riwayat.",
     "",
     ...lines,
     `Pengguna: ${message}`,
@@ -175,7 +182,68 @@ export function extractFalconUnitReferences(reply: string): FalconUnitReference[
     references.push({ title: match[1].replace(/\*+/g, "").trim(), plateNo });
   }
 
+  const detailTitle = reply.match(/^\s*(?:\*{1,2})?DETAIL UNIT\s+([A-Z]{1,2}\s*\d{1,4}\s*[A-Z]{0,3})\s+[—-]\s+(.+?)(?:\*{1,2})?\s*$/im);
+  const labelledPlate = reply.match(/(?:Plat(?:\s+Nomor)?|Nomor\s+Polisi)\s*:\s*([A-Z]{1,2}\s*\d{1,4}\s*[A-Z]{0,3})/i);
+  if (labelledPlate) {
+    const plateNo = labelledPlate[1].replace(/\s+/g, "").toUpperCase();
+    if (!seen.has(plateNo)) {
+      seen.add(plateNo);
+      references.push({
+        title: detailTitle?.[2].replace(/\*+/g, "").trim() || `Unit ${plateNo}`,
+        plateNo,
+      });
+    }
+  }
+
   return references;
+}
+
+function asksForKnownPlate(reply: string, conversation: FalconConversationTurn[]) {
+  const knownPlate = extractFalconUnitReferences(
+    conversation.map(({ content }) => content).join("\n"),
+  )[0]?.plateNo;
+  if (!knownPlate) return false;
+
+  return /(?:plat(?:\s+nomor)?|nomor\s+polisi)[^.!?\n]{0,80}(?:berapa|sebutkan|masukkan|informasikan|kirimkan|yang mana)/i.test(reply)
+    || /(?:berapa|sebutkan|masukkan|informasikan|kirimkan)[^.!?\n]{0,80}(?:plat(?:\s+nomor)?|nomor\s+polisi)/i.test(reply);
+}
+
+/** Jalankan satu giliran percakapan AI beserta resolusi tautan detail unit. */
+export async function executeFalconTurn(
+  message: string,
+  conversation: FalconConversationTurn[],
+  dependencies: {
+    ask?: typeof askFalcon;
+    resolveLinks?: typeof resolveFalconUnitLinks;
+  } = {},
+): Promise<FalconTurnResult> {
+  const ask = dependencies.ask ?? askFalcon;
+  const resolveLinks = dependencies.resolveLinks ?? resolveFalconUnitLinks;
+  const contextMessage = buildFalconContextMessage(message, conversation);
+  let { reply } = await ask(contextMessage);
+
+  if (asksForKnownPlate(reply, conversation)) {
+    const knownPlate = extractFalconUnitReferences(
+      conversation.map(({ content }) => content).join("\n"),
+    )[0]?.plateNo;
+    ({ reply } = await ask([
+      contextMessage,
+      "",
+      `Koreksi: plat nomor unit sudah diketahui, yaitu ${knownPlate}.`,
+      "Jawab permintaan pengguna sekarang tanpa meminta plat nomor lagi.",
+    ].join("\n")));
+  }
+
+  const units = await resolveLinks(reply);
+  return {
+    reply,
+    html: formatFalconReplyHtml(reply, units),
+    conversation: [
+      ...conversation,
+      { role: "user", content: message },
+      { role: "assistant", content: reply },
+    ],
+  };
 }
 
 export async function resolveFalconUnitLinks(reply: string): Promise<FalconUnitLink[]> {
