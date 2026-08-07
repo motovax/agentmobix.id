@@ -4,9 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { ChevronLeft, Search, Send } from "../components/icons";
 import {
   askFalcon,
-  buildFalconContextMessage,
-  formatFalconReplyHtml,
-  resolveFalconUnitLinks,
+  executeFalconTurn,
   type FalconConversationTurn,
 } from "../lib/falcon";
 
@@ -81,19 +79,14 @@ export function AiMobix() {
 
     setIsSearchingInventory(true);
     try {
-      const result = await askFalcon(
-        buildFalconContextMessage(value, conversationRef.current),
-      );
-      conversationRef.current = [
-        ...conversationRef.current,
-        { role: "user", content: value },
-        { role: "assistant", content: result.reply },
-      ];
-      const units = await resolveFalconUnitLinks(result.reply);
+      const result = await executeFalconTurn(value, conversationRef.current, {
+        ask: askFalcon,
+      });
+      conversationRef.current = result.conversation;
       setMessages((m) => [...m, {
         id: nextId.current++,
         kind: "in",
-        html: formatFalconReplyHtml(result.reply, units),
+        html: result.html,
       }]);
     } catch {
       setMessages((m) => [...m, {
