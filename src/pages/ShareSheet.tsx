@@ -480,10 +480,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const [composedFiles, setComposedFiles] = useState<File[]>([]);
   const [composing, setComposing] = useState(false);
 
-  // canvas-composed files without overlay — for social media share
-  const [shareFiles, setShareFiles] = useState<File[]>([]);
-  const [shareComposing, setShareComposing] = useState(false);
-  const [shareFilesSignature, setShareFilesSignature] = useState("");
   const [aiBackgroundStatus, setAiBackgroundStatus] = useState<AiBackgroundStatus>("idle");
   const [, setAiBackgroundProgress] = useState(0);
   const [aiBackgroundFiles, setAiBackgroundFiles] = useState<Record<string, File>>({});
@@ -789,42 +785,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     Object.keys(aiBackgroundFiles).join(","),
   ]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function prepareShareFiles() {
-    if (!unit || !mediaItems.length) return [];
-
-    const selectedMedia = selectedIdxes
-      .map((i) => mediaItems[i])
-      .filter(Boolean);
-    const selectedImages = selectedMedia
-      .filter((media): media is Extract<ShareMedia, { kind: "image" }> => media.kind === "image");
-    const selectedVideos = selectedMedia
-      .filter((media): media is Extract<ShareMedia, { kind: "video" }> => media.kind === "video")
-      .map((media) => media.item);
-    const signature = `${selectedIdxes.join(",")}:${sharePrice}:${shareTdp}:${aiBackgroundStatus}:${aiPreviewMode}:${Object.keys(aiBackgroundFiles).sort().join(",")}`;
-
-    if (shareFiles.length > 0 && shareFilesSignature === signature) {
-      return shareFiles;
-    }
-
-    setShareComposing(true);
-
-    try {
-      const imageFiles = selectedImages.length
-        ? await buildImageFilesForShare(selectedImages)
-        : [];
-      const videoFiles = selectedVideos.length
-        ? await buildShareVideos(selectedVideos, blobCache.current)
-        : [];
-      const files = [...imageFiles, ...videoFiles];
-
-      setShareFiles(files);
-      setShareFilesSignature(signature);
-      return files;
-    } finally {
-      setShareComposing(false);
-    }
-  }
-
   function handleGalleryTap(i: number) {
     setPendingShareStep(null);
     setPreviewIdx(i);
@@ -927,12 +887,12 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     }
   }
 
-  async function sharePreparedFiles(
+  function sharePreparedFiles(
     files: File[],
     title: string,
     caption: string,
-  ) {
-    if (!navigator.share || files.length === 0) return false;
+  ): Promise<void> | null {
+    if (!navigator.share || files.length === 0) return null;
 
     const payloadWithCaption: ShareData = {
       files,
@@ -946,25 +906,26 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         ? payloadFilesOnly
         : null;
 
-    if (!payload) return false;
+    if (!payload) return null;
 
-    await navigator.share(payload);
-    return true;
+    // Web Share membutuhkan transient user activation. Panggil langsung dari
+    // handler klik, tanpa menunggu proses penyusunan file terlebih dahulu.
+    return navigator.share(payload);
   }
 
-  async function shareWithoutFiles(title: string, caption: string) {
+  function shareWithoutFiles(title: string, caption: string): Promise<void> | null {
     if (navigator.share) {
-      await navigator.share({
+      return navigator.share({
         title,
         text: caption,
         ...(link ? { url: link } : {}),
       });
-      return;
     }
 
     const shareText = [caption, link].filter(Boolean).join("\n\n");
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
     window.location.assign(whatsappUrl);
+    return null;
   }
 
   async function handleCaptionAiHelp() {
@@ -1167,51 +1128,32 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   }
 
   function handleShare() {
-    const share = async () => {
-      const caption = captionText.trim();
-      const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
+    const caption = captionText.trim();
+    const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
+    const filesToShare = pendingShareStep?.files ?? composedFiles;
+    const imageFiles = filesToShare.filter((file) => file.type.startsWith("image/"));
+    const videoFiles = filesToShare.filter((file) => file.type.startsWith("video/"));
+    const hasMixedMediaFiles = imageFiles.length > 0 && videoFiles.length > 0;
+    const filesForCurrentStep = hasMixedMediaFiles ? videoFiles : filesToShare;
+    const captionForCurrentStep = pendingShareStep?.includeCaption === false ? "" : caption;
+    const sharePromise = sharePreparedFiles(filesForCurrentStep, title, captionForCurrentStep)
+      ?? shareWithoutFiles(title, caption);
 
+    if (!sharePromise) return;
+
+    void sharePromise.then(() => {
       if (pendingShareStep) {
-        const shared = await sharePreparedFiles(
-          pendingShareStep.files,
-          title,
-          pendingShareStep.includeCaption === false ? "" : caption,
-        );
-        if (shared) {
-          setPendingShareStep(null);
-          return;
-        }
+        setPendingShareStep(null);
+      } else if (hasMixedMediaFiles) {
+        setPendingShareStep({
+          files: imageFiles,
+          label: imageFiles.length > 1
+            ? `Lanjut bagikan ${imageFiles.length} foto`
+            : "Lanjut bagikan foto",
+          includeCaption: false,
+        });
       }
-
-      const filesToShare = await prepareShareFiles();
-      const imageFiles = filesToShare.filter((file) => file.type.startsWith("image/"));
-      const videoFiles = filesToShare.filter((file) => file.type.startsWith("video/"));
-      const hasMixedMediaFiles = imageFiles.length > 0 && videoFiles.length > 0;
-
-      if (hasMixedMediaFiles) {
-        const shared = await sharePreparedFiles(videoFiles, title, caption);
-        if (shared) {
-          setPendingShareStep({
-            files: imageFiles,
-            label: imageFiles.length > 1
-              ? `Lanjut bagikan ${imageFiles.length} foto`
-              : "Lanjut bagikan foto",
-            includeCaption: false,
-          });
-          return;
-        }
-        await shareWithoutFiles(title, caption);
-        return;
-      }
-
-      if (filesToShare.length > 0 && await sharePreparedFiles(filesToShare, title, caption)) {
-        return;
-      }
-
-      await shareWithoutFiles(title, caption);
-    };
-
-    void share().catch((error: unknown) => {
+    }).catch((error: unknown) => {
       if (error instanceof DOMException && error.name === "AbortError") return;
       const fallbackText = [captionText.trim(), link].filter(Boolean).join("\n\n");
       window.location.assign(`https://wa.me/?text=${encodeURIComponent(fallbackText)}`);
@@ -1608,10 +1550,10 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
               <button
                 type="button"
                 onClick={handleShare}
-                disabled={!unit || composing || shareComposing}
+                disabled={!unit || composing || composedFiles.length === 0}
                 className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-[18px] bg-ink px-3 py-3 text-[14px] font-bold text-surface disabled:opacity-50"
               >
-                {(composing || shareComposing) ? (
+                {composing ? (
                   <span className="text-[13px] opacity-80">Menyiapkan media...</span>
                 ) : (
                   <>
@@ -1649,10 +1591,10 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
             <button
               type="button"
               onClick={handleShare}
-              disabled={!unit || composing || shareComposing}
+              disabled={!unit || composing || composedFiles.length === 0}
               className="flex h-12 min-w-0 w-full items-center justify-center gap-2 rounded-2xl bg-ink px-3 text-[13px] font-bold text-surface disabled:opacity-50"
             >
-              {(composing || shareComposing) ? (
+              {composing ? (
                 <span className="truncate text-[12px] opacity-80">Menyiapkan media...</span>
               ) : pendingShareStep ? (
                 <>
