@@ -56,11 +56,20 @@ import { buildJasmineWhatsAppHref } from "../lib/jasmine";
 import { getCatalogReturnHref } from "../lib/catalogSearch";
 import {
   buildAgenMobixUnitLink,
+  buildShareAutoCaption,
+  CAPTION_CTA,
+  CAPTION_HOOK_PREFIX,
+  ensureCaptionCta,
+  ensureCaptionPrefix,
   ensureRequiredCaptionFacts,
   formatCaptionReadability,
   removeCaptionParagraphsContaining,
   type RequiredCaptionSection,
 } from "../lib/shareCaption";
+import {
+  fetchDpMinimPackage,
+  type DpMinimPackage,
+} from "../lib/dsf";
 import {
   buildChannelShareUrl,
   buildNativeSharePayload,
@@ -512,6 +521,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const [appliedPrice, setAppliedPrice] = useState(0);
   const [priceInput, setPriceInput] = useState("");
   const [detailsOpen, setDetailsOpen] = useState(false);
+  /** Paket DP Minim tenor 60 default untuk caption (fetch DSF). */
+  const [defaultDpMinim, setDefaultDpMinim] = useState<DpMinimPackage | null>(null);
 
   const blobCache = useRef<Map<string, Blob>>(new Map());
   const captionSuggestionIndex = useRef(0);
@@ -608,37 +619,107 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const packageTitle = shareHasFinancing ? (isDpMinimShare ? "DP Minim" : "Kredit") : "Unit";
   const paymentLabel = isDpMinimShare ? "TDP Konsumen" : "TDP";
   const paymentValue = isDpMinimShare && shareDp ? shareDp : shareTdp;
+
+  type CaptionPackage =
+    | { kind: "cash"; price: number }
+    | { kind: "dpminim"; price: number; tdp: number; cicilan: number; tenor: number }
+    | { kind: "kredit"; price: number; tdp: number; cicilan: number; tenor: number };
+
+  const captionPackage: CaptionPackage = (() => {
+    if (!unit || !shareHasFinancing) {
+      return { kind: "cash", price: captionPrice };
+    }
+    if (appliedSimulation) {
+      if (appliedSimulation.simTab === "dpminim") {
+        const tdp = appliedSimulation.tdp ?? appliedSimulation.dp ?? paymentValue;
+        const cicilan = appliedSimulation.cicilan ?? shareCicilan;
+        if (tdp && cicilan) {
+          return {
+            kind: "dpminim",
+            price: captionPrice,
+            tdp,
+            cicilan,
+            tenor: appliedSimulation.tenor || shareTenor,
+          };
+        }
+      }
+      if (shareTdp > 0 && shareCicilan > 0) {
+        return {
+          kind: "kredit",
+          price: captionPrice,
+          tdp: shareTdp,
+          cicilan: shareCicilan,
+          tenor: shareTenor,
+        };
+      }
+    }
+    if (isDpMinimShare && (shareDp || shareTdp) && shareCicilan > 0) {
+      return {
+        kind: "dpminim",
+        price: captionPrice,
+        tdp: shareDp || shareTdp,
+        cicilan: shareCicilan,
+        tenor: shareTenor,
+      };
+    }
+    // defaultDpMinim tidak mengganti paket utama (TDP/UI tetap);
+    // baris "Paket DP Minim tenor 60" ditambah di packageBlock.
+    if (shareTdp > 0 && shareCicilan > 0) {
+      return {
+        kind: "kredit",
+        price: captionPrice,
+        tdp: shareTdp,
+        cicilan: shareCicilan,
+        tenor: shareTenor,
+      };
+    }
+    return { kind: "cash", price: captionPrice };
+  })();
+
+  const packageTitle =
+    captionPackage.kind === "dpminim"
+      ? "DP Minim"
+      : captionPackage.kind === "kredit"
+        ? "Kredit"
+        : "Unit";
+  const paymentLabel = captionPackage.kind === "dpminim" ? "DP Minim" : "TDP";
+  const overlayPaymentValue =
+    captionPackage.kind === "cash"
+      ? paymentValue
+      : captionPackage.tdp;
+
+  /** Baris tambahan di bawah Harga/TDP — hanya jika paket utama bukan DP Minim user. */
+  const dpMinimExtraLine =
+    defaultDpMinim && captionPackage.kind !== "dpminim"
+      ? `Paket DP Minim ${formatJt(defaultDpMinim.tdp)} • Cicilan ${formatJt(defaultDpMinim.cicilan)}/bln • Tenor ${defaultDpMinim.tenor} bulan`
+      : "";
+
+  const packageBlock =
+    captionPackage.kind === "cash"
+      ? [`Harga ${formatRupiah(captionPackage.price)}`, dpMinimExtraLine]
+          .filter(Boolean)
+          .join("\n")
+      : captionPackage.kind === "dpminim"
+        ? `Harga ${formatRupiah(captionPackage.price)}\nPaket DP Minim ${formatJt(captionPackage.tdp)}\nCicilan ${formatJt(captionPackage.cicilan)}/bln • Tenor ${captionPackage.tenor} bulan`
+        : [
+            `Harga ${formatRupiah(captionPackage.price)}\nTDP ${formatJt(captionPackage.tdp)} • Cicilan ${formatJt(captionPackage.cicilan)}/bln • Tenor ${captionPackage.tenor} bulan`,
+            dpMinimExtraLine,
+          ]
+            .filter(Boolean)
+            .join("\n");
+
   const shareCommission =
     positiveParamNumber(searchParams, "komisi") ??
     (unit && sharePrice ? estimateBuilderCommission(unit.harga, sharePrice) : 0);
   const vehicleFacts = unit ? shareVehicleFacts(unit) : null;
   const autoCaption = unit
-    ? !shareHasFinancing
-      ? [
-          unit.nama,
-          vehicleFacts?.lines,
-          vehicleFacts?.condition,
-          `Harga ${formatRupiah(captionPrice)}`,
-          `Unit tercatat di cabang ${titleCase(unit.lokasi || "Mobix")}, cek ketersediaannya terlebih dahulu.`,
-          "Chat saya ya",
-        ].filter(Boolean).join("\n\n")
-      : isDpMinimShare
-      ? [
-          unit.nama,
-          vehicleFacts?.lines,
-          vehicleFacts?.condition,
-          `Paket DP Minim ${formatJt(paymentValue)}\nCicilan ${formatJt(shareCicilan)}/bln • Tenor ${shareTenor} bulan`,
-          `Unit tercatat di cabang ${titleCase(unit.lokasi || "Mobix")}, cek ketersediaannya terlebih dahulu.`,
-          "Chat saya ya",
-        ].filter(Boolean).join("\n\n")
-      : [
-          unit.nama,
-          vehicleFacts?.lines,
-          vehicleFacts?.condition,
-          `Harga ${formatRupiah(captionPrice)}\nTDP ${formatJt(shareTdp)} • Cicilan ${formatJt(shareCicilan)}/bln • Tenor ${shareTenor} bulan`,
-          `Unit tercatat di cabang ${titleCase(unit.lokasi || "Mobix")}, cek ketersediaannya terlebih dahulu.`,
-          "Chat saya ya",
-        ].filter(Boolean).join("\n\n")
+    ? buildShareAutoCaption([
+        unit.nama,
+        vehicleFacts?.lines,
+        vehicleFacts?.condition,
+        packageBlock,
+        `Unit tercatat di cabang ${titleCase(unit.lokasi || "Mobix")}, cek ketersediaannya terlebih dahulu.`,
+      ])
     : "";
 
   function replaceAiBackgroundFiles(entries: Array<[string, File, string]>) {
@@ -721,6 +802,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     setAppliedSimulation(null);
     setAppliedPrice(initialSharePrice);
     setPriceInput(new Intl.NumberFormat("id-ID").format(initialSharePrice));
+    setDefaultDpMinim(null);
     setAiBackgroundStatus("idle");
     setAiBackgroundProgress(0);
     setAiPreviewMode("ai");
@@ -729,7 +811,49 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     // eslint-disable-next-line react-hooks/exhaustive-deps -- hanya re-init saat unit berganti
   }, [unit?.id]);
 
-  // sinkronkan caption otomatis saat hasil simulasi live siap (jika user belum edit)
+  // Default caption: fetch paket DP Minim tenor 60 di bawah harga
+  useEffect(() => {
+    if (!unit || salesContactRequired) {
+      setDefaultDpMinim(null);
+      return;
+    }
+    const price = sharePrice || unit.harga;
+    if (!price) {
+      setDefaultDpMinim(null);
+      return;
+    }
+    let alive = true;
+    const controller = new AbortController();
+    fetchDpMinimPackage(
+      {
+        unitPrice: price,
+        brand: unit.brand,
+        model: unit.type,
+        year: unit.year,
+        category: unit.category,
+        tenor: 60,
+      },
+      controller.signal,
+    ).then((pkg) => {
+      if (!alive) return;
+      setDefaultDpMinim(pkg);
+    });
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [
+    unit?.id,
+    unit?.brand,
+    unit?.type,
+    unit?.year,
+    unit?.category,
+    unit?.harga,
+    salesContactRequired,
+    sharePrice,
+  ]);
+
+  // sinkronkan caption otomatis saat hasil simulasi / DP minim default siap (jika user belum edit)
   useEffect(() => {
     if (!unit || !autoCaption) return;
     setCaptionText((current) => {
@@ -991,28 +1115,29 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     const km = formatOdometer(unit.odometer);
     const taxInfo = taxValidityCaption(unit.stnk_expiry);
     const facts = shareVehicleFacts(unit);
-    const tdp = formatJt(shareTdp);
-    const installment = formatJt(shareCicilan);
-    const creditPackage = !shareHasFinancing
-      ? `harga ${formatRupiah(captionPrice)}`
-      : isDpMinimShare
-        ? `paket DP Minim ${formatJt(paymentValue)}, cicilan ${installment}/bln tenor ${shareTenor} bulan`
-        : `TDP ${tdp}, cicilan ${installment}/bln tenor ${shareTenor} bulan`;
-    const packageWithPrice = !shareHasFinancing
-      ? creditPackage
-      : shouldHidePriceInCaption
-        ? creditPackage
-        : `harga kredit ${formatRupiah(captionPrice)}, ${creditPackage}`;
+    const pkgTdp =
+      captionPackage.kind === "cash" ? 0 : captionPackage.tdp;
+    const pkgCicilan =
+      captionPackage.kind === "cash" ? 0 : captionPackage.cicilan;
+    const pkgTenor =
+      captionPackage.kind === "cash" ? shareTenor : captionPackage.tenor;
+    const tdp = formatJt(pkgTdp);
+    const installment = formatJt(pkgCicilan);
+    const creditPackage =
+      captionPackage.kind === "cash"
+        ? defaultDpMinim
+          ? `harga ${formatRupiah(captionPackage.price)}, paket DP Minim ${formatJt(defaultDpMinim.tdp)}, cicilan ${formatJt(defaultDpMinim.cicilan)}/bln tenor ${defaultDpMinim.tenor} bulan`
+          : `harga ${formatRupiah(captionPackage.price)}`
+        : captionPackage.kind === "dpminim"
+          ? `harga ${formatRupiah(captionPackage.price)}, paket DP Minim ${formatJt(captionPackage.tdp)}, cicilan ${installment}/bln tenor ${captionPackage.tenor} bulan`
+          : `harga ${formatRupiah(captionPackage.price)}, TDP ${tdp}, cicilan ${installment}/bln tenor ${captionPackage.tenor} bulan${defaultDpMinim ? `, paket DP Minim ${formatJt(defaultDpMinim.tdp)} tenor ${defaultDpMinim.tenor} bulan` : ""}`;
+    const packageWithPrice = creditPackage;
     const category =
       unit.category && unit.category.length <= 4
         ? unit.category.toUpperCase()
         : unit.category
           ? titleCase(unit.category)
           : "mobil";
-    const dpInfo =
-      shareHasFinancing && shareDp && shareDpPercent && !shouldHidePriceInCaption
-        ? ` DP ${formatRupiah(shareDp)} (${Math.round(shareDpPercent * 10) / 10}%).`
-        : "";
     const colorInfo = color ? ` warna ${color}` : "";
     const specs = [
       unit.year ? `tahun ${unit.year}` : "",
@@ -1047,50 +1172,72 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
           ? [{ line: "BPKB tersedia" }]
           : []),
     ];
-    const requiredPackageFacts = !shareHasFinancing
+    const hargaFact = {
+      line: `Harga ${formatRupiah(captionPrice)}`,
+      matches: [
+        formatRupiah(captionPrice),
+        formatRupiah(captionPrice).replace(/^Rp\s*/i, ""),
+      ],
+    };
+    const defaultDpMinimFacts = defaultDpMinim
       ? [
           {
-            line: `Harga ${formatRupiah(captionPrice)}`,
+            line: `Paket DP Minim ${formatJt(defaultDpMinim.tdp)}`,
             matches: [
-              formatRupiah(captionPrice),
-              formatRupiah(captionPrice).replace(/^Rp\s*/i, ""),
+              `DP Minim ${formatJt(defaultDpMinim.tdp)}`,
+              ...shortAmountMatches(defaultDpMinim.tdp),
             ],
+          },
+          {
+            line: `Cicilan ${formatJt(defaultDpMinim.cicilan)}/bln`,
+            matches: shortAmountMatches(defaultDpMinim.cicilan),
+          },
+          {
+            line: `Tenor ${defaultDpMinim.tenor} bulan`,
+            matches: [`${defaultDpMinim.tenor} bulan`],
           },
         ]
-      : isDpMinimShare
-        ? [
-          {
-            line: `Paket DP Minim ${formatJt(paymentValue)}`,
-            matches: [
-              `DP Minim ${formatJt(paymentValue)}`,
-              ...shortAmountMatches(paymentValue),
-            ],
-          },
-          {
-            line: `Cicilan ${installment}/bln`,
-            matches: shortAmountMatches(shareCicilan),
-          },
-          { line: `Tenor ${shareTenor} bulan`, matches: [`${shareTenor} bulan`] },
-        ]
-        : [
-          {
-            line: `Harga ${formatRupiah(captionPrice)}`,
-            matches: [
-              formatRupiah(captionPrice),
-              formatRupiah(captionPrice).replace(/^Rp\s*/i, ""),
-            ],
-          },
-          { line: `TDP ${tdp}`, matches: shortAmountMatches(shareTdp) },
-          {
-            line: `Cicilan ${installment}/bln`,
-            matches: shortAmountMatches(shareCicilan),
-          },
-          { line: `Tenor ${shareTenor} bulan`, matches: [`${shareTenor} bulan`] },
-        ];
+      : [];
+    const requiredPackageFacts =
+      captionPackage.kind === "cash"
+        ? [hargaFact, ...defaultDpMinimFacts]
+        : captionPackage.kind === "dpminim"
+          ? [
+              hargaFact,
+              {
+                line: `Paket DP Minim ${formatJt(captionPackage.tdp)}`,
+                matches: [
+                  `DP Minim ${formatJt(captionPackage.tdp)}`,
+                  ...shortAmountMatches(captionPackage.tdp),
+                ],
+              },
+              {
+                line: `Cicilan ${installment}/bln`,
+                matches: shortAmountMatches(captionPackage.cicilan),
+              },
+              {
+                line: `Tenor ${captionPackage.tenor} bulan`,
+                matches: [`${captionPackage.tenor} bulan`],
+              },
+            ]
+          : [
+              hargaFact,
+              { line: `TDP ${tdp}`, matches: shortAmountMatches(captionPackage.tdp) },
+              {
+                line: `Cicilan ${installment}/bln`,
+                matches: shortAmountMatches(captionPackage.cicilan),
+              },
+              {
+                line: `Tenor ${captionPackage.tenor} bulan`,
+                matches: [`${captionPackage.tenor} bulan`],
+              },
+              // Baris tambahan di bawah TDP (bukan ganti TDP)
+              ...defaultDpMinimFacts,
+            ];
     const requiredCaptionSections: RequiredCaptionSection[] = [
       { heading: "Detail unit", facts: requiredDetailFacts },
       {
-        heading: shareHasFinancing ? "Paket pembiayaan" : "Harga",
+        heading: captionPackage.kind === "cash" ? "Harga" : "Paket pembiayaan",
         facts: requiredPackageFacts,
       },
       {
@@ -1109,7 +1256,9 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       "pajak",
       "stnk",
       "harga",
-      ...(shareHasFinancing ? ["tdp", "cicilan", "tenor"] : []),
+      ...(captionPackage.kind !== "cash" || defaultDpMinim
+        ? ["tdp", "cicilan", "tenor", "dp minim"]
+        : []),
       "transmisi",
       "matic",
       "manual",
@@ -1119,19 +1268,33 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       branch,
       taxInfo,
       formatRupiah(captionPrice),
-      ...(shareHasFinancing
-        ? [formatJt(shareTdp), formatJt(shareCicilan), `${shareTenor} bulan`]
+      ...(captionPackage.kind !== "cash"
+        ? [formatJt(pkgTdp), formatJt(pkgCicilan), `${pkgTenor} bulan`]
+        : []),
+      ...(defaultDpMinim
+        ? [
+            formatJt(defaultDpMinim.tdp),
+            formatJt(defaultDpMinim.cicilan),
+            `${defaultDpMinim.tenor} bulan`,
+          ]
         : []),
     ].filter(Boolean);
 
     const variants = [
-      `${unit.nama}${colorInfo}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}\n\nUnit tercatat di ${branch}. Chat saya untuk cek ketersediaannya.`,
-      `Mau ${category} yang paketnya jelas?\n\n${unit.nama}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}\n\nMinat? Langsung chat saya.`,
+      `${unit.nama}${colorInfo}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}\n\nUnit tercatat di ${branch}.`,
+      `Mau ${category} yang paketnya jelas?\n\n${unit.nama}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}`,
       `${unit.nama}\n\n${specs}${conditionInfo ? `\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}\n\nCek unitnya di ${branch}.`,
-      `${unit.nama}${colorInfo}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\nPaketnya sudah jelas: ${packageWithPrice}.\n\nChat saya kalau mau cek.`,
-      `${unit.nama}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\nUnit tercatat di ${branch}.\n${readablePackage}.${dpInfo}\n\nMau saya bantu cek ketersediaannya?`,
+      `${unit.nama}${colorInfo}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\nPaketnya sudah jelas: ${packageWithPrice}.`,
+      `${unit.nama}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\nUnit tercatat di ${branch}.\n${readablePackage}.`,
       `Cari ${category} praktis dan menarik?\n\n${unit.nama}${colorInfo}\n\n${factBlock}${conditionInfo ? `\n\n${conditionInfo.trim()}` : ""}\n\n${readablePackage}.`,
     ];
+
+    const prefixStyle =
+      `Always start the selling hook after or as a continuation of the fixed opening line "${CAPTION_HOOK_PREFIX}". ` +
+      `End with CTA exactly: "${CAPTION_CTA}". ` +
+      "Write only a short selling hook using verified non-numeric selling points. " +
+      "Do not repeat specifications, odometer, tax/STNK, transmission, ownership, price, TDP, DP Minim, installment, tenor, or branch; the application will add those facts separately. " +
+      "Do not claim accident-free, flood-free, or complete service history.";
 
     try {
       const aiCaption = await suggestShareCaption({
@@ -1144,35 +1307,49 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         transmisi: unit.transmisi,
         cabang: branch,
         harga_builder: sharePrice,
-        harga_kredit: shareHasFinancing && !isDpMinimShare ? captionPrice : undefined,
-        tdp: shareHasFinancing ? shareTdp : undefined,
-        cicilan: shareHasFinancing ? shareCicilan : undefined,
-        tenor: shareHasFinancing ? shareTenor : undefined,
-        dp: shareHasFinancing ? shareDp ?? undefined : undefined,
-        dp_pct: shareHasFinancing ? shareDpPercent ?? undefined : undefined,
+        harga_kredit:
+          captionPackage.kind === "kredit" ? captionPackage.price : undefined,
+        tdp: captionPackage.kind !== "cash" ? pkgTdp : undefined,
+        cicilan: captionPackage.kind !== "cash" ? pkgCicilan : undefined,
+        tenor: captionPackage.kind !== "cash" ? pkgTenor : undefined,
+        dp:
+          captionPackage.kind === "dpminim"
+            ? captionPackage.tdp
+            : shareHasFinancing
+              ? shareDp ?? undefined
+              : undefined,
+        dp_pct:
+          captionPackage.kind === "dpminim"
+            ? defaultDpMinim?.dpPercent ?? shareDpPercent ?? undefined
+            : shareHasFinancing
+              ? shareDpPercent ?? undefined
+              : undefined,
         caption_saat_ini: captionText || autoCaption,
         style_hint: !shareHasFinancing
-          ? `${styleHint} Write only a short selling hook and CTA using verified non-numeric selling points. Do not invent financing, TDP, installment, tenor, or credit eligibility. The application will add the verified cash price and unit facts separately.`
-          : shouldHidePriceInCaption
-          ? `${styleHint} Write only a short selling hook and CTA using verified non-numeric selling points. Do not repeat specifications, odometer, tax/STNK, transmission, ownership, pricing, financing, tenor, or branch; the application will add those facts separately. Do not claim accident-free, flood-free, or complete service history.`
-          : `${styleHint} Write only a short selling hook and CTA using verified non-numeric selling points. Do not repeat specifications, odometer, tax/STNK, transmission, ownership, price, TDP, installment, tenor, or branch; the application will add those facts separately. Do not claim accident-free, flood-free, or complete service history.`,
+          ? `${styleHint} ${prefixStyle} Do not invent financing, TDP, installment, tenor, or credit eligibility.`
+          : `${styleHint} ${prefixStyle}`,
       });
-      const safeCaption = shouldHidePriceInCaption ? stripPriceFromCaption(aiCaption) : aiCaption;
+      const safeCaption = shouldHidePriceInCaption
+        ? stripPriceFromCaption(aiCaption)
+        : aiCaption;
       const aiSellingCopy = removeCaptionParagraphsContaining(
         formatCaptionReadability(safeCaption),
         protectedAiFactTerms,
       );
       setCaptionText(
-        ensureRequiredCaptionFacts(
-          aiSellingCopy,
-          requiredCaptionSections,
+        ensureCaptionCta(
+          ensureCaptionPrefix(
+            ensureRequiredCaptionFacts(aiSellingCopy, requiredCaptionSections),
+          ),
         ),
       );
       captionSuggestionIndex.current += 1;
     } catch {
       const nextCaption = variants[captionSuggestionIndex.current % variants.length];
       captionSuggestionIndex.current += 1;
-      setCaptionText(nextCaption);
+      setCaptionText(
+        ensureCaptionCta(ensureCaptionPrefix(nextCaption)),
+      );
     } finally {
       setCaptionSuggesting(false);
     }
@@ -1422,7 +1599,9 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
             {unit && (
               <div className="absolute bottom-3 left-3 rounded-lg bg-ink/85 px-3 py-1.5 text-[15px] font-bold text-surface">
                 Rp {formatJt(sharePrice || unit.harga)}
-                {shareHasFinancing && <> · {paymentLabel} {formatJt(paymentValue)}</>}
+                {shareHasFinancing && overlayPaymentValue > 0 && (
+                  <> · {paymentLabel} {formatJt(overlayPaymentValue)}</>
+                )}
               </div>
             )}
             <button
