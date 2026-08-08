@@ -606,7 +606,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const captionPrice = appliedSimulation?.hargaKredit ?? sharePrice ?? unit?.harga ?? 0;
   const shouldHidePriceInCaption = isDpMinimShare;
   const packageTitle = shareHasFinancing ? (isDpMinimShare ? "DP Minim" : "Kredit") : "Unit";
-  const paymentLabel = "TDP";
+  const paymentLabel = isDpMinimShare ? "TDP Konsumen" : "TDP";
   const paymentValue = isDpMinimShare && shareDp ? shareDp : shareTdp;
   const shareCommission =
     positiveParamNumber(searchParams, "komisi") ??

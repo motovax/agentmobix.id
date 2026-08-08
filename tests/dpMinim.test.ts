@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import {
-  getDsfDpMinimSummary,
+  DP_MINIM_ALL_IN_PERCENT,
+  getDpMinimAllInFromResult,
+  getDpMinimMinDp,
+  getDpMinimTargetAllIn,
+  getDpMinimTdpKonsumen,
   type DsfSimResult,
 } from "../src/lib/dsf";
 
-function dsfResult(
-  overrides: Partial<DsfSimResult> = {},
-): DsfSimResult {
+function dsfResult(overrides: Partial<DsfSimResult> = {}): DsfSimResult {
   return {
     hargaKredit: 150_000_000,
     installmentRounded: 3_860_000,
@@ -26,28 +28,47 @@ function dsfResult(
   };
 }
 
-describe("hasil DP Minim DSF", () => {
-  test("memakai langsung TDP, angsuran, dan All In dari respons DSF", () => {
-    expect(getDsfDpMinimSummary(dsfResult())).toEqual({
-      tdp: 21_323_750,
-      installment: 3_860_000,
-      allIn: 138_277_548,
-    });
+describe("formula DP Minim reverse all-in", () => {
+  test("LTV target All In per tenor", () => {
+    expect(DP_MINIM_ALL_IN_PERCENT[60]).toBe(0.95);
+    expect(DP_MINIM_ALL_IN_PERCENT[48]).toBe(0.925);
+    expect(DP_MINIM_ALL_IN_PERCENT[36]).toBe(0.9);
+    expect(getDpMinimTargetAllIn(200_000_000, 60)).toBe(190_000_000);
+    expect(getDpMinimTargetAllIn(200_000_000, 48)).toBe(185_000_000);
+    expect(getDpMinimTargetAllIn(200_000_000, 36)).toBe(180_000_000);
   });
 
-  test("tidak menurunkan TDP dari harga dikurangi All In", () => {
-    const result = dsfResult();
-    const summary = getDsfDpMinimSummary(result);
-
-    expect(summary?.tdp).toBe(21_323_750);
-    expect(summary?.tdp).not.toBe(
-      (result.hargaKredit ?? 0) - result.allInToSupplier,
-    );
+  test("min DP konsumen = (1 − LTV) × harga", () => {
+    expect(getDpMinimMinDp(200_000_000, 60)).toBe(10_000_000);
+    expect(getDpMinimMinDp(200_000_000, 48)).toBe(15_000_000);
+    expect(getDpMinimMinDp(200_000_000, 36)).toBe(20_000_000);
   });
 
-  test("menolak hasil DSF yang belum lengkap", () => {
+  test("All In dari netDisbursement + refund atau allInToSupplier", () => {
+    expect(getDpMinimAllInFromResult(dsfResult())).toBe(138_277_548);
     expect(
-      getDsfDpMinimSummary(dsfResult({ allInToSupplier: 0 })),
+      getDpMinimAllInFromResult(
+        dsfResult({ allInToSupplier: 0, netDisbursement: 100, refundSupplier: 20 }),
+      ),
+    ).toBe(120);
+    expect(getDpMinimAllInFromResult(null)).toBeNull();
+    expect(
+      getDpMinimAllInFromResult(
+        dsfResult({ allInToSupplier: 0, netDisbursement: 0, refundSupplier: 0 }),
+      ),
     ).toBeNull();
+  });
+
+  test("TDP konsumen = harga cash − All In (bukan totalDownPaymentRounded DSF)", () => {
+    const price = 150_000_000;
+    const allIn = getDpMinimAllInFromResult(dsfResult());
+    const tdp = getDpMinimTdpKonsumen(price, allIn);
+
+    expect(tdp).toBe(price - 138_277_548);
+    expect(tdp).not.toBe(dsfResult().totalDownPaymentRounded);
+  });
+
+  test("TDP konsumen tidak negatif jika All In di atas harga", () => {
+    expect(getDpMinimTdpKonsumen(100_000_000, 120_000_000)).toBe(0);
   });
 });

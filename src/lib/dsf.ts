@@ -263,33 +263,100 @@ export async function simulateKreditWithSignal(
   }
 }
 
-export interface DsfDpMinimSummary {
-  tdp: number;
-  installment: number;
-  allIn: number;
+/**
+ * Target pencairan leasing (All In / LTV) per tenor untuk paket DP Minim.
+ * DP konsumen minimal ≈ (1 - LTV) × harga cash.
+ */
+export const DP_MINIM_ALL_IN_PERCENT: Record<number, number> = {
+  12: 0.85,
+  24: 0.875,
+  36: 0.9,
+  48: 0.925,
+  60: 0.95,
+};
+
+/** Target All In (cair leasing) dari harga cash × LTV tenor. */
+export function getDpMinimTargetAllIn(price: number, tenor: number): number {
+  const ltv = DP_MINIM_ALL_IN_PERCENT[tenor] ?? 0.95;
+  return Math.round(price * ltv);
 }
 
-/** Nilai DP Minim yang ditampilkan langsung dari respons simulasi DSF. */
-export function getDsfDpMinimSummary(
-  result: DsfSimResult | null,
-): DsfDpMinimSummary | null {
-  if (
-    !result ||
-    !Number.isFinite(result.totalDownPaymentRounded) ||
-    result.totalDownPaymentRounded <= 0 ||
-    !Number.isFinite(result.installmentRounded) ||
-    result.installmentRounded <= 0 ||
-    !Number.isFinite(result.allInToSupplier) ||
-    result.allInToSupplier <= 0
-  ) {
-    return null;
-  }
+/** Min DP konsumen dari LTV tenor: (1 − LTV) × harga. */
+export function getDpMinimMinDp(price: number, tenor: number): number {
+  if (price <= 0) return 0;
+  const ltv = DP_MINIM_ALL_IN_PERCENT[tenor] ?? 0.95;
+  return Math.round(price * (1 - ltv));
+}
 
-  return {
-    tdp: result.totalDownPaymentRounded,
-    installment: result.installmentRounded,
-    allIn: result.allInToSupplier,
-  };
+/** All In dari hasil DSF: net disbursement + refund (atau allInToSupplier). */
+export function getDpMinimAllInFromResult(
+  result: DsfSimResult | null,
+): number | null {
+  if (!result) return null;
+  if (
+    Number.isFinite(result.allInToSupplier) &&
+    result.allInToSupplier > 0
+  ) {
+    return result.allInToSupplier;
+  }
+  if (
+    Number.isFinite(result.netDisbursement) &&
+    result.netDisbursement > 0
+  ) {
+    return result.netDisbursement + Math.max(0, result.refundSupplier ?? 0);
+  }
+  return null;
+}
+
+/**
+ * TDP bayar konsumen = harga cash − All In.
+ * Bukan totalDownPaymentRounded DSF — ini formula paket reverse all-in.
+ */
+export function getDpMinimTdpKonsumen(
+  price: number,
+  allIn: number | null,
+): number | null {
+  if (allIn === null || !Number.isFinite(allIn) || price <= 0) return null;
+  return Math.max(0, price - allIn);
+}
+
+/**
+ * Reverse calculation ala paket leasing: cari OTR kredit (markup di atas
+ * harga cash) yang menghasilkan cair all-in (cair murni + refund) mendekati
+ * target. All-in DSF ~linear terhadap unit price, jadi iterasi proporsional
+ * konvergen cepat (2-3 call).
+ */
+export async function findAllParamsForAllIn(
+  params: DsfSimParams,
+  targetAllIn: number,
+  signal?: AbortSignal,
+): Promise<DsfSimResult | null> {
+  const cashPrice = params.unitPrice;
+  if (!cashPrice || !targetAllIn) return null;
+
+  const clampPrice = (value: number) =>
+    Math.min(
+      Math.max(Math.round(value / 1000) * 1000, 1000),
+      cashPrice * 4,
+    );
+
+  let price = cashPrice;
+  let best: DsfSimResult | null = null;
+
+  for (let i = 0; i < 6; i += 1) {
+    const result = await simulateKreditWithSignal(
+      { ...params, unitPrice: price },
+      signal,
+    );
+    const allIn = getDpMinimAllInFromResult(result);
+    if (!result || allIn === null || allIn <= 0) return best;
+    best = { ...result, hargaKredit: price };
+    if (Math.abs(allIn - targetAllIn) <= 200000) return best;
+    const next = clampPrice((price * targetAllIn) / allIn);
+    if (next === price) return best;
+    price = next;
+  }
+  return best;
 }
 
 export interface DsfCreditPriceResult {
