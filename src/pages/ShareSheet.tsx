@@ -694,12 +694,24 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       ? paymentValue
       : captionPackage.tdp;
 
+  const dpMinimExtraLine =
+    defaultDpMinim && captionPackage.kind !== "dpminim"
+      ? `Paket DP Minim ${formatJt(defaultDpMinim.tdp)} • Cicilan ${formatJt(defaultDpMinim.cicilan)}/bln • Tenor ${defaultDpMinim.tenor} bulan`
+      : "";
+
   const packageBlock =
     captionPackage.kind === "cash"
-      ? `Harga ${formatRupiah(captionPackage.price)}`
+      ? [`Harga ${formatRupiah(captionPackage.price)}`, dpMinimExtraLine]
+          .filter(Boolean)
+          .join("\n")
       : captionPackage.kind === "dpminim"
         ? `Harga ${formatRupiah(captionPackage.price)}\nPaket DP Minim ${formatJt(captionPackage.tdp)}\nCicilan ${formatJt(captionPackage.cicilan)}/bln • Tenor ${captionPackage.tenor} bulan`
-        : `Harga ${formatRupiah(captionPackage.price)}\nTDP ${formatJt(captionPackage.tdp)} • Cicilan ${formatJt(captionPackage.cicilan)}/bln • Tenor ${captionPackage.tenor} bulan`;
+        : [
+            `Harga ${formatRupiah(captionPackage.price)}\nTDP ${formatJt(captionPackage.tdp)} • Cicilan ${formatJt(captionPackage.cicilan)}/bln • Tenor ${captionPackage.tenor} bulan`,
+            dpMinimExtraLine,
+          ]
+            .filter(Boolean)
+            .join("\n");
 
   const shareCommission =
     positiveParamNumber(searchParams, "komisi") ??
@@ -806,7 +818,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
   // Default caption: fetch paket DP Minim tenor 60 di bawah harga
   useEffect(() => {
-    if (!unit || !financingEligible || salesContactRequired) {
+    if (!unit || salesContactRequired) {
       setDefaultDpMinim(null);
       return;
     }
@@ -842,7 +854,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     unit?.year,
     unit?.category,
     unit?.harga,
-    financingEligible,
     salesContactRequired,
     sharePrice,
   ]);
@@ -1119,10 +1130,12 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     const installment = formatJt(pkgCicilan);
     const creditPackage =
       captionPackage.kind === "cash"
-        ? `harga ${formatRupiah(captionPackage.price)}`
+        ? defaultDpMinim
+          ? `harga ${formatRupiah(captionPackage.price)}, paket DP Minim ${formatJt(defaultDpMinim.tdp)}, cicilan ${formatJt(defaultDpMinim.cicilan)}/bln tenor ${defaultDpMinim.tenor} bulan`
+          : `harga ${formatRupiah(captionPackage.price)}`
         : captionPackage.kind === "dpminim"
           ? `harga ${formatRupiah(captionPackage.price)}, paket DP Minim ${formatJt(captionPackage.tdp)}, cicilan ${installment}/bln tenor ${captionPackage.tenor} bulan`
-          : `harga ${formatRupiah(captionPackage.price)}, TDP ${tdp}, cicilan ${installment}/bln tenor ${captionPackage.tenor} bulan`;
+          : `harga ${formatRupiah(captionPackage.price)}, TDP ${tdp}, cicilan ${installment}/bln tenor ${captionPackage.tenor} bulan${defaultDpMinim ? `, paket DP Minim ${formatJt(defaultDpMinim.tdp)} tenor ${defaultDpMinim.tenor} bulan` : ""}`;
     const packageWithPrice = creditPackage;
     const category =
       unit.category && unit.category.length <= 4
@@ -1171,9 +1184,28 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         formatRupiah(captionPrice).replace(/^Rp\s*/i, ""),
       ],
     };
+    const defaultDpMinimFacts = defaultDpMinim
+      ? [
+          {
+            line: `Paket DP Minim ${formatJt(defaultDpMinim.tdp)}`,
+            matches: [
+              `DP Minim ${formatJt(defaultDpMinim.tdp)}`,
+              ...shortAmountMatches(defaultDpMinim.tdp),
+            ],
+          },
+          {
+            line: `Cicilan ${formatJt(defaultDpMinim.cicilan)}/bln`,
+            matches: shortAmountMatches(defaultDpMinim.cicilan),
+          },
+          {
+            line: `Tenor ${defaultDpMinim.tenor} bulan`,
+            matches: [`${defaultDpMinim.tenor} bulan`],
+          },
+        ]
+      : [];
     const requiredPackageFacts =
       captionPackage.kind === "cash"
-        ? [hargaFact]
+        ? [hargaFact, ...defaultDpMinimFacts]
         : captionPackage.kind === "dpminim"
           ? [
               hargaFact,
@@ -1204,6 +1236,18 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
                 line: `Tenor ${captionPackage.tenor} bulan`,
                 matches: [`${captionPackage.tenor} bulan`],
               },
+              // Jangan dobel cicilan/tenor jika sudah dari TDP reguler; cukup label DP Minim
+              ...(defaultDpMinim
+                ? [
+                    {
+                      line: `Paket DP Minim ${formatJt(defaultDpMinim.tdp)}`,
+                      matches: [
+                        `DP Minim ${formatJt(defaultDpMinim.tdp)}`,
+                        ...shortAmountMatches(defaultDpMinim.tdp),
+                      ],
+                    },
+                  ]
+                : []),
             ];
     const requiredCaptionSections: RequiredCaptionSection[] = [
       { heading: "Detail unit", facts: requiredDetailFacts },
@@ -1227,7 +1271,9 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       "pajak",
       "stnk",
       "harga",
-      ...(captionPackage.kind !== "cash" ? ["tdp", "cicilan", "tenor", "dp minim"] : []),
+      ...(captionPackage.kind !== "cash" || defaultDpMinim
+        ? ["tdp", "cicilan", "tenor", "dp minim"]
+        : []),
       "transmisi",
       "matic",
       "manual",
@@ -1239,6 +1285,13 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       formatRupiah(captionPrice),
       ...(captionPackage.kind !== "cash"
         ? [formatJt(pkgTdp), formatJt(pkgCicilan), `${pkgTenor} bulan`]
+        : []),
+      ...(defaultDpMinim
+        ? [
+            formatJt(defaultDpMinim.tdp),
+            formatJt(defaultDpMinim.cicilan),
+            `${defaultDpMinim.tenor} bulan`,
+          ]
         : []),
     ].filter(Boolean);
 
