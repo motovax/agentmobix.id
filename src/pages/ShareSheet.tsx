@@ -616,8 +616,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const jasmineCalculationHref = buildJasmineWhatsAppHref(unitCalculationMessage);
   const captionPrice = appliedSimulation?.hargaKredit ?? sharePrice ?? unit?.harga ?? 0;
   const shouldHidePriceInCaption = isDpMinimShare;
-  const packageTitle = shareHasFinancing ? (isDpMinimShare ? "DP Minim" : "Kredit") : "Unit";
-  const paymentLabel = isDpMinimShare ? "TDP Konsumen" : "TDP";
   const paymentValue = isDpMinimShare && shareDp ? shareDp : shareTdp;
 
   type CaptionPackage =
@@ -682,7 +680,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       : captionPackage.kind === "kredit"
         ? "Kredit"
         : "Unit";
-  const paymentLabel = captionPackage.kind === "dpminim" ? "DP Minim" : "TDP";
+  const paymentLabel =
+    captionPackage.kind === "dpminim" ? "TDP Konsumen" : "TDP";
   const overlayPaymentValue =
     captionPackage.kind === "cash"
       ? paymentValue

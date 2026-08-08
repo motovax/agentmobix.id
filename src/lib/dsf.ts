@@ -369,6 +369,7 @@ export interface DpMinimPackage {
 /**
  * Fetch paket DP Minim untuk tenor tertentu (default 60).
  * Dipakai caption share default agar di bawah harga selalu ada DP Minim 60.
+ * Formula: reverse all-in (target LTV) → TDP konsumen = harga − All In.
  */
 export async function fetchDpMinimPackage(
   params: {
@@ -391,7 +392,7 @@ export async function fetchDpMinimPackage(
   });
   if (!rules.eligible) return null;
 
-  const result = await simulateKreditWithSignal(
+  const result = await findAllParamsForAllIn(
     {
       unitPrice: params.unitPrice,
       dpPercent: rules.minDpPercent,
@@ -404,14 +405,23 @@ export async function fetchDpMinimPackage(
       year: params.year,
       category: params.category,
     },
+    getDpMinimTargetAllIn(params.unitPrice, tenor),
     signal,
   );
-  const summary = getDsfDpMinimSummary(result);
-  if (!summary) return null;
+  const allIn = getDpMinimAllInFromResult(result);
+  const tdp = getDpMinimTdpKonsumen(params.unitPrice, allIn);
+  if (
+    !result ||
+    tdp === null ||
+    !Number.isFinite(result.installmentRounded) ||
+    result.installmentRounded <= 0
+  ) {
+    return null;
+  }
 
   return {
-    tdp: summary.tdp,
-    cicilan: summary.installment,
+    tdp,
+    cicilan: result.installmentRounded,
     tenor,
     dpPercent: rules.minDpPercent,
   };
