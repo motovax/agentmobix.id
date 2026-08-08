@@ -661,15 +661,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         tenor: shareTenor,
       };
     }
-    if (defaultDpMinim) {
-      return {
-        kind: "dpminim",
-        price: captionPrice,
-        tdp: defaultDpMinim.tdp,
-        cicilan: defaultDpMinim.cicilan,
-        tenor: defaultDpMinim.tenor,
-      };
-    }
+    // defaultDpMinim tidak mengganti paket utama (TDP/UI tetap);
+    // baris "Paket DP Minim tenor 60" ditambah di packageBlock.
     if (shareTdp > 0 && shareCicilan > 0) {
       return {
         kind: "kredit",
@@ -694,6 +687,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       ? paymentValue
       : captionPackage.tdp;
 
+  /** Baris tambahan di bawah Harga/TDP — hanya jika paket utama bukan DP Minim user. */
   const dpMinimExtraLine =
     defaultDpMinim && captionPackage.kind !== "dpminim"
       ? `Paket DP Minim ${formatJt(defaultDpMinim.tdp)} • Cicilan ${formatJt(defaultDpMinim.cicilan)}/bln • Tenor ${defaultDpMinim.tenor} bulan`
@@ -1236,18 +1230,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
                 line: `Tenor ${captionPackage.tenor} bulan`,
                 matches: [`${captionPackage.tenor} bulan`],
               },
-              // Jangan dobel cicilan/tenor jika sudah dari TDP reguler; cukup label DP Minim
-              ...(defaultDpMinim
-                ? [
-                    {
-                      line: `Paket DP Minim ${formatJt(defaultDpMinim.tdp)}`,
-                      matches: [
-                        `DP Minim ${formatJt(defaultDpMinim.tdp)}`,
-                        ...shortAmountMatches(defaultDpMinim.tdp),
-                      ],
-                    },
-                  ]
-                : []),
+              // Baris tambahan di bawah TDP (bukan ganti TDP)
+              ...defaultDpMinimFacts,
             ];
     const requiredCaptionSections: RequiredCaptionSection[] = [
       { heading: "Detail unit", facts: requiredDetailFacts },
