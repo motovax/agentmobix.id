@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { ContactActionMenu } from "../components/FloatingContactCta";
+import { FloatingPicAgentCta } from "../components/FloatingPicAgentCta";
 import {
   CreditSimulationBox,
   type CreditSimulationResult,
@@ -1947,6 +1948,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
           </button>
         </div>
       </div>
+
+      {!embedded && !showChannels && <FloatingPicAgentCta unit={unit} />}
 
       {/* sticky action bar — selalu on top (fixed), pola sama seperti detail unit */}
       {!embedded && (
