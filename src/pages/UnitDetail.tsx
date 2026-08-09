@@ -6,6 +6,7 @@ import { Link, useParams, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
 import { ContactActionMenu } from "../components/FloatingContactCta";
+import { FloatingPicAgentCta } from "../components/FloatingPicAgentCta";
 import { Photo, Skeleton } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
 import { ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
@@ -1791,6 +1792,8 @@ export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
 
         <div className="h-[104px]" />
       </main>
+
+      {!lightbox && !shareOpen && <FloatingPicAgentCta unit={unit} />}
 
       {/* STICKY ACTIONS */}
       <div className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-1/2 z-40 grid w-[calc(100%-28px)] max-w-[384px] -translate-x-1/2 grid-cols-[minmax(0,1fr)_56px] gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-nav">
