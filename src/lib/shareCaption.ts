@@ -21,6 +21,13 @@ export function buildAgenMobixUnitLink(slug?: string | null) {
     : "https://agenmobix.id";
 }
 
+export function buildMobixByDssUnitLink(slug?: string | null) {
+  const normalizedSlug = slug?.trim();
+  return normalizedSlug
+    ? `https://mobixbydss.id/produk/detail/${encodeURIComponent(normalizedSlug)}`
+    : "https://mobixbydss.id";
+}
+
 /**
  * Pastikan caption diawali prefix kanonis (tanpa mendobel jika sudah ada).
  */

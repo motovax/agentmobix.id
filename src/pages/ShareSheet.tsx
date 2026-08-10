@@ -56,6 +56,7 @@ import { buildJasmineWhatsAppHref } from "../lib/jasmine";
 import { getCatalogReturnHref } from "../lib/catalogSearch";
 import {
   buildAgenMobixUnitLink,
+  buildMobixByDssUnitLink,
   buildShareAutoCaption,
   CAPTION_CTA,
   CAPTION_HOOK_PREFIX,
@@ -949,6 +950,9 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   }
 
   const link = buildAgenMobixUnitLink(unit?.slug);
+  const additionalUnitLinks = unit?.slug
+    ? [buildMobixByDssUnitLink(unit.slug)]
+    : [];
 
   async function waitForAIBackgroundJob(
     initial: AIBackgroundResponse,
@@ -1044,7 +1048,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   }
 
   async function copyShareCaption(caption: string) {
-    const text = buildShareText(caption, link);
+    const text = buildShareText(caption, link, additionalUnitLinks);
     if (await copyTextToClipboard(text)) {
       showShareCaptionCopied();
       return true;
@@ -1075,7 +1079,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   ): Promise<void> | null {
     if (!prefersNativeWebShare() || files.length === 0) return null;
 
-    const shareText = buildShareText(caption, link);
+    const shareText = buildShareText(caption, link, additionalUnitLinks);
     const shareable = pickNativeShareableFiles(files, title, shareText);
     const payload = buildNativeSharePayload(shareable, title, shareText);
     if (!payload) return null;
@@ -1091,7 +1095,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   /** Native text share (mobile) — caption + link in `text`, no separate `url`. */
   function shareWithoutFiles(title: string, caption: string): Promise<void> | null {
     if (!prefersNativeWebShare()) return null;
-    const shareText = buildShareText(caption, link);
+    const shareText = buildShareText(caption, link, additionalUnitLinks);
     const payload = buildNativeSharePayload([], title, shareText);
     if (!payload) return null;
 
@@ -1428,7 +1432,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   function shareVia(channel: ShareChannel) {
     const caption = captionText.trim();
     const openChannel = () => {
-      const url = buildChannelShareUrl(channel, caption, link);
+      const url = buildChannelShareUrl(channel, caption, link, additionalUnitLinks);
       window.open(url, "_blank", "noopener");
       setShowChannels(false);
     };

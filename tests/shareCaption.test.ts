@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildAgenMobixUnitLink,
+  buildMobixByDssUnitLink,
   buildShareAutoCaption,
   buildWhatsAppShareText,
   CAPTION_CTA,
@@ -45,6 +46,24 @@ describe("buildAgenMobixUnitLink", () => {
 
   test("falls back to the absolute AgenMobix homepage", () => {
     expect(buildAgenMobixUnitLink()).toBe("https://agenmobix.id");
+  });
+});
+
+describe("buildMobixByDssUnitLink", () => {
+  test("builds an absolute Mobix by DSS product detail link", () => {
+    expect(buildMobixByDssUnitLink("honda-mobilio-1-5-e-2016-bda0bd87")).toBe(
+      "https://mobixbydss.id/produk/detail/honda-mobilio-1-5-e-2016-bda0bd87",
+    );
+  });
+
+  test("trims and safely encodes the unit identifier", () => {
+    expect(buildMobixByDssUnitLink(" toyota calya 2019 ")).toBe(
+      "https://mobixbydss.id/produk/detail/toyota%20calya%202019",
+    );
+  });
+
+  test("falls back to the absolute Mobix by DSS homepage", () => {
+    expect(buildMobixByDssUnitLink()).toBe("https://mobixbydss.id");
   });
 });
 
