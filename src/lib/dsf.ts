@@ -16,7 +16,7 @@ export interface DsfSimResult {
   adminFee: number;
   disclaimer: string[];
   netDisbursement: number;
-  refundSupplier: number;
+  refundSupplierActual: number;
   allInToSupplier: number;
 }
 
@@ -38,7 +38,7 @@ interface DsfAllParamsData {
   refund?: {
     allInToSupplier?: number;
     netDisbursement?: number;
-    refundSupplier?: number;
+    refundSupplierActual?: number;
   };
 }
 
@@ -244,7 +244,7 @@ export async function simulateKreditWithSignal(
     const d = await fetchDsfAllParams(params, signal);
     if (!d) return null;
     const netDisbursement = d.netDisbursement ?? d.refund?.netDisbursement ?? 0;
-    const refundSupplier = d.refund?.refundSupplier ?? 0;
+    const refundSupplierActual = d.refund?.refundSupplierActual ?? 0;
     return {
       hargaKredit: d.harga_kredit || null,
       installmentRounded: d.installmentRounded,
@@ -258,11 +258,11 @@ export async function simulateKreditWithSignal(
       adminFee: d.adminFee,
       disclaimer: d.disclaimer ?? [],
       netDisbursement,
-      refundSupplier,
+      refundSupplierActual,
       allInToSupplier:
         d.refund?.allInToSupplier ??
         (netDisbursement > 0
-          ? netDisbursement + Math.max(0, refundSupplier)
+          ? netDisbursement + Math.max(0, refundSupplierActual)
           : 0),
     };
   } catch {
@@ -295,36 +295,33 @@ export function getDpMinimMinDp(price: number, tenor: number): number {
   return Math.round(price * (1 - ltv));
 }
 
-/** All In dari hasil DSF: net disbursement + refund (atau allInToSupplier). */
+/** Pencairan + refund aktual DSF untuk rumus DP Minim. */
 export function getDpMinimAllInFromResult(
   result: DsfSimResult | null,
 ): number | null {
   if (!result) return null;
   if (
-    Number.isFinite(result.allInToSupplier) &&
-    result.allInToSupplier > 0
-  ) {
-    return result.allInToSupplier;
-  }
-  if (
     Number.isFinite(result.netDisbursement) &&
     result.netDisbursement > 0
   ) {
-    return result.netDisbursement + Math.max(0, result.refundSupplier ?? 0);
+    return (
+      result.netDisbursement +
+      Math.max(0, result.refundSupplierActual ?? 0)
+    );
   }
   return null;
 }
 
 /**
- * TDP bayar konsumen = harga cash − All In.
+ * TDP bayar konsumen = OTR real − (netDisbursement + refundSupplierActual).
  * Bukan totalDownPaymentRounded DSF — ini formula paket reverse all-in.
  */
 export function getDpMinimTdpKonsumen(
-  price: number,
+  realOtr: number,
   allIn: number | null,
 ): number | null {
-  if (allIn === null || !Number.isFinite(allIn) || price <= 0) return null;
-  return Math.max(0, price - allIn);
+  if (allIn === null || !Number.isFinite(allIn) || realOtr <= 0) return null;
+  return Math.max(0, realOtr - allIn);
 }
 
 /**

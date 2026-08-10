@@ -22,7 +22,7 @@ function dsfResult(overrides: Partial<DsfSimResult> = {}): DsfSimResult {
     adminFee: 5_500_000,
     disclaimer: [],
     netDisbursement: 126_000_000,
-    refundSupplier: 12_277_548,
+    refundSupplierActual: 12_277_548,
     allInToSupplier: 138_277_548,
     ...overrides,
   };
@@ -44,17 +44,25 @@ describe("formula DP Minim reverse all-in", () => {
     expect(getDpMinimMinDp(200_000_000, 36)).toBe(20_000_000);
   });
 
-  test("All In dari netDisbursement + refund atau allInToSupplier", () => {
+  test("pencairan dan refund selalu memakai netDisbursement + refundSupplierActual", () => {
     expect(getDpMinimAllInFromResult(dsfResult())).toBe(138_277_548);
     expect(
       getDpMinimAllInFromResult(
-        dsfResult({ allInToSupplier: 0, netDisbursement: 100, refundSupplier: 20 }),
+        dsfResult({
+          allInToSupplier: 999,
+          netDisbursement: 100,
+          refundSupplierActual: 20,
+        }),
       ),
     ).toBe(120);
     expect(getDpMinimAllInFromResult(null)).toBeNull();
     expect(
       getDpMinimAllInFromResult(
-        dsfResult({ allInToSupplier: 0, netDisbursement: 0, refundSupplier: 0 }),
+        dsfResult({
+          allInToSupplier: 999,
+          netDisbursement: 0,
+          refundSupplierActual: 20,
+        }),
       ),
     ).toBeNull();
   });
