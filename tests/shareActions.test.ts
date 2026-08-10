@@ -28,6 +28,29 @@ describe("buildShareText", () => {
     );
     expect(buildShareText("Caption saja", "")).toBe("Caption saja");
   });
+
+  test("appends AgenMobix and Mobix by DSS unit links", () => {
+    expect(
+      buildShareText(
+        "Honda Mobilio siap dipinang",
+        "https://agenmobix.id/share?u=honda-mobilio",
+        ["https://mobixbydss.id/produk/detail/honda-mobilio"],
+      ),
+    ).toBe([
+      "Honda Mobilio siap dipinang",
+      [
+        "https://agenmobix.id/share?u=honda-mobilio",
+        "https://mobixbydss.id/produk/detail/honda-mobilio",
+      ].join("\n"),
+    ].join("\n\n"));
+  });
+
+  test("does not duplicate either unit link already present in caption", () => {
+    const agenLink = "https://agenmobix.id/share?u=honda-mobilio";
+    const mobixLink = "https://mobixbydss.id/produk/detail/honda-mobilio";
+    const caption = `Cek unit\n\n${agenLink}\n${mobixLink}`;
+    expect(buildShareText(caption, agenLink, [mobixLink])).toBe(caption);
+  });
 });
 
 describe("buildChannelShareUrl", () => {
@@ -48,6 +71,14 @@ describe("buildChannelShareUrl", () => {
     const params = new URL(url).searchParams;
     expect(params.get("url")).toBe(link);
     expect(params.get("text")).toBe(caption);
+  });
+
+  test("Telegram keeps AgenMobix as URL and includes Mobix by DSS in text", () => {
+    const mobixLink = "https://mobixbydss.id/produk/detail/honda-mobilio";
+    const url = buildChannelShareUrl("tg", caption, link, [mobixLink]);
+    const params = new URL(url).searchParams;
+    expect(params.get("url")).toBe(link);
+    expect(params.get("text")).toBe(`${caption}\n\n${mobixLink}`);
   });
 
   test("X / Twitter embeds full caption + link in text", () => {

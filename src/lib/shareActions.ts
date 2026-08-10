@@ -41,14 +41,18 @@ export function buildOpenGraphShareUrl(unitLinkOrSlug: string): string {
   return `${OPEN_GRAPH_SHARE_BASE}?u=${encodeURIComponent(slug)}`;
 }
 
-/** Caption + unit link ready to paste into chat apps. */
-export function buildShareText(caption: string, link: string): string {
+/** Caption + unit links ready to paste into chat apps. */
+export function buildShareText(
+  caption: string,
+  link: string,
+  additionalLinks: string[] = [],
+): string {
   const body = caption.trim();
-  const url = link.trim();
-  if (!body) return url;
-  if (!url) return body;
-  if (body.includes(url)) return body;
-  return `${body}\n\n${url}`;
+  const urls = [...new Set([link, ...additionalLinks].map((url) => url.trim()).filter(Boolean))];
+  const missingUrls = urls.filter((url) => !body.includes(url));
+  if (!body) return missingUrls.join("\n");
+  if (missingUrls.length === 0) return body;
+  return `${body}\n\n${missingUrls.join("\n")}`;
 }
 
 /**
@@ -206,12 +210,14 @@ export function buildChannelShareUrl(
   channel: ShareChannel,
   caption: string,
   link: string,
+  additionalLinks: string[] = [],
 ): string {
-  const text = buildShareText(caption, link);
+  const text = buildShareText(caption, link, additionalLinks);
   const encodedText = encodeURIComponent(text);
   const safeLink = link.trim() || "https://agenmobix.id";
   const encodedLink = encodeURIComponent(safeLink);
-  const encodedCaption = encodeURIComponent(caption.trim() || text);
+  const captionWithAdditionalLinks = buildShareText(caption, "", additionalLinks);
+  const encodedCaption = encodeURIComponent(captionWithAdditionalLinks || text);
 
   switch (channel) {
     case "wa":
