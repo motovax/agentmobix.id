@@ -93,6 +93,23 @@ describe("status pembiayaan unit", () => {
 
     expect(rules.eligible).toBe(true);
     expect(rules.vehicleType).toBe("CV");
+    expect(rules.minDpPercent).toBe(20);
+    expect(rules.fixedDpPercent).toBe(20);
+    expect(rules.refundPercentage).toBe(10);
+  });
+
+  test("menggunakan Mocil Plus untuk PC usia maksimal 10 tahun", () => {
+    const currentYear = new Date().getFullYear();
+    const rules = getDsfSimulationRules({
+      category: "MPV",
+      year: currentYear - 10,
+      tenor: 60,
+    });
+
+    expect(rules.vehicleType).toBe("PC");
+    expect(rules.loanPackageName).toBe("Mocil Plus");
+    expect(rules.minDpPercent).toBe(15);
+    expect(rules.refundPercentage).toBe(10);
   });
 
   test("menggunakan nama paket DSF kanonis untuk B1820CLT usia 11 tahun", () => {
@@ -105,7 +122,7 @@ describe("status pembiayaan unit", () => {
 
     expect(rules.eligible).toBe(true);
     expect(rules.loanPackageName).toBe("PAKET C11");
-    expect(rules.minDpPercent).toBe(20);
+    expect(rules.minDpPercent).toBe(15);
   });
 
   test("menggunakan nama paket DSF kanonis untuk unit usia 12 dan 13 tahun", () => {
