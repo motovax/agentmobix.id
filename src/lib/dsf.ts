@@ -62,6 +62,7 @@ export interface DsfSimulationRules {
   fixedDpPercent?: number;
   paymentType: "ADDB" | "ADDM";
   loanPackageName: string;
+  refundPercentage: number;
   eligible: boolean;
 }
 
@@ -90,10 +91,11 @@ export function getDsfSimulationRules(
   if (isCvCategory(params.category)) {
     return {
       vehicleType: "CV",
-      minDpPercent: 25,
-      fixedDpPercent: 25,
+      minDpPercent: 20,
+      fixedDpPercent: 20,
       paymentType: "ADDB",
       loanPackageName: "Mocil Plus",
+      refundPercentage: 10,
       eligible: true,
     };
   }
@@ -106,10 +108,11 @@ export function getDsfSimulationRules(
   ) {
     return {
       vehicleType: "PC",
-      minDpPercent: 25,
-      fixedDpPercent: 25,
+      minDpPercent: 15,
+      fixedDpPercent: 15,
       paymentType: "ADDB",
       loanPackageName: "Non-DSF",
+      refundPercentage: 0,
       eligible: false,
     };
   }
@@ -117,9 +120,10 @@ export function getDsfSimulationRules(
   if (params.tenor === 12) {
     return {
       vehicleType: "PC",
-      minDpPercent: 30,
+      minDpPercent: 15,
       paymentType: "ADDM",
       loanPackageName: "Mocil 1 YR",
+      refundPercentage: 9,
       eligible: true,
     };
   }
@@ -129,24 +133,27 @@ export function getDsfSimulationRules(
       vehicleType: "PC",
       minDpPercent: 15,
       paymentType: "ADDB",
-      loanPackageName: "Mocil SPC - PC",
+      loanPackageName: "Mocil Plus",
+      refundPercentage: 10,
       eligible: true,
     };
   }
   if (vehicleAge === 11 || vehicleAge === 12) {
     return {
       vehicleType: "PC",
-      minDpPercent: 20,
+      minDpPercent: 15,
       paymentType: "ADDB",
       loanPackageName: vehicleAge === 11 ? "PAKET C11" : "PAKET C12",
+      refundPercentage: 9,
       eligible: true,
     };
   }
   return {
     vehicleType: "PC",
-    minDpPercent: 25,
+    minDpPercent: 15,
     paymentType: "ADDB",
     loanPackageName: "PAKET C",
+    refundPercentage: 9,
     eligible: true,
   };
 }
@@ -184,7 +191,7 @@ function buildDsfSimulationPayload(params: DsfSimParams) {
     Refund: {
       IsApplied: "YES",
       Showroom: "PT DIGITAL SUMBER SEJAHTERA MOTOR",
-      RefundPercentage: 9,
+      RefundPercentage: rules.refundPercentage,
     },
     Insurances: {
       InsuranceType: "TLO",
