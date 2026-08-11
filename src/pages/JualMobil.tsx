@@ -179,7 +179,15 @@ function ColorCombobox({
   const [options, setOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
-  const hasMinimumQuery = [...query.trim()].length >= 3;
+  const trimmedQuery = query.trim();
+  const hasMinimumQuery = [...trimmedQuery].length >= 3;
+  const hasExactMatch = options.some((option) =>
+    option.localeCompare(trimmedQuery, "id-ID", { sensitivity: "base" }) === 0
+  );
+  const customColor = hasMinimumQuery && !loading && !searchError && !hasExactMatch
+    ? trimmedQuery
+    : "";
+  const selectableColors = customColor ? [customColor, ...options] : options;
 
   useEffect(() => {
     if (!open) setQuery(value);
@@ -254,13 +262,13 @@ function ColorCombobox({
           if (event.key === "ArrowDown") {
             event.preventDefault();
             setOpen(true);
-            setActiveIndex((current) => Math.min(current + 1, Math.max(options.length - 1, 0)));
+            setActiveIndex((current) => Math.min(current + 1, Math.max(selectableColors.length - 1, 0)));
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
             setActiveIndex((current) => Math.max(current - 1, 0));
-          } else if (event.key === "Enter" && open && options[activeIndex]) {
+          } else if (event.key === "Enter" && open && selectableColors[activeIndex]) {
             event.preventDefault();
-            selectColor(options[activeIndex]);
+            selectColor(selectableColors[activeIndex]);
           } else if (event.key === "Escape") {
             setQuery(value);
             setOpen(false);
@@ -300,23 +308,47 @@ function ColorCombobox({
             <p className="px-3 py-4 text-center text-[12px] text-muted">Mencari warna...</p>
           ) : searchError ? (
             <p className="px-3 py-4 text-center text-[12px] text-[#B84E43]">{searchError}</p>
-          ) : options.length > 0 ? options.map((color, index) => (
-            <button
-              key={color}
-              type="button"
-              role="option"
-              aria-selected={value === color}
-              onMouseDown={(event) => event.preventDefault()}
-              onMouseEnter={() => setActiveIndex(index)}
-              onClick={() => selectColor(color)}
-              className={`flex w-full items-center justify-between rounded-[9px] px-3 py-2.5 text-left text-[13px] transition-colors ${
-                index === activeIndex ? "bg-teal-deep/10 text-teal-deep" : "text-ink hover:bg-field"
-              }`}
-            >
-              <span>{color}</span>
-              {value === color && <Check size={15} className="shrink-0 text-teal-deep" />}
-            </button>
-          )) : (
+          ) : selectableColors.length > 0 ? (
+            <>
+              {customColor && (
+                <button
+                  key={`custom:${customColor}`}
+                  type="button"
+                  role="option"
+                  aria-selected={value === customColor}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setActiveIndex(0)}
+                  onClick={() => selectColor(customColor)}
+                  className={`flex w-full items-center justify-between rounded-[9px] px-3 py-2.5 text-left text-[13px] transition-colors ${
+                    activeIndex === 0 ? "bg-teal-deep/10 text-teal-deep" : "text-ink hover:bg-field"
+                  }`}
+                >
+                  <span>Gunakan &ldquo;{customColor}&rdquo;</span>
+                  {value === customColor && <Check size={15} className="shrink-0 text-teal-deep" />}
+                </button>
+              )}
+              {options.map((color, index) => {
+                const itemIndex = index + (customColor ? 1 : 0);
+                return (
+                  <button
+                    key={color}
+                    type="button"
+                    role="option"
+                    aria-selected={value === color}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onMouseEnter={() => setActiveIndex(itemIndex)}
+                    onClick={() => selectColor(color)}
+                    className={`flex w-full items-center justify-between rounded-[9px] px-3 py-2.5 text-left text-[13px] transition-colors ${
+                      itemIndex === activeIndex ? "bg-teal-deep/10 text-teal-deep" : "text-ink hover:bg-field"
+                    }`}
+                  >
+                    <span>{color}</span>
+                    {value === color && <Check size={15} className="shrink-0 text-teal-deep" />}
+                  </button>
+                );
+              })}
+            </>
+          ) : (
             <p className="px-3 py-4 text-center text-[12px] text-muted">Warna tidak ditemukan.</p>
           )}
         </div>
@@ -856,7 +888,7 @@ export function JualMobil() {
                 </SelectField>
               </Field>
 
-              <Field label="Warna" required hint="Ketik untuk mencari, lalu pilih warna kendaraan yang sesuai.">
+              <Field label="Warna" required hint="Ketik minimal 3 karakter. Jika tidak ada, gunakan warna yang Anda masukkan.">
                 <ColorCombobox
                   value={form.color}
                   onChange={(value) => update("color", value)}
