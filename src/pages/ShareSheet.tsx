@@ -3,6 +3,7 @@ import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
 import { ContactActionMenu } from "../components/FloatingContactCta";
 import { FloatingPicAgentCta } from "../components/FloatingPicAgentCta";
+import { DpMinimSummaryCard } from "../components/DpMinimSummaryCard";
 import {
   CreditSimulationBox,
   type CreditSimulationResult,
@@ -525,6 +526,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const [detailsOpen, setDetailsOpen] = useState(false);
   /** Paket DP Minim tenor 60 default untuk caption (fetch DSF). */
   const [defaultDpMinim, setDefaultDpMinim] = useState<DpMinimPackage | null>(null);
+  const [defaultDpMinimLoading, setDefaultDpMinimLoading] = useState(true);
 
   const blobCache = useRef<Map<string, Blob>>(new Map());
   const captionSuggestionIndex = useRef(0);
@@ -804,6 +806,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     setAppliedPrice(initialSharePrice);
     setPriceInput(new Intl.NumberFormat("id-ID").format(initialSharePrice));
     setDefaultDpMinim(null);
+    setDefaultDpMinimLoading(true);
     setAiBackgroundStatus("idle");
     setAiBackgroundProgress(0);
     setAiPreviewMode("ai");
@@ -816,15 +819,19 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   useEffect(() => {
     if (!unit || salesContactRequired) {
       setDefaultDpMinim(null);
+      setDefaultDpMinimLoading(false);
       return;
     }
     const price = sharePrice || unit.harga;
     if (!price) {
       setDefaultDpMinim(null);
+      setDefaultDpMinimLoading(false);
       return;
     }
     let alive = true;
     const controller = new AbortController();
+    setDefaultDpMinim(null);
+    setDefaultDpMinimLoading(true);
     fetchDpMinimPackage(
       {
         unitPrice: price,
@@ -838,6 +845,12 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     ).then((pkg) => {
       if (!alive) return;
       setDefaultDpMinim(pkg);
+    }).catch(() => {
+      if (!alive) return;
+      setDefaultDpMinim(null);
+    }).finally(() => {
+      if (!alive) return;
+      setDefaultDpMinimLoading(false);
     });
     return () => {
       alive = false;
@@ -1785,6 +1798,13 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
             </div>
           )}
         </div>
+
+        {unit && !salesContactRequired && (
+          <DpMinimSummaryCard
+            packageData={defaultDpMinim}
+            loading={defaultDpMinimLoading}
+          />
+        )}
 
         {/* est. komisi */}
         <div className="mb-[18px] flex items-center justify-between rounded-[14px] border border-line bg-surface px-3.5 py-3">
