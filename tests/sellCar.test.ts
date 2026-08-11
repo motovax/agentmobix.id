@@ -31,6 +31,7 @@ const localData: SellCarData = {
   source: "test",
   sourceSheet: "test",
   mrpVersion: "test",
+  vehicleColors: [],
   rows: [
     { brand: "TOYOTA", model: "AVANZA", variant: "1.3 E MT", year: 2022, price: 100_000_000, notes: "" },
   ],

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
@@ -32,7 +32,6 @@ const INITIAL_FORM: SellCarFormData = {
 };
 
 const PLATES = ["B - DKI Jakarta", "D - Bandung", "F - Bogor", "L - Surabaya", "AB - Yogyakarta", "Lainnya"];
-const COLORS = ["Hitam", "Putih", "Abu-abu", "Silver", "Merah", "Biru", "Cokelat", "Lainnya"];
 const MONTHS = [
   "Januari",
   "Februari",
@@ -159,6 +158,142 @@ function SelectField({
         {children}
       </select>
       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted" />
+    </div>
+  );
+}
+
+function ColorCombobox({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+}) {
+  const listboxId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const disabled = options.length === 0;
+  const filteredOptions = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase("id-ID");
+    if (!needle) return options;
+    return options.filter((option) => option.toLocaleLowerCase("id-ID").includes(needle));
+  }, [options, query]);
+
+  useEffect(() => {
+    if (!open) setQuery(value);
+  }, [open, value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeWhenOutside = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", closeWhenOutside);
+    return () => document.removeEventListener("mousedown", closeWhenOutside);
+  }, [open]);
+
+  function selectColor(color: string) {
+    onChange(color);
+    setQuery(color);
+    setOpen(false);
+    inputRef.current?.focus();
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <input
+        ref={inputRef}
+        type="text"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-controls={listboxId}
+        aria-expanded={open}
+        aria-required="true"
+        autoComplete="off"
+        value={open ? query : value}
+        onFocus={() => {
+          if (disabled) return;
+          setQuery(value);
+          setActiveIndex(0);
+          setOpen(true);
+        }}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setActiveIndex(0);
+          setOpen(true);
+          if (event.target.value !== value) onChange("");
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setOpen(true);
+            setActiveIndex((current) => Math.min(current + 1, Math.max(filteredOptions.length - 1, 0)));
+          } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setActiveIndex((current) => Math.max(current - 1, 0));
+          } else if (event.key === "Enter" && open && filteredOptions[activeIndex]) {
+            event.preventDefault();
+            selectColor(filteredOptions[activeIndex]);
+          } else if (event.key === "Escape") {
+            setQuery(value);
+            setOpen(false);
+          } else if (event.key === "Tab") {
+            setOpen(false);
+          }
+        }}
+        disabled={disabled}
+        placeholder={disabled ? "Master warna belum tersedia" : "Cari warna kendaraan"}
+        className="h-11 w-full rounded-[12px] border border-line bg-surface px-3.5 pr-9 text-[13px] text-ink outline-none transition placeholder:text-placeholder focus:border-teal-deep disabled:bg-field disabled:text-placeholder"
+      />
+      <button
+        type="button"
+        aria-label={open ? "Tutup pilihan warna" : "Buka pilihan warna"}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => {
+          if (disabled) return;
+          setQuery(value);
+          setActiveIndex(0);
+          setOpen((current) => !current);
+          inputRef.current?.focus();
+        }}
+        disabled={disabled}
+        className="absolute right-0 top-0 flex h-11 w-10 items-center justify-center text-muted disabled:cursor-not-allowed"
+      >
+        <ChevronDown className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          id={listboxId}
+          role="listbox"
+          className="absolute z-30 mt-1.5 max-h-60 w-full overflow-y-auto rounded-[12px] border border-line bg-surface p-1.5 shadow-[0_12px_30px_rgba(14,27,30,0.16)]"
+        >
+          {filteredOptions.length > 0 ? filteredOptions.map((color, index) => (
+            <button
+              key={color}
+              type="button"
+              role="option"
+              aria-selected={value === color}
+              onMouseDown={(event) => event.preventDefault()}
+              onMouseEnter={() => setActiveIndex(index)}
+              onClick={() => selectColor(color)}
+              className={`flex w-full items-center justify-between rounded-[9px] px-3 py-2.5 text-left text-[13px] transition-colors ${
+                index === activeIndex ? "bg-teal-deep/10 text-teal-deep" : "text-ink hover:bg-field"
+              }`}
+            >
+              <span>{color}</span>
+              {value === color && <Check size={15} className="shrink-0 text-teal-deep" />}
+            </button>
+          )) : (
+            <p className="px-3 py-4 text-center text-[12px] text-muted">Warna tidak ditemukan.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -511,6 +646,10 @@ export function JualMobil() {
     event.preventDefault();
     if (!data) return;
     setError("");
+    if (!form.color.trim()) {
+      setError("Pilih warna kendaraan dari master warna.");
+      return;
+    }
     setSubmitting(true);
     try {
       const result = await fetchSellCarQuote(form);
@@ -690,10 +829,12 @@ export function JualMobil() {
                 </SelectField>
               </Field>
 
-              <Field label="Warna" required hint="Pilih warna atau gunakan input manual jika tidak tersedia.">
-                <SelectField value={form.color} onChange={(value) => update("color", value)} placeholder="Pilih warna">
-                  {COLORS.map((color) => <option key={color} value={color}>{color}</option>)}
-                </SelectField>
+              <Field label="Warna" required hint="Ketik untuk mencari, lalu pilih warna kendaraan yang sesuai.">
+                <ColorCombobox
+                  value={form.color}
+                  onChange={(value) => update("color", value)}
+                  options={data?.vehicleColors ?? []}
+                />
               </Field>
 
               <Field label="Jarak Tempuh (KM)" required hint="KM standar adalah 15.000 per tahun kendaraan.">

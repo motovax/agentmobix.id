@@ -15,6 +15,7 @@ export type SellCarData = {
   sourceSheet: string;
   rows: PriceRow[];
   mrpVersion: string;
+  vehicleColors: string[];
 };
 
 export type SellCarFormData = {
@@ -100,6 +101,7 @@ export type SellCarResult = SellCarFormData & {
 type MRPOptionsResponse = {
   mrp_version?: string;
   options?: Array<{ brand: string; model: string; variant: string; year: number }>;
+  vehicle_colors?: string[];
 };
 
 type APIEnvelope<T> = {
@@ -222,11 +224,15 @@ function alignLocalRows(rows: PriceRow[]): PriceRow[] {
 async function fetchLocalSellCarData(): Promise<SellCarData> {
   const response = await fetch("/sell-car-price-matrix.json");
   if (!response.ok) throw new Error("Gagal memuat matrix harga lokal");
-  const data = await response.json() as Omit<SellCarData, "mrpVersion"> & { mrpVersion?: string };
+  const data = await response.json() as Omit<SellCarData, "mrpVersion" | "vehicleColors"> & {
+    mrpVersion?: string;
+    vehicleColors?: string[];
+  };
   return {
     ...data,
     rows: alignLocalRows(data.rows || []),
     mrpVersion: data.mrpVersion || "mobix-local-fallback",
+    vehicleColors: data.vehicleColors || [],
   };
 }
 
@@ -242,6 +248,9 @@ export async function fetchSellCarData(): Promise<SellCarData> {
         sourceSheet: "brand sheets",
         mrpVersion: data.mrp_version || "",
         rows: data.options.map((option) => ({ ...option, price: 0, notes: "" })),
+        vehicleColors: Array.isArray(data.vehicle_colors)
+          ? data.vehicle_colors.filter((color) => typeof color === "string" && color.trim() !== "")
+          : [],
       };
     }
   } catch {
