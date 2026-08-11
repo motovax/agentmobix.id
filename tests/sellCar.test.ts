@@ -4,6 +4,7 @@ import {
   buildLocalSellCarResult,
   normalizeStnkExpiryForQuote,
   ownershipTypeForQuote,
+  searchVehicleColors,
   type PriceRow,
   type SellCarAIExtraction,
   type SellCarData,
@@ -31,11 +32,28 @@ const localData: SellCarData = {
   source: "test",
   sourceSheet: "test",
   mrpVersion: "test",
-  vehicleColors: [],
   rows: [
     { brand: "TOYOTA", model: "AVANZA", variant: "1.3 E MT", year: 2022, price: 100_000_000, notes: "" },
   ],
 };
+
+describe("searchVehicleColors", () => {
+  test("tidak memanggil endpoint sebelum query mencapai 3 karakter", async () => {
+    const originalFetch = globalThis.fetch;
+    let requestCount = 0;
+    globalThis.fetch = (() => {
+      requestCount += 1;
+      throw new Error("fetch seharusnya tidak dipanggil");
+    }) as typeof fetch;
+
+    try {
+      await expect(searchVehicleColors("ab")).resolves.toEqual([]);
+      expect(requestCount).toBe(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
 
 function extraction(overrides: Partial<SellCarAIExtraction["extracted"]> = {}): SellCarAIExtraction {
   return {
