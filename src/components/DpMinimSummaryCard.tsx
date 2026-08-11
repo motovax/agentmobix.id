@@ -32,7 +32,7 @@ export function DpMinimSummaryCard({
 
       {loading ? (
         <div className="grid grid-cols-2 divide-x divide-teal-tint-border border-t border-teal-tint-border bg-surface/55">
-          {["TDP mulai", "Cicilan / bulan"].map((label) => (
+          {["DP Minim real", "Cicilan / bulan"].map((label) => (
             <div key={label} className="px-4 py-3.5">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted">
                 {label}
@@ -47,7 +47,7 @@ export function DpMinimSummaryCard({
           <div className="grid grid-cols-2 divide-x divide-teal-tint-border border-y border-teal-tint-border bg-surface/55">
             <div className="min-w-0 px-4 py-3.5">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-                TDP mulai
+                DP Minim real
               </div>
               <div className="mt-1 truncate text-[16px] font-extrabold text-teal-deep">
                 {formatRupiah(packageData.tdp)}

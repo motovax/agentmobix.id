@@ -16,7 +16,7 @@ describe("DpMinimSummaryCard", () => {
     );
 
     expect(html).toContain("DP Minim");
-    expect(html).toContain("TDP mulai");
+    expect(html).toContain("DP Minim real");
     expect(html).toContain("Rp 12.500.000");
     expect(html).toContain("Rp 3.250.000");
     expect(html).toContain("60 bulan");

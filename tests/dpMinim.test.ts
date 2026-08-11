@@ -1,9 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
-  DP_MINIM_ALL_IN_PERCENT,
   getDpMinimAllInFromResult,
-  getDpMinimMinDp,
-  getDpMinimTargetAllIn,
+  getDpMinimSimulationParams,
   getDpMinimTdpKonsumen,
   type DsfSimResult,
 } from "../src/lib/dsf";
@@ -28,20 +26,25 @@ function dsfResult(overrides: Partial<DsfSimResult> = {}): DsfSimResult {
   };
 }
 
-describe("formula DP Minim reverse all-in", () => {
-  test("LTV target All In per tenor", () => {
-    expect(DP_MINIM_ALL_IN_PERCENT[60]).toBe(0.95);
-    expect(DP_MINIM_ALL_IN_PERCENT[48]).toBe(0.925);
-    expect(DP_MINIM_ALL_IN_PERCENT[36]).toBe(0.9);
-    expect(getDpMinimTargetAllIn(200_000_000, 60)).toBe(190_000_000);
-    expect(getDpMinimTargetAllIn(200_000_000, 48)).toBe(185_000_000);
-    expect(getDpMinimTargetAllIn(200_000_000, 36)).toBe(180_000_000);
-  });
+describe("formula DP Minim dari pencairan aktual DSF", () => {
+  test("tenor 60, 48, dan 36 memakai harga aktual dan DP murni minimum", () => {
+    for (const tenor of [60, 48, 36]) {
+      const params = getDpMinimSimulationParams({
+        unitPrice: 180_000_000,
+        brand: "Mitsubishi",
+        model: "Xpander GLS",
+        year: 2022,
+        category: "MPV",
+        tenor,
+      });
 
-  test("min DP konsumen = (1 − LTV) × harga", () => {
-    expect(getDpMinimMinDp(200_000_000, 60)).toBe(10_000_000);
-    expect(getDpMinimMinDp(200_000_000, 48)).toBe(15_000_000);
-    expect(getDpMinimMinDp(200_000_000, 36)).toBe(20_000_000);
+      expect(params?.unitPrice).toBe(180_000_000);
+      expect(params?.tenor).toBe(tenor);
+      expect(params?.dpPercent).toBe(15);
+      expect(params?.simulationType).toBe("DP");
+      expect(params?.simulationValue).toBe(15);
+      expect(params?.paymentType).toBe("ADDB");
+    }
   });
 
   test("pencairan dan refund selalu memakai netDisbursement + refundSupplierActual", () => {
@@ -78,5 +81,16 @@ describe("formula DP Minim reverse all-in", () => {
 
   test("TDP konsumen tidak negatif jika All In di atas harga", () => {
     expect(getDpMinimTdpKonsumen(100_000_000, 120_000_000)).toBe(0);
+  });
+
+  test("contoh Xpander: harga dikurangi pencairan murni dan refund", () => {
+    const result = dsfResult({
+      netDisbursement: 146_558_000,
+      refundSupplierActual: 10_378_981,
+    });
+    const allIn = getDpMinimAllInFromResult(result);
+
+    expect(allIn).toBe(156_936_981);
+    expect(getDpMinimTdpKonsumen(180_000_000, allIn)).toBe(23_063_019);
   });
 });

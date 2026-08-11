@@ -270,31 +270,6 @@ export async function simulateKreditWithSignal(
   }
 }
 
-/**
- * Target pencairan leasing (All In / LTV) per tenor untuk paket DP Minim.
- * DP konsumen minimal ≈ (1 - LTV) × harga cash.
- */
-export const DP_MINIM_ALL_IN_PERCENT: Record<number, number> = {
-  12: 0.85,
-  24: 0.875,
-  36: 0.9,
-  48: 0.925,
-  60: 0.95,
-};
-
-/** Target All In (cair leasing) dari harga cash × LTV tenor. */
-export function getDpMinimTargetAllIn(price: number, tenor: number): number {
-  const ltv = DP_MINIM_ALL_IN_PERCENT[tenor] ?? 0.95;
-  return Math.round(price * ltv);
-}
-
-/** Min DP konsumen dari LTV tenor: (1 − LTV) × harga. */
-export function getDpMinimMinDp(price: number, tenor: number): number {
-  if (price <= 0) return 0;
-  const ltv = DP_MINIM_ALL_IN_PERCENT[tenor] ?? 0.95;
-  return Math.round(price * (1 - ltv));
-}
-
 /** Pencairan + refund aktual DSF untuk rumus DP Minim. */
 export function getDpMinimAllInFromResult(
   result: DsfSimResult | null,
@@ -314,7 +289,7 @@ export function getDpMinimAllInFromResult(
 
 /**
  * TDP bayar konsumen = OTR real − (netDisbursement + refundSupplierActual).
- * Bukan totalDownPaymentRounded DSF — ini formula paket reverse all-in.
+ * Bukan totalDownPaymentRounded DSF dan tidak memakai target All In.
  */
 export function getDpMinimTdpKonsumen(
   realOtr: number,
@@ -322,45 +297,6 @@ export function getDpMinimTdpKonsumen(
 ): number | null {
   if (allIn === null || !Number.isFinite(allIn) || realOtr <= 0) return null;
   return Math.max(0, realOtr - allIn);
-}
-
-/**
- * Reverse calculation ala paket leasing: cari OTR kredit (markup di atas
- * harga cash) yang menghasilkan cair all-in (cair murni + refund) mendekati
- * target. All-in DSF ~linear terhadap unit price, jadi iterasi proporsional
- * konvergen cepat (2-3 call).
- */
-export async function findAllParamsForAllIn(
-  params: DsfSimParams,
-  targetAllIn: number,
-  signal?: AbortSignal,
-): Promise<DsfSimResult | null> {
-  const cashPrice = params.unitPrice;
-  if (!cashPrice || !targetAllIn) return null;
-
-  const clampPrice = (value: number) =>
-    Math.min(
-      Math.max(Math.round(value / 1000) * 1000, 1000),
-      cashPrice * 4,
-    );
-
-  let price = cashPrice;
-  let best: DsfSimResult | null = null;
-
-  for (let i = 0; i < 6; i += 1) {
-    const result = await simulateKreditWithSignal(
-      { ...params, unitPrice: price },
-      signal,
-    );
-    const allIn = getDpMinimAllInFromResult(result);
-    if (!result || allIn === null || allIn <= 0) return best;
-    best = { ...result, hargaKredit: price };
-    if (Math.abs(allIn - targetAllIn) <= 200000) return best;
-    const next = clampPrice((price * targetAllIn) / allIn);
-    if (next === price) return best;
-    price = next;
-  }
-  return best;
 }
 
 export interface DpMinimPackage {
@@ -373,7 +309,7 @@ export interface DpMinimPackage {
 /**
  * Fetch paket DP Minim untuk tenor tertentu (default 60).
  * Dipakai caption share default agar di bawah harga selalu ada DP Minim 60.
- * Formula: reverse all-in (target LTV) → TDP konsumen = harga − All In.
+ * Formula: harga unit aktual − (pencairan murni + refund aktual DSF).
  */
 export async function fetchDpMinimPackage(
   params: {
@@ -396,20 +332,8 @@ export async function fetchDpMinimPackage(
   });
   if (!rules.eligible) return null;
 
-  const result = await findAllParamsForAllIn(
-    {
-      unitPrice: params.unitPrice,
-      dpPercent: rules.minDpPercent,
-      simulationType: "DP",
-      simulationValue: rules.minDpPercent,
-      paymentType: "ADDB",
-      tenor,
-      brand: params.brand,
-      model: params.model,
-      year: params.year,
-      category: params.category,
-    },
-    getDpMinimTargetAllIn(params.unitPrice, tenor),
+  const result = await fetchDpMinimSimulation(
+    { ...params, tenor },
     signal,
   );
   const allIn = getDpMinimAllInFromResult(result);
@@ -429,6 +353,39 @@ export async function fetchDpMinimPackage(
     tenor,
     dpPercent: rules.minDpPercent,
   };
+}
+
+/** Simulasi DP minimum pada harga unit aktual dan DP murni minimum DSF. */
+export function getDpMinimSimulationParams(
+  params: {
+    unitPrice: number;
+    brand?: string;
+    model?: string;
+    year?: number;
+    category?: string;
+    tenor: number;
+  },
+): DsfSimParams | null {
+  if (!params.unitPrice || params.unitPrice <= 0) return null;
+  const rules = getDsfSimulationRules(params);
+  if (!rules.eligible) return null;
+
+  return {
+    ...params,
+    dpPercent: rules.minDpPercent,
+    simulationType: "DP",
+    simulationValue: rules.minDpPercent,
+    paymentType: rules.paymentType,
+  };
+}
+
+export async function fetchDpMinimSimulation(
+  params: Parameters<typeof getDpMinimSimulationParams>[0],
+  signal?: AbortSignal,
+): Promise<DsfSimResult | null> {
+  const simulationParams = getDpMinimSimulationParams(params);
+  if (!simulationParams) return null;
+  return simulateKreditWithSignal(simulationParams, signal);
 }
 
 export interface DsfCreditPriceResult {
