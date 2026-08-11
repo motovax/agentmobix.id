@@ -12,6 +12,7 @@ import {
   fetchSellCarData,
   getBrands,
   getYears,
+  searchVehicleColors,
   type SellCarAIExtraction,
   type SellCarAIPhotoKind,
   type SellCarData,
@@ -165,11 +166,9 @@ function SelectField({
 function ColorCombobox({
   value,
   onChange,
-  options,
 }: {
   value: string;
   onChange: (value: string) => void;
-  options: string[];
 }) {
   const listboxId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -177,16 +176,39 @@ function ColorCombobox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);
   const [activeIndex, setActiveIndex] = useState(0);
-  const disabled = options.length === 0;
-  const filteredOptions = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase("id-ID");
-    if (!needle) return options;
-    return options.filter((option) => option.toLocaleLowerCase("id-ID").includes(needle));
-  }, [options, query]);
+  const [options, setOptions] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const hasMinimumQuery = [...query.trim()].length >= 3;
 
   useEffect(() => {
     if (!open) setQuery(value);
   }, [open, value]);
+
+  useEffect(() => {
+    if (!open || !hasMinimumQuery) {
+      setOptions([]);
+      setLoading(false);
+      setSearchError("");
+      return;
+    }
+
+    const controller = new AbortController();
+    setLoading(true);
+    setSearchError("");
+    setActiveIndex(0);
+    searchVehicleColors(query, controller.signal)
+      .then((colors) => setOptions(colors))
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setOptions([]);
+        setSearchError(error instanceof Error ? error.message : "Gagal mencari warna kendaraan");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [hasMinimumQuery, open, query]);
 
   useEffect(() => {
     if (!open) return;
@@ -213,11 +235,11 @@ function ColorCombobox({
         aria-autocomplete="list"
         aria-controls={listboxId}
         aria-expanded={open}
+        aria-busy={loading}
         aria-required="true"
         autoComplete="off"
         value={open ? query : value}
         onFocus={() => {
-          if (disabled) return;
           setQuery(value);
           setActiveIndex(0);
           setOpen(true);
@@ -232,13 +254,13 @@ function ColorCombobox({
           if (event.key === "ArrowDown") {
             event.preventDefault();
             setOpen(true);
-            setActiveIndex((current) => Math.min(current + 1, Math.max(filteredOptions.length - 1, 0)));
+            setActiveIndex((current) => Math.min(current + 1, Math.max(options.length - 1, 0)));
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
             setActiveIndex((current) => Math.max(current - 1, 0));
-          } else if (event.key === "Enter" && open && filteredOptions[activeIndex]) {
+          } else if (event.key === "Enter" && open && options[activeIndex]) {
             event.preventDefault();
-            selectColor(filteredOptions[activeIndex]);
+            selectColor(options[activeIndex]);
           } else if (event.key === "Escape") {
             setQuery(value);
             setOpen(false);
@@ -246,23 +268,20 @@ function ColorCombobox({
             setOpen(false);
           }
         }}
-        disabled={disabled}
-        placeholder={disabled ? "Master warna belum tersedia" : "Cari warna kendaraan"}
-        className="h-11 w-full rounded-[12px] border border-line bg-surface px-3.5 pr-9 text-[13px] text-ink outline-none transition placeholder:text-placeholder focus:border-teal-deep disabled:bg-field disabled:text-placeholder"
+        placeholder="Ketik minimal 3 karakter"
+        className="h-11 w-full rounded-[12px] border border-line bg-surface px-3.5 pr-9 text-[13px] text-ink outline-none transition placeholder:text-placeholder focus:border-teal-deep"
       />
       <button
         type="button"
         aria-label={open ? "Tutup pilihan warna" : "Buka pilihan warna"}
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => {
-          if (disabled) return;
           setQuery(value);
           setActiveIndex(0);
           setOpen((current) => !current);
           inputRef.current?.focus();
         }}
-        disabled={disabled}
-        className="absolute right-0 top-0 flex h-11 w-10 items-center justify-center text-muted disabled:cursor-not-allowed"
+        className="absolute right-0 top-0 flex h-11 w-10 items-center justify-center text-muted"
       >
         <ChevronDown className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -273,7 +292,15 @@ function ColorCombobox({
           role="listbox"
           className="absolute z-30 mt-1.5 max-h-60 w-full overflow-y-auto rounded-[12px] border border-line bg-surface p-1.5 shadow-[0_12px_30px_rgba(14,27,30,0.16)]"
         >
-          {filteredOptions.length > 0 ? filteredOptions.map((color, index) => (
+          {!hasMinimumQuery ? (
+            <p className="px-3 py-4 text-center text-[12px] text-muted">
+              Ketik minimal 3 karakter untuk mencari warna.
+            </p>
+          ) : loading ? (
+            <p className="px-3 py-4 text-center text-[12px] text-muted">Mencari warna...</p>
+          ) : searchError ? (
+            <p className="px-3 py-4 text-center text-[12px] text-[#B84E43]">{searchError}</p>
+          ) : options.length > 0 ? options.map((color, index) => (
             <button
               key={color}
               type="button"
@@ -833,7 +860,6 @@ export function JualMobil() {
                 <ColorCombobox
                   value={form.color}
                   onChange={(value) => update("color", value)}
-                  options={data?.vehicleColors ?? []}
                 />
               </Field>
 
