@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import {
   financingValueLabel,
@@ -112,6 +112,17 @@ export function CreditSimulationBox({
   });
   const minDsfDpPercent = dsfRules.minDpPercent;
   const maxDsfDpPercent = dsfRules.fixedDpPercent ?? MAX_DP_PERCENT;
+  const availableDsfTenors = useMemo(
+    () => TENOR_OPTIONS.filter((value) => value <= dsfRules.maxTenorMonths),
+    [dsfRules.maxTenorMonths],
+  );
+  const dpMinimTableTenors = useMemo(
+    () =>
+      DP_MINIM_TABLE_TENORS.filter(
+        (value) => value <= dsfRules.maxTenorMonths,
+      ),
+    [dsfRules.maxTenorMonths],
+  );
   const currencyFormatter = new Intl.NumberFormat("id-ID");
 
   const creditPriceForBounds = price;
@@ -226,8 +237,17 @@ export function CreditSimulationBox({
 
   useEffect(() => {
     const nextPercent = dsfRules.fixedDpPercent ?? Math.max(dpPercent, minDsfDpPercent);
-    if (nextPercent !== dpPercent) setDpPercent(nextPercent);
+    if (nextPercent !== dpPercent) {
+      setDpPercent(nextPercent);
+      setDpPercentInput(String(nextPercent));
+    }
   }, [dpPercent, dsfRules.fixedDpPercent, minDsfDpPercent]);
+
+  useEffect(() => {
+    if (tenor > dsfRules.maxTenorMonths) {
+      setTenor(dsfRules.maxTenorMonths as Tenor);
+    }
+  }, [dsfRules.maxTenorMonths, tenor]);
 
   useEffect(() => {
     setDpPercentInput(String(Math.round(displayDpPercent * 10) / 10));
@@ -425,7 +445,7 @@ export function CreditSimulationBox({
     setDpMinimTableLoading(true);
     (async () => {
       const results = await Promise.all(
-        DP_MINIM_TABLE_TENORS.map((rowTenor) =>
+        dpMinimTableTenors.map((rowTenor) =>
           fetchDpMinimSimulation(
             {
               unitPrice: price,
@@ -441,7 +461,7 @@ export function CreditSimulationBox({
       );
       if (!alive) return;
       setDpMinimRows(
-        DP_MINIM_TABLE_TENORS.map((rowTenor, index) => ({
+        dpMinimTableTenors.map((rowTenor, index) => ({
           tenor: rowTenor,
           result: results[index],
         })),
@@ -461,6 +481,7 @@ export function CreditSimulationBox({
     unit.year,
     unit.category,
     dpMinimTableKey,
+    dpMinimTableTenors,
   ]);
 
   useEffect(() => {
@@ -850,7 +871,7 @@ export function CreditSimulationBox({
                     aktual DSF. Pilih tenor untuk melihat hasilnya.
                   </div>
                   <div className="mb-3.5 overflow-hidden rounded-[14px] border border-line">
-                    {DP_MINIM_TABLE_TENORS.map((rowTenor) => {
+                    {dpMinimTableTenors.map((rowTenor) => {
                       const row = dpMinimRows?.find((r) => r.tenor === rowTenor);
                       const res = row?.result ?? null;
                       const rowAllIn = getDpMinimAllInFromResult(res);
@@ -931,7 +952,7 @@ export function CreditSimulationBox({
                       {simTab === "dpminim" ? "Jumlah angsuran" : "Tenor (bulan)"}
                     </div>
                     <div className="grid grid-cols-5 gap-1.5">
-                      {TENOR_OPTIONS.map((t) => {
+                      {availableDsfTenors.map((t) => {
                         const isActive = t === tenor;
                         return (
                           <button

@@ -47,6 +47,20 @@ describe("formula DP Minim dari pencairan aktual DSF", () => {
     }
   });
 
+  test("unit usia 11-14 tahun memakai DP 20% dan tenor maksimal 48 bulan", () => {
+    const params = getDpMinimSimulationParams({
+      unitPrice: 150_000_000,
+      year: new Date().getFullYear() - 11,
+      category: "SUV",
+      tenor: 60,
+    });
+
+    expect(params?.tenor).toBe(48);
+    expect(params?.dpPercent).toBe(20);
+    expect(params?.simulationValue).toBe(20);
+    expect(params?.paymentType).toBe("ADDB");
+  });
+
   test("pencairan dan refund selalu memakai netDisbursement + refundSupplierActual", () => {
     expect(getDpMinimAllInFromResult(dsfResult())).toBe(138_277_548);
     expect(

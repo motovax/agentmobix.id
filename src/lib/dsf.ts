@@ -60,6 +60,7 @@ export interface DsfSimulationRules {
   vehicleType: "PC" | "CV";
   minDpPercent: number;
   fixedDpPercent?: number;
+  maxTenorMonths: 48 | 60;
   paymentType: "ADDB" | "ADDM";
   loanPackageName: string;
   refundPercentage: number;
@@ -93,8 +94,9 @@ export function getDsfSimulationRules(
       vehicleType: "CV",
       minDpPercent: 20,
       fixedDpPercent: 20,
+      maxTenorMonths: 60,
       paymentType: "ADDB",
-      loanPackageName: "Mocil Plus",
+      loanPackageName: "MOCIL PLUS",
       refundPercentage: 10,
       eligible: true,
     };
@@ -102,14 +104,12 @@ export function getDsfSimulationRules(
 
   const manufacturedYear = params.year ?? 0;
   const vehicleAge = new Date().getFullYear() - manufacturedYear;
-  if (
-    manufacturedYear < 2013 ||
-    vehicleAge > 13
-  ) {
+  if (manufacturedYear < 2012 || vehicleAge > 14) {
     return {
       vehicleType: "PC",
-      minDpPercent: 15,
-      fixedDpPercent: 15,
+      minDpPercent: 20,
+      fixedDpPercent: 20,
+      maxTenorMonths: 48,
       paymentType: "ADDB",
       loanPackageName: "Non-DSF",
       refundPercentage: 0,
@@ -117,42 +117,28 @@ export function getDsfSimulationRules(
     };
   }
 
-  if (params.tenor === 12) {
-    return {
-      vehicleType: "PC",
-      minDpPercent: 15,
-      paymentType: "ADDM",
-      loanPackageName: "Mocil 1 YR",
-      refundPercentage: 9,
-      eligible: true,
-    };
-  }
-
   if (vehicleAge <= 10) {
     return {
       vehicleType: "PC",
       minDpPercent: 15,
+      maxTenorMonths: 60,
       paymentType: "ADDB",
-      loanPackageName: "Mocil Plus",
+      loanPackageName: "MOCIL PLUS",
       refundPercentage: 10,
-      eligible: true,
-    };
-  }
-  if (vehicleAge === 11 || vehicleAge === 12) {
-    return {
-      vehicleType: "PC",
-      minDpPercent: 15,
-      paymentType: "ADDB",
-      loanPackageName: vehicleAge === 11 ? "PAKET C11" : "PAKET C12",
-      refundPercentage: 9,
       eligible: true,
     };
   }
   return {
     vehicleType: "PC",
-    minDpPercent: 15,
+    minDpPercent: 20,
+    maxTenorMonths: 48,
     paymentType: "ADDB",
-    loanPackageName: "PAKET C",
+    loanPackageName:
+      vehicleAge === 11
+        ? "PAKET C11"
+        : vehicleAge === 12
+          ? "PAKET C12"
+          : "PAKET C",
     refundPercentage: 9,
     eligible: true,
   };
@@ -208,7 +194,7 @@ function buildDsfSimulationPayload(params: DsfSimParams) {
     },
     SimulationType: simulationType,
     SimulationValue: effectiveSimulationValue,
-    TenorInMonths: tenor,
+    TenorInMonths: Math.min(tenor, rules.maxTenorMonths),
   };
 }
 
@@ -331,9 +317,10 @@ export async function fetchDpMinimPackage(
     tenor,
   });
   if (!rules.eligible) return null;
+  const effectiveTenor = Math.min(tenor, rules.maxTenorMonths);
 
   const result = await fetchDpMinimSimulation(
-    { ...params, tenor },
+    { ...params, tenor: effectiveTenor },
     signal,
   );
   const allIn = getDpMinimAllInFromResult(result);
@@ -350,7 +337,7 @@ export async function fetchDpMinimPackage(
   return {
     tdp,
     cicilan: result.installmentRounded,
-    tenor,
+    tenor: effectiveTenor,
     dpPercent: rules.minDpPercent,
   };
 }
@@ -372,6 +359,7 @@ export function getDpMinimSimulationParams(
 
   return {
     ...params,
+    tenor: Math.min(params.tenor, rules.maxTenorMonths),
     dpPercent: rules.minDpPercent,
     simulationType: "DP",
     simulationValue: rules.minDpPercent,
@@ -485,7 +473,7 @@ export async function findLowestCreditPrice(
   return best;
 }
 
-/** Hook untuk list view (UnitCard, UnitRow) — fixed DP 15%, tenor 60 bln. */
+/** Hook untuk list view; payload menyesuaikan DP minimum dan tenor dari usia unit. */
 export function useDsfSim(price: number, title: string, year?: number) {
   const [result, setResult] = useState<DsfSimResult | null>(null);
 

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { getDsfSimulationRules } from "../src/lib/dsf";
+import {
+  getDpMinimSimulationParams,
+  getDsfSimulationRules,
+  resolveSmartCreditPrice,
+} from "../src/lib/dsf";
 import {
   compactFinancingLabel,
   financingValueLabel,
@@ -14,9 +18,9 @@ const oldPassengerFinancing: ProductFinancing = {
   provider: "dsf",
   reason_code: "vehicle_age_over_limit",
   message:
-    "Unit tahun 2011 berusia 15 tahun dan melebihi batas pembiayaan DSF 13 tahun.",
+    "Unit tahun 2011 berusia 15 tahun dan melebihi batas pembiayaan DSF 14 tahun.",
   vehicle_age_years: 15,
-  max_vehicle_age_years: 13,
+  max_vehicle_age_years: 14,
 };
 
 const availableFinancing: ProductFinancing = {
@@ -32,7 +36,7 @@ describe("status pembiayaan unit", () => {
     expect(hasAvailableFinancing(oldPassengerFinancing)).toBe(false);
     expect(requiresSalesContact(oldPassengerFinancing)).toBe(true);
     expect(compactFinancingLabel(oldPassengerFinancing)).toBe(
-      "Kredit DSF tidak tersedia · usia >13 tahun",
+      "Kredit DSF tidak tersedia · usia >14 tahun",
     );
   });
 
@@ -107,8 +111,9 @@ describe("status pembiayaan unit", () => {
     });
 
     expect(rules.vehicleType).toBe("PC");
-    expect(rules.loanPackageName).toBe("Mocil Plus");
+    expect(rules.loanPackageName).toBe("MOCIL PLUS");
     expect(rules.minDpPercent).toBe(15);
+    expect(rules.maxTenorMonths).toBe(60);
     expect(rules.refundPercentage).toBe(10);
   });
 
@@ -122,18 +127,77 @@ describe("status pembiayaan unit", () => {
 
     expect(rules.eligible).toBe(true);
     expect(rules.loanPackageName).toBe("PAKET C11");
-    expect(rules.minDpPercent).toBe(15);
+    expect(rules.minDpPercent).toBe(20);
+    expect(rules.maxTenorMonths).toBe(48);
   });
 
-  test("menggunakan nama paket DSF kanonis untuk unit usia 12 dan 13 tahun", () => {
+  test("menggunakan paket DSF kanonis dan DP 20% untuk unit usia 12-14 tahun", () => {
     const currentYear = new Date().getFullYear();
-    expect(
-      getDsfSimulationRules({ category: "MPV", year: currentYear - 12, tenor: 60 })
-        .loanPackageName,
-    ).toBe("PAKET C12");
-    expect(
-      getDsfSimulationRules({ category: "LCGC", year: currentYear - 13, tenor: 60 })
-        .loanPackageName,
-    ).toBe("PAKET C");
+    const c12 = getDsfSimulationRules({
+      category: "MPV",
+      year: currentYear - 12,
+      tenor: 60,
+    });
+    const c13 = getDsfSimulationRules({
+      category: "LCGC",
+      year: currentYear - 13,
+      tenor: 60,
+    });
+    const c14 = getDsfSimulationRules({
+      category: "LCGC",
+      year: currentYear - 14,
+      tenor: 60,
+    });
+
+    expect(c12.loanPackageName).toBe("PAKET C12");
+    expect(c13.loanPackageName).toBe("PAKET C");
+    expect(c14.loanPackageName).toBe("PAKET C");
+    expect(c12.minDpPercent).toBe(20);
+    expect(c12.maxTenorMonths).toBe(48);
+  });
+
+  test("mengunci tenor unit lama ke 48 bulan dan tetap mengirim target upping OTR", async () => {
+    const currentYear = new Date().getFullYear();
+    const params = getDpMinimSimulationParams({
+      unitPrice: 150_000_000,
+      category: "SUV",
+      year: currentYear - 11,
+      tenor: 60,
+    });
+    expect(params?.tenor).toBe(48);
+    expect(params?.simulationValue).toBe(20);
+
+    const originalFetch = globalThis.fetch;
+    let payload: Record<string, unknown> | null = null;
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      payload = JSON.parse(String(init?.body ?? "{}"));
+      return new Response(
+        JSON.stringify({
+          status: true,
+          data: { harga_kredit: 155_000_000, refund: { allInToSupplier: 150_000_000 } },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    try {
+      await resolveSmartCreditPrice(
+        {
+          unitPrice: 155_000_000,
+          dpPercent: 20,
+          category: "SUV",
+          year: currentYear - 11,
+          tenor: 60,
+        },
+        150_000_000,
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(payload?.CashPriceTarget).toBe(150_000_000);
+    expect(payload?.TenorInMonths).toBe(48);
+    expect(payload?.SimulationValue).toBe(20);
+    expect(payload?.LoanPackageName).toBe("PAKET C11");
   });
 });
