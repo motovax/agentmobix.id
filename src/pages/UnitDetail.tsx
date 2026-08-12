@@ -35,6 +35,7 @@ import {
 import {
   fetchDpMinimSimulation,
   getDpMinimAllInFromResult,
+  getDpMinimRealDP,
   getDpMinimTdpKonsumen,
   getDsfSimulationRules,
   resolveSmartCreditPrice,
@@ -274,10 +275,11 @@ export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
       ? simResult.adminFee
       : 5500000;
   const dpMinimAllIn = getDpMinimAllInFromResult(simResult);
-  const dpMinimTdpKonsumen = getDpMinimTdpKonsumen(price, dpMinimAllIn);
+  const dpMinimRealDP = getDpMinimRealDP(price, dpMinimAllIn);
+  const dpMinimTdpKonsumen = getDpMinimTdpKonsumen(dpMinimRealDP, simResult);
   const dpMinimSisaCair =
     dpMinimAllIn !== null && price > 0 ? Math.max(0, dpMinimAllIn - price) : null;
-  const shareDp = simTab === "dpminim" ? dpMinimTdpKonsumen : displayDp;
+  const shareDp = simTab === "dpminim" ? dpMinimRealDP : displayDp;
   const shareDpPercent =
     simTab === "dpminim" && shareDp !== null && price > 0
       ? (shareDp / price) * 100
@@ -1129,7 +1131,14 @@ export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
                 </div>
               ) : simTab === "dpminim" ? (
                 <div className="mt-1 text-[12px] font-semibold text-teal-deep">
-                  TDP : {shareDp !== null ? formatRupiah(shareDp) : "Menghitung DP Minim..."}
+                  <div>
+                    TDP : {shareTdp !== null ? formatRupiah(shareTdp) : "Menghitung DP Minim..."}
+                  </div>
+                  {shareDp !== null && (
+                    <div className="text-[10px] text-muted">
+                      DP Minim Real {formatRupiah(shareDp)}
+                    </div>
+                  )}
                 </div>
               ) : smartCreditPriceLoading ? (
                 <div className="mt-1 text-[12px] font-semibold text-muted">
@@ -1456,7 +1465,8 @@ export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
                     const row = dpMinimRows?.find((r) => r.tenor === rowTenor);
                     const res = row?.result ?? null;
                     const rowAllIn = getDpMinimAllInFromResult(res);
-                    const rowDp = getDpMinimTdpKonsumen(price, rowAllIn);
+                    const rowDp = getDpMinimRealDP(price, rowAllIn);
+                    const rowTdp = getDpMinimTdpKonsumen(rowDp, res);
                     const pending = dpMinimTableLoading && !res;
                     const isActive = rowTenor === tenor;
                     return (
@@ -1498,15 +1508,20 @@ export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
                             </span>
                           </div>
                           <div className="flex items-center justify-between gap-2 text-[11px]">
-                            <span className="font-semibold text-muted">DP Minim Real</span>
+                            <span className="font-semibold text-muted">TDP DP Minim</span>
                             <span className="text-[13px] font-extrabold text-teal-deep">
                               {pending
                                 ? "..."
-                                : rowDp !== null
-                                  ? formatRupiah(rowDp)
+                                : rowTdp !== null
+                                  ? formatRupiah(rowTdp)
                                   : "-"}
                             </span>
                           </div>
+                          {rowDp !== null && (
+                            <div className="text-[10px] font-semibold text-muted">
+                              DP Minim Real {formatRupiah(rowDp)}
+                            </div>
+                          )}
                         </div>
                       </button>
                     );
@@ -1634,7 +1649,7 @@ export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
                     </div>
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-[12px] font-semibold text-mid">
-                        DP Minim Real
+                        TDP DP Minim
                       </div>
                       <div className="text-right text-[15px] font-extrabold text-teal-deep">
                         {dpMinimTdpKonsumen !== null
@@ -1642,6 +1657,11 @@ export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
                           : "-"}
                       </div>
                     </div>
+                    {dpMinimRealDP !== null && (
+                      <div className="-mt-1 text-right text-[10px] font-semibold text-muted">
+                        DP Minim Real {formatRupiah(dpMinimRealDP)}
+                      </div>
+                    )}
                     {dpMinimSisaCair !== null && dpMinimSisaCair > 0 && (
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-[12px] font-semibold text-mid">
@@ -1720,7 +1740,7 @@ export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
             )}
             <p className="m-0 mt-2 text-[11px] text-muted">
               {simTab === "dpminim"
-                ? "DP Minim Real = harga aktif − (pencairan murni + refund aktual DSF). Syarat dan ketentuan berlaku; komisi bersifat estimasi."
+                ? "TDP DP Minim = DP Minim Real + komponen biaya TDP DSF. DP Minim Real = harga aktif − (pencairan murni + refund aktual DSF). Syarat dan ketentuan berlaku; komisi bersifat estimasi."
                 : "Simulasi, syarat & ketentuan berlaku. Komisi bersifat estimasi."}
             </p>
           </div>

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   getDpMinimAllInFromResult,
+  getDpMinimRealDP,
   getDpMinimSimulationParams,
   getDpMinimTdpKonsumen,
   type DsfSimResult,
@@ -84,27 +85,43 @@ describe("formula DP Minim dari pencairan aktual DSF", () => {
     ).toBeNull();
   });
 
-  test("TDP konsumen = harga cash − All In (bukan totalDownPaymentRounded DSF)", () => {
+  test("DP Minim Real = harga cash − All In (bukan totalDownPaymentRounded DSF)", () => {
     const price = 150_000_000;
     const allIn = getDpMinimAllInFromResult(dsfResult());
-    const tdp = getDpMinimTdpKonsumen(price, allIn);
+    const dpReal = getDpMinimRealDP(price, allIn);
 
-    expect(tdp).toBe(price - 138_277_548);
-    expect(tdp).not.toBe(dsfResult().totalDownPaymentRounded);
+    expect(dpReal).toBe(price - 138_277_548);
+    expect(dpReal).not.toBe(dsfResult().totalDownPaymentRounded);
   });
 
-  test("TDP konsumen tidak negatif jika All In di atas harga", () => {
-    expect(getDpMinimTdpKonsumen(100_000_000, 120_000_000)).toBe(0);
+  test("DP Minim Real tidak negatif jika All In di atas harga", () => {
+    expect(getDpMinimRealDP(100_000_000, 120_000_000)).toBe(0);
   });
 
-  test("contoh Xpander: harga dikurangi pencairan murni dan refund", () => {
+  test("contoh B1743DFX: TDP menambahkan biaya DSF ke DP Minim Real", () => {
     const result = dsfResult({
       netDisbursement: 146_558_000,
       refundSupplierActual: 10_378_981,
+      downPaymentRounded: 27_000_000,
+      downPayment: 27_000_000,
+      totalDownPaymentRounded: 33_442_000,
     });
     const allIn = getDpMinimAllInFromResult(result);
+    const dpReal = getDpMinimRealDP(180_000_000, allIn);
 
     expect(allIn).toBe(156_936_981);
-    expect(getDpMinimTdpKonsumen(180_000_000, allIn)).toBe(23_063_019);
+    expect(dpReal).toBe(23_063_019);
+    expect(getDpMinimTdpKonsumen(dpReal, result)).toBe(29_505_019);
+  });
+
+  test("TDP DP Minim memakai semua komponen biaya dari TDP DSF", () => {
+    const result = dsfResult({
+      downPaymentRounded: 27_000_000,
+      totalDownPaymentRounded: 37_665_200,
+    });
+
+    expect(getDpMinimTdpKonsumen(23_063_019, result)).toBe(33_728_219);
+    expect(getDpMinimTdpKonsumen(null, result)).toBeNull();
+    expect(getDpMinimTdpKonsumen(23_063_019, null)).toBeNull();
   });
 });

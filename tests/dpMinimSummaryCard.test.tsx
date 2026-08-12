@@ -7,7 +7,8 @@ describe("DpMinimSummaryCard", () => {
     const html = renderToStaticMarkup(
       <DpMinimSummaryCard
         packageData={{
-          tdp: 12_500_000,
+          tdp: 18_942_000,
+          dpReal: 12_500_000,
           cicilan: 3_250_000,
           tenor: 60,
           dpPercent: 15,
@@ -16,7 +17,9 @@ describe("DpMinimSummaryCard", () => {
     );
 
     expect(html).toContain("DP Minim");
-    expect(html).toContain("DP Minim real");
+    expect(html).toContain("TDP DP Minim");
+    expect(html).toContain("DP Minim Real");
+    expect(html).toContain("Rp 18.942.000");
     expect(html).toContain("Rp 12.500.000");
     expect(html).toContain("Rp 3.250.000");
     expect(html).toContain("60 bulan");

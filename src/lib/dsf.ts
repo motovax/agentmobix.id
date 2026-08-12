@@ -274,10 +274,10 @@ export function getDpMinimAllInFromResult(
 }
 
 /**
- * TDP bayar konsumen = OTR real − (netDisbursement + refundSupplierActual).
+ * DP Minim Real = OTR real − (netDisbursement + refundSupplierActual).
  * Bukan totalDownPaymentRounded DSF dan tidak memakai target All In.
  */
-export function getDpMinimTdpKonsumen(
+export function getDpMinimRealDP(
   realOtr: number,
   allIn: number | null,
 ): number | null {
@@ -285,8 +285,36 @@ export function getDpMinimTdpKonsumen(
   return Math.max(0, realOtr - allIn);
 }
 
+/**
+ * TDP DP Minim = DP Minim Real + seluruh komponen biaya TDP dari hasil DSF.
+ *
+ * Selisih `totalDownPaymentRounded - downPaymentRounded` sudah mengikuti tipe
+ * pembayaran dari DSF: premi, admin, provisi (bila ada), serta angsuran pertama
+ * untuk ADDM. Dengan begitu rumus ini tidak menebak komponen biaya satu per satu.
+ */
+export function getDpMinimTdpKonsumen(
+  dpMinimReal: number | null,
+  result: DsfSimResult | null,
+): number | null {
+  if (dpMinimReal === null || !Number.isFinite(dpMinimReal) || !result) {
+    return null;
+  }
+  const dsfDp = result.downPaymentRounded || result.downPayment;
+  const dsfTdp = result.totalDownPaymentRounded;
+  if (
+    !Number.isFinite(dsfDp) ||
+    dsfDp < 0 ||
+    !Number.isFinite(dsfTdp) ||
+    dsfTdp < 0
+  ) {
+    return null;
+  }
+  return Math.max(0, dpMinimReal + Math.max(0, dsfTdp - dsfDp));
+}
+
 export interface DpMinimPackage {
   tdp: number;
+  dpReal: number;
   cicilan: number;
   tenor: number;
   dpPercent: number;
@@ -295,7 +323,8 @@ export interface DpMinimPackage {
 /**
  * Fetch paket DP Minim untuk tenor tertentu (default 60).
  * Dipakai caption share default agar di bawah harga selalu ada DP Minim 60.
- * Formula: harga unit aktual − (pencairan murni + refund aktual DSF).
+ * DP Minim Real memakai harga aktual dikurangi pencairan dan refund aktual;
+ * TDP kemudian menambahkan komponen biaya dari hasil DSF.
  */
 export async function fetchDpMinimPackage(
   params: {
@@ -324,9 +353,11 @@ export async function fetchDpMinimPackage(
     signal,
   );
   const allIn = getDpMinimAllInFromResult(result);
-  const tdp = getDpMinimTdpKonsumen(params.unitPrice, allIn);
+  const dpReal = getDpMinimRealDP(params.unitPrice, allIn);
+  const tdp = getDpMinimTdpKonsumen(dpReal, result);
   if (
     !result ||
+    dpReal === null ||
     tdp === null ||
     !Number.isFinite(result.installmentRounded) ||
     result.installmentRounded <= 0
@@ -336,6 +367,7 @@ export async function fetchDpMinimPackage(
 
   return {
     tdp,
+    dpReal,
     cicilan: result.installmentRounded,
     tenor: effectiveTenor,
     dpPercent: rules.minDpPercent,
