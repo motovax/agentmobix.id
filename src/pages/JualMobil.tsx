@@ -180,6 +180,7 @@ function ColorCombobox({
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
   const trimmedQuery = query.trim();
+  const isSuggestionMode = trimmedQuery === "";
   const hasMinimumQuery = [...trimmedQuery].length >= 3;
   const hasExactMatch = options.some((option) =>
     option.localeCompare(trimmedQuery, "id-ID", { sensitivity: "base" }) === 0
@@ -194,7 +195,7 @@ function ColorCombobox({
   }, [open, value]);
 
   useEffect(() => {
-    if (!open || !hasMinimumQuery) {
+    if (!open || (!isSuggestionMode && !hasMinimumQuery)) {
       setOptions([]);
       setLoading(false);
       setSearchError("");
@@ -216,7 +217,7 @@ function ColorCombobox({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [hasMinimumQuery, open, query]);
+  }, [hasMinimumQuery, isSuggestionMode, open, query]);
 
   useEffect(() => {
     if (!open) return;
@@ -300,14 +301,34 @@ function ColorCombobox({
           role="listbox"
           className="absolute z-30 mt-1.5 max-h-60 w-full overflow-y-auto rounded-[12px] border border-line bg-surface p-1.5 shadow-[0_12px_30px_rgba(14,27,30,0.16)]"
         >
-          {!hasMinimumQuery ? (
+          {loading ? (
+            <p className="px-3 py-4 text-center text-[12px] text-muted">
+              {isSuggestionMode ? "Memuat saran warna..." : "Mencari warna..."}
+            </p>
+          ) : searchError ? (
+            <p className="px-3 py-4 text-center text-[12px] text-[#B84E43]">{searchError}</p>
+          ) : isSuggestionMode && options.length > 0 ? (
+            options.map((color, index) => (
+              <button
+                key={color}
+                type="button"
+                role="option"
+                aria-selected={value === color}
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => selectColor(color)}
+                className={`flex w-full items-center justify-between rounded-[9px] px-3 py-2.5 text-left text-[13px] transition-colors ${
+                  index === activeIndex ? "bg-teal-deep/10 text-teal-deep" : "text-ink hover:bg-field"
+                }`}
+              >
+                <span>{color}</span>
+                {value === color && <Check size={15} className="shrink-0 text-teal-deep" />}
+              </button>
+            ))
+          ) : !hasMinimumQuery ? (
             <p className="px-3 py-4 text-center text-[12px] text-muted">
               Ketik minimal 3 karakter untuk mencari warna.
             </p>
-          ) : loading ? (
-            <p className="px-3 py-4 text-center text-[12px] text-muted">Mencari warna...</p>
-          ) : searchError ? (
-            <p className="px-3 py-4 text-center text-[12px] text-[#B84E43]">{searchError}</p>
           ) : selectableColors.length > 0 ? (
             <>
               {customColor && (

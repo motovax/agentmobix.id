@@ -258,9 +258,10 @@ export async function fetchSellCarData(): Promise<SellCarData> {
 
 export async function searchVehicleColors(query: string, signal?: AbortSignal): Promise<string[]> {
   const normalizedQuery = query.trim();
-  if ([...normalizedQuery].length < 3) return [];
+  if (normalizedQuery && [...normalizedQuery].length < 3) return [];
 
-  const response = await mrpFetch(`/api/mrp/colors?q=${encodeURIComponent(normalizedQuery)}`, { signal });
+  const search = normalizedQuery ? `?q=${encodeURIComponent(normalizedQuery)}` : "";
+  const response = await mrpFetch(`/api/mrp/colors${search}`, { signal });
   if (!response.ok) throw new Error(await readAPIError(response, "Gagal mencari warna kendaraan"));
   const payload = await response.json() as VehicleColorSearchResponse | APIEnvelope<VehicleColorSearchResponse>;
   const data = unwrapAPIData(payload);
