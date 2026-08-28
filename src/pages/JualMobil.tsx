@@ -11,6 +11,9 @@ import {
   fetchSellCarQuote,
   fetchSellCarData,
   getBrands,
+  getModels,
+  getSelectedPriceRow,
+  getVariants,
   getYears,
   searchVehicleColors,
   type SellCarAIExtraction,
@@ -18,6 +21,7 @@ import {
   type SellCarData,
   type SellCarFormData,
 } from "../lib/sellCar";
+import { formatRupiah } from "../lib/format";
 
 const INITIAL_FORM: SellCarFormData = {
   brand: "",
@@ -30,6 +34,8 @@ const INITIAL_FORM: SellCarFormData = {
   ownershipType: "",
   plate: "",
   stnk: "",
+  generationId: "",
+  packageIds: [],
 };
 
 const PLATES = ["B - DKI Jakarta", "D - Bandung", "F - Bogor", "L - Surabaya", "AB - Yogyakarta", "Lainnya"];
@@ -706,20 +712,30 @@ export function JualMobil() {
   }, []);
 
   const brands = useMemo(() => (data ? getBrands(data.rows) : []), [data]);
-  const modelOptions = useMemo(() => {
-    if (!data) return [];
-    return data.rows
-      .filter((row) => !form.brand || row.brand === form.brand)
-      .filter((row, index, rows) => rows.findIndex((item) => item.model === row.model && item.variant === row.variant) === index)
-      .sort((a, b) => `${a.model} ${a.variant}`.localeCompare(`${b.model} ${b.variant}`));
-  }, [data, form.brand]);
+  const models = useMemo(() => (data ? getModels(data.rows, form.brand) : []), [data, form.brand]);
+  const variants = useMemo(
+    () => (data ? getVariants(data.rows, form.brand, form.model) : []),
+    [data, form.brand, form.model],
+  );
   const years = useMemo(
     () => (data ? getYears(data.rows, form.brand, form.model, form.variant) : []),
     [data, form.brand, form.model, form.variant],
   );
+  const selectedPriceRow = useMemo(() => getSelectedPriceRow(data, form), [data, form]);
+  const generationOptions = selectedPriceRow?.generationOptions ?? [];
+  const packageOptions = selectedPriceRow?.packageOptions ?? [];
 
   function update<K extends keyof SellCarFormData>(key: K, value: SellCarFormData[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function togglePackage(packageId: string) {
+    setForm((current) => ({
+      ...current,
+      packageIds: current.packageIds.includes(packageId)
+        ? current.packageIds.filter((id) => id !== packageId)
+        : [...current.packageIds, packageId],
+    }));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -875,32 +891,112 @@ export function JualMobil() {
 
               <Field label="Model" required>
                 <SelectField
-                  value={form.model && form.variant ? `${form.model}|${form.variant}` : ""}
-                  onChange={(value) => {
-                    const [model, variant] = value.split("|");
-                    setForm((current) => ({ ...current, model: model ?? "", variant: variant ?? "", year: "" }));
-                  }}
+                  value={form.model}
+                  onChange={(value) => setForm((current) => ({
+                    ...current,
+                    model: value,
+                    variant: "",
+                    year: "",
+                    generationId: "",
+                    packageIds: [],
+                  }))}
                   placeholder="Pilih merek terlebih dahulu"
                   disabled={!form.brand}
                 >
-                  {modelOptions.map((option) => (
-                    <option key={`${option.model}|${option.variant}`} value={`${option.model}|${option.variant}`}>
-                      {option.model} - {option.variant}
-                    </option>
-                  ))}
+                  {models.map((model) => <option key={model} value={model}>{model}</option>)}
+                </SelectField>
+              </Field>
+
+              <Field label="Varian / Trim" required hint="Pilihan varian mengikuti model pada MRP aktif.">
+                <SelectField
+                  value={form.variant}
+                  onChange={(value) => setForm((current) => ({
+                    ...current,
+                    variant: value,
+                    year: "",
+                    generationId: "",
+                    packageIds: [],
+                  }))}
+                  placeholder="Pilih model terlebih dahulu"
+                  disabled={!form.model}
+                >
+                  {variants.map((variant) => <option key={variant} value={variant}>{variant}</option>)}
                 </SelectField>
               </Field>
 
               <Field label="Tahun Pabrik" required hint="Tahun mobil tersebut diproduksi.">
                 <SelectField
                   value={form.year}
-                  onChange={(value) => update("year", value)}
+                  onChange={(value) => setForm((current) => ({
+                    ...current,
+                    year: value,
+                    generationId: "",
+                    packageIds: [],
+                  }))}
                   placeholder="Pilih tahun pabrik"
                   disabled={!form.variant}
                 >
                   {years.map((year) => <option key={year} value={year}>{year}</option>)}
                 </SelectField>
               </Field>
+
+              {generationOptions.length > 0 && (
+                <Field
+                  label="Generasi / Facelift"
+                  hint="Pilih hanya jika unit memiliki generasi atau facelift tersebut. Nominal mengikuti MRP aktif."
+                >
+                  <SelectField
+                    value={form.generationId}
+                    onChange={(value) => update("generationId", value)}
+                    placeholder="Standar / tidak ada penyesuaian"
+                  >
+                    {generationOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label} ({option.amount >= 0 ? "+" : "−"}{formatRupiah(Math.abs(option.amount))})
+                      </option>
+                    ))}
+                  </SelectField>
+                </Field>
+              )}
+
+              {packageOptions.length > 0 && (
+                <fieldset className="rounded-[14px] border border-line bg-field/50 p-3">
+                  <legend className="px-1 text-[12px] font-semibold text-ink">Package / Fitur Khusus</legend>
+                  <p className="m-0 mb-2 text-[10px] leading-[1.4] text-muted">
+                    Pilih fitur yang benar-benar tersedia pada unit. Opsi mengikuti model, varian, dan tahun.
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {packageOptions.map((option) => {
+                      const selected = form.packageIds.includes(option.id);
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => togglePackage(option.id)}
+                          className={`flex min-h-11 items-center gap-2 rounded-[11px] border px-3 py-2 text-left transition ${
+                            selected
+                              ? "border-teal-deep bg-teal-tint text-teal-deep"
+                              : "border-line bg-surface text-ink hover:border-teal-tint-border"
+                          }`}
+                        >
+                          <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border ${
+                            selected ? "border-teal-deep bg-teal-deep text-white" : "border-line bg-surface"
+                          }`}>
+                            {selected && <Check size={13} />}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[11px] font-bold leading-[1.3]">{option.label}</span>
+                            <span className={`mt-0.5 block text-[10px] font-semibold ${option.amount >= 0 ? "text-teal-deep" : "text-[#B84E43]"}`}>
+                              {option.amount >= 0 ? "+" : "−"}{formatRupiah(Math.abs(option.amount))}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              )}
 
               <Field label="Transmisi" required>
                 <SelectField value={form.transmission} onChange={(value) => update("transmission", value)} placeholder="Pilih transmisi...">

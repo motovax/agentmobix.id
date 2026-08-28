@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
   applySellCarAIExtraction,
+  buildSellCarQuotePayload,
   buildLocalSellCarResult,
+  getModels,
+  getSelectedPriceRow,
+  getVariants,
   normalizeStnkExpiryForQuote,
   ownershipTypeForQuote,
   searchVehicleColors,
@@ -22,6 +26,8 @@ const emptyForm: SellCarFormData = {
   ownershipType: "",
   plate: "",
   stnk: "",
+  generationId: "",
+  packageIds: [],
 };
 
 const rows: PriceRow[] = [
@@ -92,6 +98,8 @@ describe("applySellCarAIExtraction", () => {
       ownershipType: "",
       plate: "B - DKI Jakarta",
       stnk: "2027-08",
+      generationId: "",
+      packageIds: [],
     });
   });
 
@@ -199,5 +207,73 @@ describe("normalizeStnkExpiryForQuote", () => {
     expect(normalizeStnkExpiryForQuote("2023-04")).toBe("2023-04");
     expect(normalizeStnkExpiryForQuote("04/2023")).toBe("2023-04");
     expect(normalizeStnkExpiryForQuote("")).toBe("");
+  });
+});
+
+describe("MRP dynamic selectors", () => {
+  test("memisahkan model dan varian dari matrix aktif", () => {
+    const matrix: PriceRow[] = [
+      { brand: "TOYOTA", model: "CALYA", variant: "E", year: 2022, price: 0, notes: "" },
+      { brand: "TOYOTA", model: "CALYA", variant: "G", year: 2022, price: 0, notes: "" },
+      { brand: "TOYOTA", model: "AVANZA", variant: "E", year: 2022, price: 0, notes: "" },
+    ];
+    expect(getModels(matrix, "TOYOTA")).toEqual(["AVANZA", "CALYA"]);
+    expect(getVariants(matrix, "TOYOTA", "CALYA")).toEqual(["E", "G"]);
+  });
+
+  test("mengambil opsi generasi dan package hanya dari baris terpilih", () => {
+    const option = { id: "generation_1", kind: "generation" as const, label: "Facelift 2022", amount: 5_000_000 };
+    const selectedData: SellCarData = {
+      source: "test",
+      sourceSheet: "test",
+      mrpVersion: "v1",
+      rows: [{
+        brand: "DAIHATSU",
+        model: "SIGRA",
+        variant: "R",
+        year: 2022,
+        price: 0,
+        notes: "",
+        generationOptions: [option],
+        packageOptions: [],
+      }],
+    };
+    const selected = getSelectedPriceRow(selectedData, {
+      ...emptyForm,
+      brand: "DAIHATSU",
+      model: "SIGRA",
+      variant: "R",
+      year: "2022",
+    });
+    expect(selected?.generationOptions).toEqual([option]);
+  });
+
+  test("quote hanya mengirim ID adjustment, bukan nominal dari browser", () => {
+    expect(buildSellCarQuotePayload({
+      ...emptyForm,
+      brand: "DAIHATSU",
+      model: "SIGRA",
+      variant: "R",
+      year: "2022",
+      transmission: "Manual",
+      color: "Hitam",
+      mileage: "50.000",
+      ownershipType: "Perorangan",
+      generationId: "generation_1",
+      packageIds: ["package_1", "package_2"],
+      stnk: "08/2027",
+    })).toEqual({
+      brand: "DAIHATSU",
+      model: "SIGRA",
+      variant: "R",
+      year: 2022,
+      transmission: "Manual",
+      color: "Hitam",
+      odometer: 50000,
+      ownership_type: "perorangan",
+      generation_id: "generation_1",
+      package_ids: ["package_1", "package_2"],
+      stnk_expiry: "2027-08",
+    });
   });
 });

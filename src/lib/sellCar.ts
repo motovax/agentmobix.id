@@ -8,6 +8,8 @@ export type PriceRow = {
   year: number;
   price: number;
   notes: string;
+  generationOptions?: PriceAdjustmentOption[];
+  packageOptions?: PriceAdjustmentOption[];
 };
 
 export type SellCarData = {
@@ -28,6 +30,8 @@ export type SellCarFormData = {
   ownershipType: string;
   plate: string;
   stnk: string;
+  generationId: string;
+  packageIds: string[];
 };
 
 export type SellCarAIPhotoKind = "vehicle" | "stnk" | "odometer";
@@ -68,6 +72,11 @@ export type PriceAdjustment = {
   amount: number;
 };
 
+export type PriceAdjustmentOption = PriceAdjustment & {
+  id: string;
+  kind: "generation" | "package";
+};
+
 export function ownershipTypeForQuote(value: string): string {
   switch (value) {
     case "Perorangan": return "perorangan";
@@ -99,7 +108,14 @@ export type SellCarResult = SellCarFormData & {
 
 type MRPOptionsResponse = {
   mrp_version?: string;
-  options?: Array<{ brand: string; model: string; variant: string; year: number }>;
+  options?: Array<{
+    brand: string;
+    model: string;
+    variant: string;
+    year: number;
+    generation_options?: PriceAdjustmentOption[];
+    package_options?: PriceAdjustmentOption[];
+  }>;
 };
 
 type VehicleColorSearchResponse = {
@@ -247,7 +263,16 @@ export async function fetchSellCarData(): Promise<SellCarData> {
         source: "Mobix MRP API",
         sourceSheet: "brand sheets",
         mrpVersion: data.mrp_version || "",
-        rows: data.options.map((option) => ({ ...option, price: 0, notes: "" })),
+        rows: data.options.map((option) => ({
+          brand: option.brand,
+          model: option.model,
+          variant: option.variant,
+          year: option.year,
+          price: 0,
+          notes: "",
+          generationOptions: option.generation_options ?? [],
+          packageOptions: option.package_options ?? [],
+        })),
       };
     }
   } catch {
@@ -332,6 +357,8 @@ export function applySellCarAIExtraction(
     mileage: extracted.mileage > 0 ? String(extracted.mileage) : "",
     plate: plateRegionFormValue(extracted.plate_region),
     stnk: extracted.stnk_expiry || "",
+    generationId: "",
+    packageIds: [],
   };
 }
 
@@ -351,6 +378,34 @@ export function getYears(rows: PriceRow[], brand: string, model: string, variant
   return [...new Set(rows
     .filter((row) => (!brand || row.brand === brand) && row.model === model && row.variant === variant)
     .map((row) => row.year))].sort((a, b) => b - a);
+}
+
+export function getSelectedPriceRow(data: SellCarData | null, form: SellCarFormData): PriceRow | undefined {
+  if (!data || !form.brand || !form.model || !form.variant || !form.year) return undefined;
+  const year = Number(form.year);
+  return data.rows.find((row) =>
+    row.brand === form.brand &&
+    row.model === form.model &&
+    row.variant === form.variant &&
+    row.year === year
+  );
+}
+
+export function buildSellCarQuotePayload(form: SellCarFormData) {
+  const stnkExpiry = normalizeStnkExpiryForQuote(form.stnk);
+  return {
+    brand: form.brand,
+    model: form.model,
+    variant: form.variant,
+    year: Number(form.year),
+    transmission: form.transmission,
+    color: form.color,
+    odometer: Number(form.mileage.replace(/\D/g, "")),
+    ownership_type: ownershipTypeForQuote(form.ownershipType),
+    ...(form.generationId ? { generation_id: form.generationId } : {}),
+    ...(form.packageIds.length > 0 ? { package_ids: form.packageIds } : {}),
+    ...(stnkExpiry ? { stnk_expiry: stnkExpiry } : {}),
+  };
 }
 
 export function buildLocalSellCarResult(
@@ -429,21 +484,9 @@ export function buildLocalSellCarResult(
 export async function fetchSellCarQuote(form: SellCarFormData): Promise<SellCarResult> {
   let apiError: Error | null = null;
   try {
-    const stnkExpiry = normalizeStnkExpiryForQuote(form.stnk);
     const response = await mrpFetch("/api/mrp/quote", {
       method: "POST",
-      body: JSON.stringify({
-        brand: form.brand,
-        model: form.model,
-        variant: form.variant,
-        year: Number(form.year),
-        transmission: form.transmission,
-        color: form.color,
-        odometer: Number(form.mileage.replace(/\D/g, "")),
-        ownership_type: ownershipTypeForQuote(form.ownershipType),
-        // Backend reduces recommended_price when tax is overdue.
-        ...(stnkExpiry ? { stnk_expiry: stnkExpiry } : {}),
-      }),
+      body: JSON.stringify(buildSellCarQuotePayload(form)),
     });
     if (!response.ok) {
       throw new Error(await readAPIError(response, "Gagal menghitung harga mobil"));
