@@ -98,7 +98,7 @@ export function CreditSimulationBox({
   const [dpMinimTableKey, setDpMinimTableKey] = useState(0);
   const [simResult, setSimResult] = useState<DsfSimResult | null>(null);
   const [simLoading, setSimLoading] = useState(false);
-  const [simError, setSimError] = useState<string | null>(null);
+  const [simError, setSimError] = useState(false);
   const [simRunKey, setSimRunKey] = useState(0);
   const [smartCreditPrice, setSmartCreditPrice] = useState<number | null>(null);
   const [smartCreditPriceLoading, setSmartCreditPriceLoading] = useState(false);
@@ -369,13 +369,13 @@ export function CreditSimulationBox({
     if (!financingEligible || !price) {
       setSimResult(null);
       setSimLoading(false);
-      setSimError(null);
+      setSimError(false);
       return;
     }
     let alive = true;
     const controller = new AbortController();
     setSimResult(null);
-    setSimError(null);
+    setSimError(false);
     setSimLoading(true);
     const isDpMinim = simTab === "dpminim";
     (async () => {
@@ -390,7 +390,6 @@ export function CreditSimulationBox({
               category: unit.category,
             },
             controller.signal,
-            setSimError,
           )
         : await simulateKreditWithSignal(
             {
@@ -410,11 +409,10 @@ export function CreditSimulationBox({
               category: unit.category,
             },
             controller.signal,
-            setSimError,
           );
       if (!alive) return;
       setSimResult(result);
-      setSimError((current) => result === null ? current ?? "API DSF tidak mengirimkan hasil simulasi" : null);
+      setSimError(result === null);
       setSimLoading(false);
     })();
     return () => {
@@ -550,7 +548,7 @@ export function CreditSimulationBox({
     setSimTab(nextTab);
     if (nextTab === "syariah") return;
     setSimResult(null);
-    setSimError(null);
+    setSimError(false);
     setSimRunKey((value) => value + 1);
   }
 
@@ -561,7 +559,7 @@ export function CreditSimulationBox({
   function handleDpMinimRowSelect(nextTenor: Tenor) {
     setTenor(nextTenor);
     setSimResult(null);
-    setSimError(null);
+    setSimError(false);
     setSimRunKey((value) => value + 1);
   }
 
@@ -1020,9 +1018,6 @@ export function CreditSimulationBox({
                       </div>
                       <div className="mt-1 text-[11px] leading-[1.5] text-muted">
                         Hasil simulasi belum tersedia dari DSF. Coba hitung ulang.
-                      </div>
-                      <div className="mt-2 rounded-[8px] bg-danger-bg px-2.5 py-2 text-left text-[11px] leading-[1.5] text-danger">
-                        Pesan API DSF: {simError}
                       </div>
                       <button
                         type="button"

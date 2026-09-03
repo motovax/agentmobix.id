@@ -42,37 +42,6 @@ interface DsfAllParamsData {
   };
 }
 
-type DsfErrorHandler = (message: string) => void;
-
-const DSF_ERROR_KEYS = ["message", "error", "detail", "errors"] as const;
-
-/** Ambil pesan yang dikirim DSF tanpa menampilkan seluruh payload mentah. */
-export function getDsfApiErrorMessage(payload: unknown, status?: number): string {
-  const findMessage = (value: unknown, depth = 0): string => {
-    if (depth > 3 || value == null) return "";
-    if (typeof value === "string") return value.trim();
-    if (Array.isArray(value)) {
-      return value.map((item) => findMessage(item, depth + 1)).filter(Boolean).join("; ");
-    }
-    if (typeof value !== "object") return "";
-
-    const record = value as Record<string, unknown>;
-    for (const key of DSF_ERROR_KEYS) {
-      const message = findMessage(record[key], depth + 1);
-      if (message) return message;
-    }
-    return "";
-  };
-
-  const message = findMessage(payload).replace(/\s+/g, " ").slice(0, 500);
-  if (message) return message;
-  return status && status >= 400
-    ? `API DSF merespons HTTP ${status}`
-    : "API DSF tidak mengirimkan pesan error";
-}
-
-class DsfApiError extends Error {}
-
 export interface DsfSimParams {
   unitPrice: number;
   dpPercent: number;
@@ -243,17 +212,10 @@ async function fetchDsfAllParams(
     body: JSON.stringify(payload),
     signal,
   });
-  const responseText = await res.text();
-  let json: Record<string, unknown> = {};
-  try {
-    json = responseText ? JSON.parse(responseText) : {};
-  } catch {
-    if (!res.ok) throw new DsfApiError(getDsfApiErrorMessage(responseText, res.status));
-  }
-  if (!res.ok || !json.status || !json.data) {
-    throw new DsfApiError(getDsfApiErrorMessage(json, res.status));
-  }
-  return json.data as DsfAllParamsData;
+  if (!res.ok) return null;
+  const json = await res.json();
+  if (!json.status || !json.data) return null;
+  return json.data;
 }
 
 export async function simulateKredit(params: DsfSimParams): Promise<DsfSimResult | null> {
@@ -263,7 +225,6 @@ export async function simulateKredit(params: DsfSimParams): Promise<DsfSimResult
 export async function simulateKreditWithSignal(
   params: DsfSimParams,
   signal?: AbortSignal,
-  onError?: DsfErrorHandler,
 ): Promise<DsfSimResult | null> {
   try {
     const d = await fetchDsfAllParams(params, signal);
@@ -290,13 +251,7 @@ export async function simulateKreditWithSignal(
           ? netDisbursement + Math.max(0, refundSupplierActual)
           : 0),
     };
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") return null;
-    onError?.(
-      error instanceof DsfApiError
-        ? error.message
-        : getDsfApiErrorMessage(error instanceof Error ? error.message : error),
-    );
+  } catch {
     return null;
   }
 }
@@ -447,11 +402,10 @@ export function getDpMinimSimulationParams(
 export async function fetchDpMinimSimulation(
   params: Parameters<typeof getDpMinimSimulationParams>[0],
   signal?: AbortSignal,
-  onError?: DsfErrorHandler,
 ): Promise<DsfSimResult | null> {
   const simulationParams = getDpMinimSimulationParams(params);
   if (!simulationParams) return null;
-  return simulateKreditWithSignal(simulationParams, signal, onError);
+  return simulateKreditWithSignal(simulationParams, signal);
 }
 
 export interface DsfCreditPriceResult {
