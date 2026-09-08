@@ -41,7 +41,6 @@ export function JualMobilHasil() {
   if (!result) return null;
 
   const whatsappUrl = getWhatsAppUrl(result);
-  const adjustments = result.adjustments ?? [];
   const lowerPrice = typeof result.priceMin === "number" ? result.priceMin : Math.max(0, result.recommendedPrice - 5_000_000);
   const upperPrice = typeof result.priceMax === "number" ? result.priceMax : result.recommendedPrice + 5_000_000;
   return (
@@ -112,22 +111,6 @@ export function JualMobilHasil() {
               <Detail label="Potongan Pajak" value={formatRupiah(result.taxDeductionTotal)} />
             ) : null}
           </div>
-
-          {adjustments.length > 0 && (
-            <div className="mt-6 rounded-[14px] border border-line bg-field/60 p-3.5">
-              <div className="text-[12px] font-extrabold text-ink">Penyesuaian Harga</div>
-              <div className="mt-2.5 space-y-2">
-                {adjustments.map((adjustment, index) => (
-                  <div key={`${adjustment.label}-${index}`} className="flex items-start justify-between gap-3 text-[11px]">
-                    <span className="min-w-0 leading-[1.4] text-mid">{adjustment.label}</span>
-                    <span className={`shrink-0 font-extrabold tabular-nums ${adjustment.amount >= 0 ? "text-teal-deep" : "text-[#B84E43]"}`}>
-                      {adjustment.amount >= 0 ? "+" : "−"}{formatRupiah(Math.abs(adjustment.amount))}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="mt-7">
             <Link href="/jual-mobil" className="flex h-11 w-full items-center justify-center rounded-[12px] bg-[#E6E6E6] text-[13px] font-bold text-ink no-underline">
