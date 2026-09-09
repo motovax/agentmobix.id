@@ -1,5 +1,8 @@
 # Share popup: kemampuan foto + caption per sosmed
 
+> Pembaruan 9 September 2026: berbagi unit kini hanya menyertakan caption dan file media yang didukung aplikasi tujuan, tanpa tambahan URL AgenMobix, Mobix by DSS, atau URL preview Open Graph. WA, X, dan Threads menerima caption lewat intent teks. Fallback Facebook, Telegram, Instagram, dan TikTok membuka situs tujuan setelah menyalin caption; pengguna menempelkan caption dan mengunggah media secara manual. Keterangan tautan/preview di bawah adalah dokumentasi perilaku lama.
+
+
 Dokumen ini merangkum **apa yang bisa / tidak bisa** dilakukan channel di **popup fallback** fitur share AgenMobix, alasannya, dan opsi solusi agar user tetap bisa membagikan **foto + caption**.
 
 **Terakhir diperbarui:** 2026-08-07  

@@ -11,118 +11,41 @@ import {
 } from "../src/lib/shareActions";
 
 describe("buildShareText", () => {
-  test("joins caption and link with a blank line", () => {
-    expect(buildShareText("Halo unit bagus", "https://agenmobix.id/unit/a")).toBe(
-      "Halo unit bagus\n\nhttps://agenmobix.id/unit/a",
-    );
-  });
-
-  test("does not duplicate an already-included link", () => {
-    const caption = "Cek unit\n\nhttps://agenmobix.id/unit/a";
-    expect(buildShareText(caption, "https://agenmobix.id/unit/a")).toBe(caption);
-  });
-
-  test("falls back to whichever side is present", () => {
-    expect(buildShareText("", "https://agenmobix.id/unit/a")).toBe(
-      "https://agenmobix.id/unit/a",
-    );
-    expect(buildShareText("Caption saja", "")).toBe("Caption saja");
-  });
-
-  test("appends AgenMobix and Mobix by DSS unit links", () => {
-    expect(
-      buildShareText(
-        "Honda Mobilio siap dipinang",
-        "https://agenmobix.id/share?u=honda-mobilio",
-        ["https://mobixbydss.id/produk/detail/honda-mobilio"],
-      ),
-    ).toBe([
-      "Honda Mobilio siap dipinang",
-      [
-        "https://agenmobix.id/share?u=honda-mobilio",
-        "https://mobixbydss.id/produk/detail/honda-mobilio",
-      ].join("\n"),
-    ].join("\n\n"));
-  });
-
-  test("does not duplicate either unit link already present in caption", () => {
-    const agenLink = "https://agenmobix.id/share?u=honda-mobilio";
-    const mobixLink = "https://mobixbydss.id/produk/detail/honda-mobilio";
-    const caption = `Cek unit\n\n${agenLink}\n${mobixLink}`;
-    expect(buildShareText(caption, agenLink, [mobixLink])).toBe(caption);
+  test("membagikan caption saja tanpa menambahkan tautan", () => {
+    expect(buildShareText("  Honda Mobilio\nTDP 20jt  ")).toBe("Honda Mobilio\nTDP 20jt");
+    expect(buildShareText("  ")).toBe("");
   });
 });
 
 describe("buildChannelShareUrl", () => {
   const caption = "Honda Mobilio\nTDP 20jt";
-  const link = "https://agenmobix.id/unit/honda-mobilio";
 
-  test("WhatsApp embeds full caption + link in text", () => {
-    const url = buildChannelShareUrl("wa", caption, link);
-    expect(url.startsWith("https://wa.me/?text=")).toBe(true);
-    const text = decodeURIComponent(url.split("text=")[1] ?? "");
-    expect(text).toContain("Honda Mobilio");
-    expect(text).toContain(link);
-  });
+  for (const channel of ["wa", "x", "threads"] as const) {
+    test(`${channel} hanya mengirim caption tanpa URL situs`, () => {
+      const url = new URL(buildChannelShareUrl(channel, caption));
+      expect(url.searchParams.get("text")).toBe(caption);
+      expect(url.searchParams.has("url")).toBe(false);
+      expect(url.searchParams.has("u")).toBe(false);
+      expect(channelNeedsClipboardFirst(channel)).toBe(false);
+    });
+  }
 
-  test("Telegram uses real unit URL and caption as text", () => {
-    const url = buildChannelShareUrl("tg", caption, link);
-    expect(url.startsWith("https://t.me/share/url?")).toBe(true);
-    const params = new URL(url).searchParams;
-    expect(params.get("url")).toBe(link);
-    expect(params.get("text")).toBe(caption);
-  });
+  for (const [channel, destination] of [
+    ["fb", "https://www.facebook.com/"],
+    ["tg", "https://web.telegram.org/"],
+    ["ig", "https://www.instagram.com/"],
+    ["tt", "https://www.tiktok.com/"],
+  ] as const) {
+    test(`${channel} membuka aplikasi dengan caption melalui clipboard`, () => {
+      expect(buildChannelShareUrl(channel, caption)).toBe(destination);
+      expect(channelNeedsClipboardFirst(channel)).toBe(true);
+    });
+  }
 
-  test("Telegram keeps AgenMobix as URL and includes Mobix by DSS in text", () => {
-    const mobixLink = "https://mobixbydss.id/produk/detail/honda-mobilio";
-    const url = buildChannelShareUrl("tg", caption, link, [mobixLink]);
-    const params = new URL(url).searchParams;
-    expect(params.get("url")).toBe(link);
-    expect(params.get("text")).toBe(`${caption}\n\n${mobixLink}`);
-  });
-
-  test("X / Twitter embeds full caption + link in text", () => {
-    const url = buildChannelShareUrl("x", caption, link);
-    expect(url.startsWith("https://x.com/intent/tweet?text=")).toBe(true);
-    const text = decodeURIComponent(url.split("text=")[1] ?? "");
-    expect(text).toContain("Honda Mobilio");
-    expect(text).toContain(link);
-  });
-
-  test("Facebook sharer points at Open Graph preview URL (not raw SPA link)", () => {
-    const url = buildChannelShareUrl("fb", caption, link);
-    expect(url.startsWith("https://www.facebook.com/sharer/sharer.php?")).toBe(true);
-    const params = new URL(url).searchParams;
-    const shared = params.get("u") || "";
-    expect(shared).toContain("agentmobix-api.margi-landshark.workers.dev/og");
-    expect(shared).toContain("honda-mobilio");
-    expect(params.get("quote")).toBeNull();
-  });
-
-  test("buildOpenGraphShareUrl extracts slug from share link", () => {
+  test("buildOpenGraphShareUrl tetap tersedia untuk preview halaman", () => {
     expect(buildOpenGraphShareUrl("https://agenmobix.id/share?u=toyota-calya-2019")).toBe(
       "https://agentmobix-api.margi-landshark.workers.dev/og?u=toyota-calya-2019",
     );
-    expect(buildOpenGraphShareUrl("toyota-calya-2019")).toContain("u=toyota-calya-2019");
-  });
-
-  test("Instagram opens app/site (caption via clipboard first)", () => {
-    expect(buildChannelShareUrl("ig", caption, link)).toBe("https://www.instagram.com/");
-    expect(channelNeedsClipboardFirst("ig")).toBe(true);
-    expect(channelNeedsClipboardFirst("wa")).toBe(false);
-  });
-
-  test("TikTok opens app/site (caption via clipboard first)", () => {
-    expect(buildChannelShareUrl("tt", caption, link)).toBe("https://www.tiktok.com/");
-    expect(channelNeedsClipboardFirst("tt")).toBe(true);
-  });
-
-  test("Threads intent embeds full caption + link", () => {
-    const url = buildChannelShareUrl("threads", caption, link);
-    expect(url.startsWith("https://www.threads.net/intent/post?text=")).toBe(true);
-    const text = decodeURIComponent(url.split("text=")[1] ?? "");
-    expect(text).toContain("Honda Mobilio");
-    expect(text).toContain(link);
   });
 });
 

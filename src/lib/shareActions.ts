@@ -41,18 +41,9 @@ export function buildOpenGraphShareUrl(unitLinkOrSlug: string): string {
   return `${OPEN_GRAPH_SHARE_BASE}?u=${encodeURIComponent(slug)}`;
 }
 
-/** Caption + unit links ready to paste into chat apps. */
-export function buildShareText(
-  caption: string,
-  link: string,
-  additionalLinks: string[] = [],
-): string {
-  const body = caption.trim();
-  const urls = [...new Set([link, ...additionalLinks].map((url) => url.trim()).filter(Boolean))];
-  const missingUrls = urls.filter((url) => !body.includes(url));
-  if (!body) return missingUrls.join("\n");
-  if (missingUrls.length === 0) return body;
-  return `${body}\n\n${missingUrls.join("\n")}`;
+/** Caption siap dibagikan tanpa menambahkan tautan situs atau media. */
+export function buildShareText(caption: string): string {
+  return caption.trim();
 }
 
 /**
@@ -198,41 +189,31 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
 }
 
 /**
+ * Facebook / Telegram require a link for web sharing; use clipboard instead.
  * Instagram / TikTok have no public web intent that pre-fills a post caption.
- * Caller should copy caption+link first, then open the app/site.
+ * Caller should copy caption first, then open the app/site.
  */
 export function channelNeedsClipboardFirst(channel: ShareChannel): boolean {
-  return channel === "ig" || channel === "tt";
+  return channel === "ig" || channel === "tt" || channel === "fb" || channel === "tg";
 }
 
 /** Deep links / web intents for channel picker fallback. */
 export function buildChannelShareUrl(
   channel: ShareChannel,
   caption: string,
-  link: string,
-  additionalLinks: string[] = [],
 ): string {
-  const text = buildShareText(caption, link, additionalLinks);
+  const text = buildShareText(caption);
   const encodedText = encodeURIComponent(text);
-  const safeLink = link.trim() || "https://agenmobix.id";
-  const encodedLink = encodeURIComponent(safeLink);
-  const captionWithAdditionalLinks = buildShareText(caption, "", additionalLinks);
-  const encodedCaption = encodeURIComponent(captionWithAdditionalLinks || text);
 
   switch (channel) {
     case "wa":
       return `https://wa.me/?text=${encodedText}`;
     case "tg":
-      // Telegram expects a real URL in `url` and optional caption in `text`.
-      return `https://t.me/share/url?url=${encodedLink}&text=${encodedCaption}`;
+      return "https://web.telegram.org/";
     case "x":
       return `https://x.com/intent/tweet?text=${encodedText}`;
-    case "fb": {
-      // Facebook only scrapes Open Graph from the shared URL (quote is ignored).
-      // Point `u` at the Worker OG page so crawlers get title + unit photo.
-      const ogUrl = buildOpenGraphShareUrl(link);
-      return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(ogUrl)}`;
-    }
+    case "fb":
+      return "https://www.facebook.com/";
     case "ig":
       // No prefilled caption intent — open Instagram; paste from clipboard.
       return "https://www.instagram.com/";

@@ -57,8 +57,6 @@ import {
 import { buildJasmineWhatsAppHref } from "../lib/jasmine";
 import { getCatalogReturnHref } from "../lib/catalogSearch";
 import {
-  buildAgenMobixUnitLink,
-  buildMobixByDssUnitLink,
   buildShareAutoCaption,
   CAPTION_CTA,
   CAPTION_HOOK_PREFIX,
@@ -964,11 +962,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     });
   }
 
-  const link = buildAgenMobixUnitLink(unit?.slug);
-  const additionalUnitLinks = unit?.slug
-    ? [buildMobixByDssUnitLink(unit.slug)]
-    : [];
-
   async function waitForAIBackgroundJob(
     initial: AIBackgroundResponse,
     onProgress: (progress: number) => void,
@@ -1063,7 +1056,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   }
 
   async function copyShareCaption(caption: string) {
-    const text = buildShareText(caption, link, additionalUnitLinks);
+    const text = buildShareText(caption);
     if (await copyTextToClipboard(text)) {
       showShareCaptionCopied();
       return true;
@@ -1094,7 +1087,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   ): Promise<void> | null {
     if (!prefersNativeWebShare() || files.length === 0) return null;
 
-    const shareText = buildShareText(caption, link, additionalUnitLinks);
+    const shareText = buildShareText(caption);
     const shareable = pickNativeShareableFiles(files, title, shareText);
     const payload = buildNativeSharePayload(shareable, title, shareText);
     if (!payload) return null;
@@ -1107,10 +1100,10 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     return navigator.share(payload);
   }
 
-  /** Native text share (mobile) — caption + link in `text`, no separate `url`. */
+  /** Native text share (mobile) — caption in `text`, no separate `url`. */
   function shareWithoutFiles(title: string, caption: string): Promise<void> | null {
     if (!prefersNativeWebShare()) return null;
-    const shareText = buildShareText(caption, link, additionalUnitLinks);
+    const shareText = buildShareText(caption);
     const payload = buildNativeSharePayload([], title, shareText);
     if (!payload) return null;
 
@@ -1456,12 +1449,12 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   function shareVia(channel: ShareChannel) {
     const caption = captionText.trim();
     const openChannel = () => {
-      const url = buildChannelShareUrl(channel, caption, link, additionalUnitLinks);
+      const url = buildChannelShareUrl(channel, caption);
       window.open(url, "_blank", "noopener");
       setShowChannels(false);
     };
 
-    // IG/TikTok have no web intent with prefilled caption — copy first, then open app/site.
+    // Channel tanpa intent caption saja: salin sebelum membuka aplikasi.
     if (channelNeedsClipboardFirst(channel)) {
       void copyShareCaption(caption).finally(openChannel);
       return;
@@ -1492,7 +1485,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         >
           <div className="border-b border-line px-3 py-2.5 text-center text-[11px] font-bold text-muted">
             {shareCaptionCopied
-              ? "Caption + link tersalin — pilih channel"
+              ? "Caption tersalin — pilih channel"
               : "Bagikan via"}
           </div>
           <div className="grid grid-cols-4 divide-x divide-y divide-line">
@@ -1537,7 +1530,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
             </button>
           </div>
           <div className="border-t border-line px-3 py-2 text-center text-[10px] leading-snug text-muted">
-            IG & TikTok: caption disalin otomatis — tempel di post/video.
+            Facebook, Telegram, IG & TikTok: tempel caption yang disalin. Unggah media dari tombol Download.
           </div>
         </div>
       </>
@@ -1952,7 +1945,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
                 ) : shareCaptionCopied ? (
                   <>
                     <Check className="shrink-0" size={16} strokeWidth={2.4} />
-                    <span>Caption + link tersalin</span>
+                    <span>Caption tersalin</span>
                   </>
                 ) : (
                   <>
@@ -2001,7 +1994,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
               ) : shareCaptionCopied ? (
                 <>
                   <Check className="shrink-0" size={14} strokeWidth={2.4} />
-                  <span className="truncate">Caption + link tersalin</span>
+                  <span className="truncate">Caption tersalin</span>
                 </>
               ) : pendingShareStep ? (
                 <>
