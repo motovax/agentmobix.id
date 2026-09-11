@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildFalconContextMessage,
+  DEFAULT_FALCON_API_BASE,
+  DEFAULT_FALCON_SSE_URL,
   extractFalconUnitReferences,
   formatFalconReplyHtml,
   MAX_FALCON_RECOMMENDATIONS,
@@ -193,5 +195,14 @@ describe("parser SSE Falcon", () => {
       event: "message",
       payload: { reply: "Siap" },
     });
+  });
+});
+
+describe("konfigurasi default endpoint Falcon", () => {
+  test("menggunakan internal.motovax.com sebagai host backend Falcon", () => {
+    expect(DEFAULT_FALCON_API_BASE).toBe("https://internal.motovax.com");
+    expect(DEFAULT_FALCON_SSE_URL).toBe(
+      "https://internal.motovax.com/api/falcon/external/stream",
+    );
   });
 });

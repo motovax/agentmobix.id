@@ -1,8 +1,11 @@
 import { fetchUnits, mobixImage } from "./mobix";
 import { buildAgenMobixUnitLink } from "./shareCaption";
 
+export const DEFAULT_FALCON_API_BASE = "https://internal.motovax.com";
+export const DEFAULT_FALCON_SSE_URL = `${DEFAULT_FALCON_API_BASE}/api/falcon/external/stream`;
+
 const FALCON_API_BASE = (
-  import.meta.env.VITE_FALCON_API_BASE || "https://motovax-ai.motovax.com"
+  import.meta.env.VITE_FALCON_API_BASE || DEFAULT_FALCON_API_BASE
 ).replace(/\/$/, "");
 const FALCON_SSE_URL = (
   import.meta.env.VITE_FALCON_SSE_URL || `${FALCON_API_BASE}/api/falcon/external/stream`

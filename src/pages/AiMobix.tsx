@@ -89,11 +89,12 @@ export function AiMobix() {
         kind: "in",
         html: result.html,
       }]);
-    } catch {
+    } catch (error) {
+      console.error("Falcon turn failed:", error);
       setMessages((m) => [...m, {
         id: nextId.current++,
         kind: "in",
-            html: "Falcon sedang tidak dapat diakses. Coba lagi beberapa saat atau buka katalog untuk melihat stok terbaru.",
+        html: "Falcon sedang tidak dapat diakses. Coba lagi beberapa saat atau buka katalog untuk melihat stok terbaru.",
       }]);
     } finally {
       setIsSearchingInventory(false);
