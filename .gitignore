@@ -34,3 +34,6 @@ bun-debug.log*
 .env
 .env.*
 !.env.example
+
+# Fural sandbox clipboard artifacts
+.fural-clipboard/
