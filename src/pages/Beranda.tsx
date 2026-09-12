@@ -146,6 +146,9 @@ export function Beranda() {
   const searchResultsRef = useRef<HTMLElement | null>(null);
   const recLoadingRef = useRef(false);
   const recRequestRef = useRef(0);
+  // The catalog order rotates hourly; replay the seed from the first page so a
+  // "muat lagi" click minutes later stays on the same shuffle.
+  const recRotationSeedRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     const timer = window.setTimeout(
@@ -179,6 +182,7 @@ export function Beranda() {
     setRecLoading(true);
     setRecError(false);
     if (replace) {
+      recRotationSeedRef.current = undefined;
       setRecItems([]);
       setRecTotal(0);
       setRecNextPage(1);
@@ -189,10 +193,12 @@ export function Beranda() {
       const result = await fetchUnits({
         page,
         limit: isSearchActive ? SEARCH_BATCH_SIZE : REC_BATCH_SIZE,
+        rotation_seed: recRotationSeedRef.current,
         ...buildCatalogSearchParams(debouncedQuery),
         kategori: activeCategory ? [activeCategory] : undefined,
       });
       if (requestId !== recRequestRef.current) return;
+      recRotationSeedRef.current ??= result.rotationSeed;
       const nextItems = result.items.map(toCardUnit);
       setRecItems((current) =>
         replace ? nextItems : appendUniqueUnits(current, nextItems),

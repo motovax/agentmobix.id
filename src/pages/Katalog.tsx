@@ -252,6 +252,10 @@ export function Katalog() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  // The catalog order rotates hourly. Load-more can be clicked minutes after
+  // the first page, so replay the seed from that response to keep one browsing
+  // session on a single shuffle instead of silently skipping units.
+  const rotationSeedRef = useRef<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
   // debounce the search box
@@ -286,6 +290,7 @@ export function Katalog() {
     let alive = true;
     setLoading(true);
     setError(null);
+    rotationSeedRef.current = undefined;
     fetchUnits({
       limit: LIMIT,
       page: 1,
@@ -294,6 +299,7 @@ export function Katalog() {
     })
       .then((res) => {
         if (!alive) return;
+        rotationSeedRef.current = res.rotationSeed;
         setItems(res.items.map(toCardUnit));
         setTotal(res.total);
         setTotalPages(res.totalPages);
@@ -302,6 +308,7 @@ export function Katalog() {
       })
       .catch((e: unknown) => {
         if (!alive) return;
+        rotationSeedRef.current = undefined;
         setItems([]);
         setTotal(0);
         setTotalPages(1);
@@ -321,10 +328,12 @@ export function Katalog() {
     fetchUnits({
       limit: LIMIT,
       page: next,
+      rotation_seed: rotationSeedRef.current,
       ...buildSearchParams(),
       kategori: kategori ? [kategori] : undefined,
     })
       .then((res) => {
+        rotationSeedRef.current ??= res.rotationSeed;
         setItems((prev) => {
           const seen = new Set(prev.map((u) => u.id));
           return [...prev, ...res.items.map(toCardUnit).filter((u) => !seen.has(u.id))];

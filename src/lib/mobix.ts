@@ -128,6 +128,12 @@ export interface ApiEnvelope<T> {
     limit?: number;
     total_pages?: number;
     lastRequest?: string;
+    /**
+     * Hourly bucket backing the default catalog shuffle. Echo it back as
+     * `rotation_seed` on later pages so one traversal stays on a single
+     * shuffle even if the hour rolls over midway.
+     */
+    rotation_seed?: string;
   };
 }
 
@@ -204,6 +210,11 @@ export interface ListRequest {
   page?: number;
   limit?: number;
   plate_no?: string;
+  /**
+   * Pins the default catalog shuffle. Omit on the first request, then pass
+   * the `rotationSeed` returned by that call when loading further pages.
+   */
+  rotation_seed?: string;
 }
 
 const INDONESIAN_PLATE_PREFIXES = new Set([
@@ -412,6 +423,11 @@ export interface ListResult {
   total: number;
   page: number;
   totalPages: number;
+  /**
+   * Seed to replay when requesting the next page. Undefined for endpoints or
+   * fallbacks that already resolve pagination client-side.
+   */
+  rotationSeed?: string;
 }
 
 const LIST_FALLBACK_CATEGORIES = ["HATCHBACK", "LCGC", "MPV", "PICKUP", "SUV", "TRUK", "VAN"];
@@ -425,6 +441,7 @@ function listEnvelopeToResult(env: ApiEnvelope<ProductListItem[]>): ListResult {
     total: env.metadata.total_data ?? env.data?.length ?? 0,
     page: env.metadata.page ?? 1,
     totalPages: env.metadata.total_pages ?? 1,
+    rotationSeed: env.metadata.rotation_seed,
   };
 }
 
@@ -541,15 +558,18 @@ async function fetchUnitsByPriceRange(req: ListRequest): Promise<ListResult> {
   const candidates: ProductListItem[] = [];
   let candidatePage = 1;
   let candidateTotalPages = 1;
+  // The default catalog order rotates hourly. Replaying the seed returned by
+  // the first page keeps this multi-page walk on one shuffle, so units cannot
+  // be duplicated or skipped when the hour rolls over mid-walk.
+  let candidateSeed: string | undefined = rest.rotation_seed;
   do {
     const res = await fetchUnits({
       ...rest,
-      // Without an explicit sort the API returns a random order per request,
-      // which makes pagination leak/duplicate units across pages.
-      sort: rest.sort?.length ? rest.sort : ["brand", "type"],
+      rotation_seed: candidateSeed,
       page: candidatePage,
       limit: candidatePageSize,
     });
+    candidateSeed ??= res.rotationSeed;
     for (const item of res.items) {
       if (!seen.has(item.id)) {
         seen.add(item.id);
