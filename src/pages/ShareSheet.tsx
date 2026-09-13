@@ -47,6 +47,7 @@ import {
   type VideoItem,
   type AIBackgroundResponse,
 } from "../lib/mobix";
+import { describeAiBackgroundError } from "../lib/aiBackground";
 import { useAsync } from "../lib/useAsync";
 import { formatJt, formatOdometer, formatRupiah } from "../lib/format";
 import {
@@ -73,6 +74,8 @@ import {
 } from "../lib/dsf";
 import {
   buildChannelShareUrl,
+  canDeliverFilesToChannel,
+  channelDropsFilesNotice,
   buildNativeSharePayload,
   buildShareText,
   channelNeedsClipboardFirst,
@@ -502,6 +505,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const [pendingShareStep, setPendingShareStep] = useState<PendingShareStep | null>(null);
   const [showChannels, setShowChannels] = useState(false);
   const [shareCaptionCopied, setShareCaptionCopied] = useState(false);
+  /** Peringatan saat media tidak bisa ikut terkirim lewat tautan web channel. */
+  const [shareMediaNotice, setShareMediaNotice] = useState("");
 
   // multi-select share media
   const [selectedIdxes, setSelectedIdxes] = useState<number[]>([]);
@@ -512,11 +517,11 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const [composing, setComposing] = useState(false);
 
   const [aiBackgroundStatus, setAiBackgroundStatus] = useState<AiBackgroundStatus>("idle");
-  const [, setAiBackgroundProgress] = useState(0);
+  const [aiBackgroundProgress, setAiBackgroundProgress] = useState(0);
   const [aiBackgroundFiles, setAiBackgroundFiles] = useState<Record<string, File>>({});
   const [aiBackgroundUrls, setAiBackgroundUrls] = useState<Record<string, string>>({});
   const [aiPreviewMode, setAiPreviewMode] = useState<"ai" | "original">("ai");
-  const [, setAiBackgroundError] = useState("");
+  const [aiBackgroundError, setAiBackgroundError] = useState("");
   const [liveSimulation, setLiveSimulation] = useState<CreditSimulationResult | null>(null);
   const [appliedSimulation, setAppliedSimulation] = useState<CreditSimulationResult | null>(null);
   const [appliedPrice, setAppliedPrice] = useState(0);
@@ -800,6 +805,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     setCaptionText(autoCaption);
     lastAutoCaptionRef.current = autoCaption;
     setPendingShareStep(null);
+    setShareMediaNotice("");
     setLiveSimulation(null);
     setAppliedSimulation(null);
     setAppliedPrice(initialSharePrice);
@@ -1006,7 +1012,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         setAiBackgroundProgress(Math.min(99, avg));
       };
 
-      const entries = await Promise.all(
+      // Satu foto gagal tidak boleh membatalkan foto lain yang sudah berhasil.
+      const settled = await Promise.allSettled(
         selectedImageMedia.map(async (media, index) => {
           const started = await generateAIBackground({
             source: media.item.url,
@@ -1026,26 +1033,43 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
           }
 
           const blob = await fetchRawMediaBlob(result.image_url, blobCache.current);
-          if (!blob) return null;
+          if (!blob) throw new Error("Foto AI gagal diunduh dari server.");
           const file = new File([blob], `unit-ai-background-${index + 1}.jpg`, {
             type: blob.type || "image/jpeg",
           });
           return [media.id, file, mobixMedia(result.image_url) ?? result.image_url] as [string, File, string];
         }),
       );
-      const validEntries = entries.filter(Boolean) as Array<[string, File, string]>;
+
+      const validEntries = settled
+        .filter((entry): entry is PromiseFulfilledResult<[string, File, string]> =>
+          entry.status === "fulfilled",
+        )
+        .map((entry) => entry.value);
+      const firstFailure = settled.find(
+        (entry): entry is PromiseRejectedResult => entry.status === "rejected",
+      );
 
       mergeAiBackgroundFiles(validEntries);
-      setAiBackgroundProgress(100);
+      setAiBackgroundProgress(validEntries.length > 0 ? 100 : 0);
       setAiBackgroundStatus(validEntries.length > 0 ? "done" : "failed");
+
       if (validEntries.length === 0) {
-        setAiBackgroundError("Tidak ada foto AI yang berhasil dibuat.");
+        const reason = firstFailure?.reason;
+        setAiBackgroundError(
+          describeAiBackgroundError(reason instanceof Error ? reason.message : String(reason ?? "")),
+        );
+      } else if (firstFailure) {
+        const gagal = settled.length - validEntries.length;
+        setAiBackgroundError(`${gagal} dari ${settled.length} foto gagal diproses AI. Foto asli dipakai untuk sisanya.`);
+      } else {
+        setAiBackgroundError("");
       }
     } catch (error) {
       setAiBackgroundProgress(0);
       setAiBackgroundStatus("failed");
       setAiBackgroundError(
-        error instanceof Error ? error.message : "Gagal membuat AI background.",
+        describeAiBackgroundError(error instanceof Error ? error.message : String(error ?? "")),
       );
     }
   }
@@ -1377,6 +1401,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
   function handleShare() {
     const caption = captionText.trim();
+    setShareMediaNotice("");
     const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
 
     // Media masih disusun — jangan fallback popup (sering terasa "kadang popup").
@@ -1448,11 +1473,39 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
   function shareVia(channel: ShareChannel) {
     const caption = captionText.trim();
+    const title = unit ? `${packageTitle} ${unit.nama}` : "Mobix";
+    const files = pendingShareStep?.files ?? composedFiles;
+
     const openChannel = () => {
       const url = buildChannelShareUrl(channel, caption);
       window.open(url, "_blank", "noopener");
       setShowChannels(false);
     };
+
+    // Tautan wa.me / x.com hanya membawa teks — foto tidak pernah ikut.
+    // Kalau browser bisa kirim file, pakai sheet native supaya media benar-benar terlampir.
+    if (!channelNeedsClipboardFirst(channel) && canDeliverFilesToChannel(files)) {
+      const shareable = pickNativeShareableFiles(files, title, buildShareText(caption));
+      const payload = buildNativeSharePayload(shareable, title, buildShareText(caption));
+      if (payload) {
+        setShowChannels(false);
+        if (caption) void copyShareCaption(caption);
+        void navigator.share(payload).catch((error: unknown) => {
+          if (isShareAbortError(error)) return;
+          // Sheet native ditolak browser — turun ke web intent + unduh media.
+          setShareMediaNotice(channelDropsFilesNotice(channel, files.length));
+          downloadFiles(files);
+          openChannel();
+        });
+        return;
+      }
+    }
+
+    // Web intent murni: media tidak ikut, jadi unduh dulu dan katakan apa adanya.
+    if (files.length > 0) {
+      setShareMediaNotice(channelDropsFilesNotice(channel, files.length));
+      downloadFiles(files);
+    }
 
     // Channel tanpa intent caption saja: salin sebelum membuka aplikasi.
     if (channelNeedsClipboardFirst(channel)) {
@@ -1632,12 +1685,54 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
             >
               <Sparkles size={13} />
               {aiBackgroundStatus === "generating"
-                ? "Memproses..."
+                ? `Memproses ${aiBackgroundProgress}%`
                 : selectedAiBackgroundComplete
                   ? "Foto AI ✓"
-                  : "Foto AI"}
+                  : aiBackgroundStatus === "failed"
+                    ? "Coba lagi"
+                    : "Foto AI"}
             </button>
+            {aiBackgroundStatus === "generating" && (
+              <div className="absolute inset-x-3 bottom-3 h-1 overflow-hidden rounded-full bg-white/50">
+                <div
+                  className="h-full rounded-full bg-teal-deep transition-[width] duration-500"
+                  style={{ width: `${Math.max(4, aiBackgroundProgress)}%` }}
+                />
+              </div>
+            )}
           </Photo>
+          )}
+          {aiBackgroundError && (
+            <div
+              role="status"
+              className="flex items-start gap-2 border-t border-danger-border bg-danger-bg px-3.5 py-2.5 text-[11px] leading-[1.5] text-danger"
+            >
+              <span className="flex-1">{aiBackgroundError}</span>
+              <button
+                type="button"
+                onClick={() => setAiBackgroundError("")}
+                aria-label="Tutup pesan Foto AI"
+                className="shrink-0 text-danger"
+              >
+                <Close size={13} />
+              </button>
+            </div>
+          )}
+          {shareMediaNotice && (
+            <div
+              role="status"
+              className="flex items-start gap-2 border-t border-line bg-teal-tint px-3.5 py-2.5 text-[11px] leading-[1.5] text-ink"
+            >
+              <span className="flex-1">{shareMediaNotice}</span>
+              <button
+                type="button"
+                onClick={() => setShareMediaNotice("")}
+                aria-label="Tutup pesan media share"
+                className="shrink-0 text-mid"
+              >
+                <Close size={13} />
+              </button>
+            </div>
           )}
           {embedded && onClose ? (
             <button
