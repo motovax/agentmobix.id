@@ -197,6 +197,32 @@ export function channelNeedsClipboardFirst(channel: ShareChannel): boolean {
   return channel === "ig" || channel === "tt" || channel === "fb" || channel === "tg";
 }
 
+/**
+ * Web intent channel URLs (wa.me, x.com/intent, threads) can only carry text —
+ * a photo never rides along. When files are ready and the browser can share
+ * them, the native sheet is the only path that actually attaches the photo.
+ */
+export function canDeliverFilesToChannel(files: File[]): boolean {
+  return files.length > 0 && canWebShareFiles(files);
+}
+
+/**
+ * Warning copy for channels that will receive caption only.
+ * Agents kept reporting "foto tidak ikut keshare" because the web intent
+ * silently drops files; say it out loud and point at the download button.
+ */
+export function channelDropsFilesNotice(
+  channel: ShareChannel,
+  fileCount: number,
+): string {
+  if (fileCount === 0) return "";
+  const media = fileCount > 1 ? `${fileCount} media` : "Foto";
+  if (channel === "wa") {
+    return `${media} tidak bisa ikut lewat tautan WhatsApp web. Media sudah diunduh — lampirkan manual di chat WhatsApp.`;
+  }
+  return `${media} tidak bisa ikut lewat tautan ${channel.toUpperCase()}. Media sudah diunduh — lampirkan manual.`;
+}
+
 /** Deep links / web intents for channel picker fallback. */
 export function buildChannelShareUrl(
   channel: ShareChannel,

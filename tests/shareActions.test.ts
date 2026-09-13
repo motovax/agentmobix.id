@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildChannelShareUrl,
+  canDeliverFilesToChannel,
+  channelDropsFilesNotice,
   buildNativeSharePayload,
   buildOpenGraphShareUrl,
   buildShareText,
@@ -202,5 +204,64 @@ describe("pickNativeShareableFiles", () => {
     } finally {
       globalThis.navigator = original;
     }
+  });
+});
+
+describe("canDeliverFilesToChannel", () => {
+  const file = new File(["x"], "unit.jpg", { type: "image/jpeg" });
+
+  test("false tanpa file — tidak ada media untuk dikirim", () => {
+    expect(canDeliverFilesToChannel([])).toBe(false);
+  });
+
+  test("false saat browser menolak share file (web intent hanya teks)", () => {
+    const original = globalThis.navigator;
+    // @ts-expect-error test stub
+    globalThis.navigator = {
+      share: async () => {},
+      canShare: () => false,
+    };
+    try {
+      expect(canDeliverFilesToChannel([file])).toBe(false);
+    } finally {
+      globalThis.navigator = original;
+    }
+  });
+
+  test("true saat browser sanggup melampirkan file lewat sheet native", () => {
+    const original = globalThis.navigator;
+    // @ts-expect-error test stub
+    globalThis.navigator = {
+      share: async () => {},
+      canShare: (data: ShareData) => Boolean(data.files?.length),
+    };
+    try {
+      expect(canDeliverFilesToChannel([file])).toBe(true);
+    } finally {
+      globalThis.navigator = original;
+    }
+  });
+});
+
+describe("channelDropsFilesNotice", () => {
+  test("kosong saat tidak ada media", () => {
+    expect(channelDropsFilesNotice("wa", 0)).toBe("");
+  });
+
+  test("WhatsApp: sebut foto tidak ikut dan media sudah diunduh", () => {
+    const notice = channelDropsFilesNotice("wa", 1);
+    expect(notice).toContain("WhatsApp");
+    expect(notice).toContain("diunduh");
+    expect(notice.startsWith("Foto")).toBe(true);
+  });
+
+  test("jamak memakai jumlah media", () => {
+    expect(channelDropsFilesNotice("wa", 3)).toContain("3 media");
+  });
+
+  test("channel lain tetap memberi peringatan yang sama jelasnya", () => {
+    const notice = channelDropsFilesNotice("x", 2);
+    expect(notice).toContain("2 media");
+    expect(notice).toContain("diunduh");
   });
 });
