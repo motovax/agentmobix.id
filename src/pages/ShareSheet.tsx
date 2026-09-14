@@ -319,7 +319,7 @@ async function buildShareImagesViaBackend(
   const sources = selectedGallery
     .map((g) => g?.url)
     .filter((value): value is string => Boolean(value));
-  const entries = await Promise.all(
+  const entries = await Promise.allSettled(
     sources.map(async (source, index) => {
       const blob = await composeShareImageViaBackend({
         source,
@@ -335,7 +335,9 @@ async function buildShareImagesViaBackend(
     }),
   );
 
-  return entries.filter(Boolean) as File[];
+  return entries
+    .map((entry) => (entry.status === "fulfilled" ? entry.value : null))
+    .filter(Boolean) as File[];
 }
 
 async function buildShareImagesLocally(
@@ -352,11 +354,17 @@ async function buildShareImagesLocally(
     sources.map((url) => fetchRawBlob(url, cache)),
   );
   const valid = blobs.filter(Boolean) as Blob[];
-  return Promise.all(
+  // Satu foto yang gagal decode (blob rusak, format tak didukung) tidak boleh
+  // menghapus seluruh galeri — sebelumnya Promise.all membuat share jatuh ke
+  // caption-saja padahal foto lain baik-baik saja.
+  const composed = await Promise.allSettled(
     valid.map((blob, index) =>
       composeOverlay(blob, dealHarga, tdp, includeOverlay, "cover", `unit-photo-${index + 1}.jpg`),
     ),
   );
+  return composed
+    .filter((entry): entry is PromiseFulfilledResult<File> => entry.status === "fulfilled")
+    .map((entry) => entry.value);
 }
 
 async function buildShareImages(
@@ -373,15 +381,20 @@ async function buildShareImages(
     includeOverlay,
   );
 
-  return backendFiles.length > 0
-    ? backendFiles
-    : buildShareImagesLocally(
-        selectedGallery,
-        dealHarga,
-        tdp,
-        includeOverlay,
-        cache,
-      );
+  // Backend sukses penuh — pakai hasilnya. Sukses sebagian pun dulu diterima
+  // apa adanya sehingga foto yang hilang tidak pernah dicoba ulang; sekarang
+  // compose lokal dipakai kalau ia berhasil mengumpulkan lebih banyak foto.
+  const expected = selectedGallery.filter((item) => item?.url).length;
+  if (backendFiles.length >= expected) return backendFiles;
+
+  const localFiles = await buildShareImagesLocally(
+    selectedGallery,
+    dealHarga,
+    tdp,
+    includeOverlay,
+    cache,
+  );
+  return localFiles.length > backendFiles.length ? localFiles : backendFiles;
 }
 
 async function buildShareVideos(
@@ -940,14 +953,34 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         : [];
       if (!alive) return;
 
-      setComposedFiles([...imageFiles, ...videoFiles]);
+      const files = [...imageFiles, ...videoFiles];
+      setComposedFiles(files);
       setComposing(false);
+
+      // Media gagal disiapkan diam-diam membuat share turun ke caption-saja.
+      // Katakan apa adanya supaya agen tahu foto tidak akan ikut terkirim.
+      const requested = selectedImages.length + selectedVideos.length;
+      if (requested > 0 && files.length === 0) {
+        setShareMediaNotice(
+          "Media unit ini gagal disiapkan, jadi share hanya akan membawa caption. Coba pilih foto lain atau muat ulang halaman.",
+        );
+      } else if (files.length < requested) {
+        const gagal = requested - files.length;
+        setShareMediaNotice(
+          `${gagal} dari ${requested} media gagal disiapkan dan tidak akan ikut terkirim.`,
+        );
+      } else {
+        setShareMediaNotice("");
+      }
     }
 
     run().catch(() => {
       if (alive) {
         setComposedFiles([]);
         setComposing(false);
+        setShareMediaNotice(
+          "Media unit ini gagal disiapkan, jadi share hanya akan membawa caption. Coba pilih foto lain atau muat ulang halaman.",
+        );
       }
     });
 

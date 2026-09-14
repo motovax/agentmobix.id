@@ -15,11 +15,20 @@ export const MOBIX_THUMBNAIL_WIDTH = 420;
 export const MOBIX_HERO_WIDTH = 1600;
 export const MOBIX_SHARE_WIDTH = 2560;
 
+/**
+ * Append/replace the `w` param without rewriting the rest of the query.
+ *
+ * `URLSearchParams.toString()` re-encodes every existing param — it turns a
+ * space into `+` and `/` into `%2F`, which breaks `unit-file-serve?path=...`
+ * (403) and invalidates signed URLs. Only the `w` param may be touched.
+ */
 function withWidth(url: string, width: number) {
   const [path, search = ""] = url.split("?", 2);
-  const params = new URLSearchParams(search);
-  params.set("w", String(width));
-  return `${path}?${params.toString()}`;
+  const kept = search
+    .split("&")
+    .filter((part) => part && part.split("=", 1)[0] !== "w");
+  kept.push(`w=${encodeURIComponent(String(width))}`);
+  return `${path}?${kept.join("&")}`;
 }
 
 /* ---- raw API shapes (from /openapi.json) ---- */
@@ -664,11 +673,9 @@ export function mobixImage(
  * fetch() can read the blob for navigator.share({ files }).
  */
 export function mobixImageFetchable(pathOrUrl: string | undefined): string | undefined {
-  if (!pathOrUrl) return undefined;
-  const path = /^https?:\/\//.test(pathOrUrl)
-    ? new URL(pathOrUrl).pathname + new URL(pathOrUrl).search
-    : pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
-  return `${API_BASE}${path}`;
+  // Keep the original origin: a photo served from a CDN/CMS host 404s when its
+  // path is re-pointed at API_BASE, which silently emptied the share files.
+  return mobixAbsoluteMediaUrl(pathOrUrl);
 }
 
 export function mobixImageFetchableWithWidth(
@@ -690,11 +697,26 @@ export function mobixMedia(pathOrUrl: string | undefined): string | undefined {
 
 /** Fetchable media URL on the Mobix API origin, without image-specific query params. */
 export function mobixMediaFetchable(pathOrUrl: string | undefined): string | undefined {
+  // Same reasoning as mobixImageFetchable: never relocate a media URL's origin.
+  return mobixAbsoluteMediaUrl(pathOrUrl);
+}
+
+/**
+ * Absolute URL for a gallery/media entry, keeping the original origin.
+ *
+ * `/share-image` rejects a bare path with `400 invalid source format`, so the
+ * `source` it receives must always be absolute. Photos already hosted on
+ * another origin (CDN, CMS) keep that origin — rewriting them onto API_BASE
+ * turns a working photo into a 404.
+ */
+export function mobixAbsoluteMediaUrl(
+  pathOrUrl: string | undefined,
+): string | undefined {
   if (!pathOrUrl) return undefined;
-  const path = /^https?:\/\//.test(pathOrUrl)
-    ? new URL(pathOrUrl).pathname + new URL(pathOrUrl).search
-    : pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
-  return `${API_BASE}${path}`;
+  const value = pathOrUrl.trim();
+  if (!value) return undefined;
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${IMG_BASE}${value.startsWith("/") ? value : `/${value}`}`;
 }
 
 /**
@@ -705,7 +727,10 @@ export async function composeShareImageViaBackend(
   request: ShareImageRequest,
 ): Promise<Blob | null> {
   const url = new URL(`${API_BASE}/share-image`);
-  url.searchParams.set("source", request.source);
+  // Bare paths are rejected with `400 invalid source format`.
+  const source = mobixAbsoluteMediaUrl(request.source);
+  if (!source) return null;
+  url.searchParams.set("source", source);
   url.searchParams.set("price", String(request.price ?? 0));
   url.searchParams.set("tdp", String(request.tdp ?? 0));
   url.searchParams.set("overlay", request.includeOverlay ? "1" : "0");
