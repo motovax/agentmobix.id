@@ -59,6 +59,7 @@ import {
 import { buildJasmineWhatsAppHref } from "../lib/jasmine";
 import { getCatalogReturnHref } from "../lib/catalogSearch";
 import {
+  buildMobixByDssUnitLink,
   buildShareAutoCaption,
   CAPTION_CTA,
   CAPTION_HOOK_PREFIX,
@@ -720,6 +721,12 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     positiveParamNumber(searchParams, "komisi") ??
     (unit && sharePrice ? estimateBuilderCommission(unit.harga, sharePrice) : 0);
   const vehicleFacts = unit ? shareVehicleFacts(unit) : null;
+  /**
+   * Tautan unit di Mobix by DSS, ditempel di akhir caption share.
+   * Tanpa slug tidak ada halaman unit yang bisa dituju — lebih baik tanpa
+   * tautan daripada mengirim homepage polos yang menyesatkan pembeli.
+   */
+  const unitLink = unit?.slug ? buildMobixByDssUnitLink(unit.slug) : undefined;
   const autoCaption = unit
     ? buildShareAutoCaption([
         unit.nama,
@@ -1081,7 +1088,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   }
 
   async function copyShareCaption(caption: string) {
-    const text = buildShareText(caption);
+    const text = buildShareText(caption, unitLink);
     if (await copyTextToClipboard(text)) {
       showShareCaptionCopied();
       return true;
@@ -1112,7 +1119,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   ): Promise<void> | null {
     if (!prefersNativeWebShare() || files.length === 0) return null;
 
-    const shareText = buildShareText(caption);
+    const shareText = buildShareText(caption, unitLink);
     const shareable = pickNativeShareableFiles(files, title, shareText);
     const payload = buildNativeSharePayload(shareable, title, shareText);
     if (!payload) return null;
@@ -1128,7 +1135,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   /** Native text share (mobile) — caption in `text`, no separate `url`. */
   function shareWithoutFiles(title: string, caption: string): Promise<void> | null {
     if (!prefersNativeWebShare()) return null;
-    const shareText = buildShareText(caption);
+    const shareText = buildShareText(caption, unitLink);
     const payload = buildNativeSharePayload([], title, shareText);
     if (!payload) return null;
 
@@ -1478,7 +1485,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     const files = pendingShareStep?.files ?? composedFiles;
 
     const openChannel = () => {
-      const url = buildChannelShareUrl(channel, caption);
+      const url = buildChannelShareUrl(channel, caption, unitLink);
       window.open(url, "_blank", "noopener");
       setShowChannels(false);
     };
@@ -1492,8 +1499,9 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       !channelNeedsClipboardFirst(channel) &&
       canDeliverFilesToChannel(files)
     ) {
-      const shareable = pickNativeShareableFiles(files, title, buildShareText(caption));
-      const payload = buildNativeSharePayload(shareable, title, buildShareText(caption));
+      const shareText = buildShareText(caption, unitLink);
+      const shareable = pickNativeShareableFiles(files, title, shareText);
+      const payload = buildNativeSharePayload(shareable, title, shareText);
       if (payload) {
         setShowChannels(false);
         if (caption) void copyShareCaption(caption);
@@ -1800,6 +1808,12 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
                 >
                   <Sparkles size={14} />
                 </button>
+                {unitLink && (
+                  <p className="m-0 mt-1.5 break-all border-t border-line pt-1.5 text-[10px] leading-snug text-muted">
+                    Tautan unit ikut terkirim di akhir caption:{" "}
+                    <span className="font-semibold text-mid">{unitLink}</span>
+                  </p>
+                )}
               </>
             )}
           </div>

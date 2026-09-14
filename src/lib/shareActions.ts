@@ -49,9 +49,16 @@ export function buildOpenGraphShareUrl(unitLinkOrSlug: string): string {
   return `${OPEN_GRAPH_SHARE_BASE}?u=${encodeURIComponent(slug)}`;
 }
 
-/** Caption siap dibagikan tanpa menambahkan tautan situs atau media. */
-export function buildShareText(caption: string): string {
-  return caption.trim();
+/**
+ * Caption siap dibagikan, ditutup tautan unit di Mobix by DSS.
+ * Tautan hanya ditambahkan bila belum ada di caption — agen kadang sudah
+ * menempelkannya sendiri, dan dobel tautan terlihat seperti spam.
+ */
+export function buildShareText(caption: string, link?: string): string {
+  const body = caption.trim();
+  const url = link?.trim() ?? "";
+  if (!url || body.includes(url)) return body;
+  return body ? `${body}\n\n${url}` : url;
 }
 
 /**
@@ -238,8 +245,9 @@ export function channelDropsFilesNotice(
 export function buildChannelShareUrl(
   channel: ShareChannel,
   caption: string,
+  link?: string,
 ): string {
-  const text = buildShareText(caption);
+  const text = buildShareText(caption, link);
   const encodedText = encodeURIComponent(text);
 
   switch (channel) {
