@@ -3,7 +3,15 @@
  * and Web Share API capability checks.
  */
 
-export type ShareChannel = "wa" | "tg" | "x" | "fb" | "ig" | "threads" | "tt";
+export type ShareChannel =
+  | "wa"
+  | "wa-web"
+  | "tg"
+  | "x"
+  | "fb"
+  | "ig"
+  | "threads"
+  | "tt";
 
 /** Cloudflare Worker endpoint that serves per-unit Open Graph HTML for crawlers. */
 export const OPEN_GRAPH_SHARE_BASE =
@@ -217,6 +225,9 @@ export function channelDropsFilesNotice(
 ): string {
   if (fileCount === 0) return "";
   const media = fileCount > 1 ? `${fileCount} media` : "Foto";
+  if (channel === "wa-web") {
+    return `Caption sudah dikirim ke WhatsApp Web. ${media} sudah diunduh — lanjutkan dengan melampirkannya di chat yang sama.`;
+  }
   if (channel === "wa") {
     return `${media} tidak bisa ikut lewat tautan WhatsApp web. Media sudah diunduh — lampirkan manual di chat WhatsApp.`;
   }
@@ -234,6 +245,9 @@ export function buildChannelShareUrl(
   switch (channel) {
     case "wa":
       return `https://wa.me/?text=${encodedText}`;
+    case "wa-web":
+      // Desktop: paksa WhatsApp Web (bukan deep link ke app) dengan caption terisi.
+      return `https://web.whatsapp.com/send?text=${encodedText}`;
     case "tg":
       return "https://web.telegram.org/";
     case "x":

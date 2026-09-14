@@ -198,6 +198,18 @@ export function Download({ size = 20, className, strokeWidth = 1.5 }: IconProps)
   );
 }
 
+/** Badge kecil penanda "versi web/desktop" — solid supaya tetap terbaca di ~12px. */
+export function MonitorSolid({ size = 14, className }: IconProps) {
+  return (
+    <svg {...base(size)} viewBox="0 0 20 20" className={className}>
+      <path
+        d="M3 4.5h14a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-5.2v1.6H13a.9.9 0 0 1 0 1.8H7a.9.9 0 0 1 0-1.8h1.2v-1.6H3a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 export function Play({ size = 20, className }: IconProps) {
   return (
     <svg {...base(size)} viewBox="0 0 20 20" className={className}>

@@ -19,6 +19,7 @@ import {
   Copy,
   Sparkles,
   Play,
+  MonitorSolid,
   WhatsAppSolid,
   Telegram,
   XTwitter,
@@ -1484,7 +1485,13 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
     // Tautan wa.me / x.com hanya membawa teks — foto tidak pernah ikut.
     // Kalau browser bisa kirim file, pakai sheet native supaya media benar-benar terlampir.
-    if (!channelNeedsClipboardFirst(channel) && canDeliverFilesToChannel(files)) {
+    // "wa-web" dikecualikan: user memilih WhatsApp Web secara sadar, jadi jangan
+    // dibelokkan ke sheet native — caption dulu di tab WA Web, foto menyusul.
+    if (
+      channel !== "wa-web" &&
+      !channelNeedsClipboardFirst(channel) &&
+      canDeliverFilesToChannel(files)
+    ) {
       const shareable = pickNativeShareableFiles(files, title, buildShareText(caption));
       const payload = buildNativeSharePayload(shareable, title, buildShareText(caption));
       if (payload) {
@@ -1546,6 +1553,22 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
               <WhatsAppSolid size={compact ? 22 : 24} />
               <span className={label}>{compact ? "WA" : "WhatsApp"}</span>
             </button>
+            {!prefersNativeWebShare() && (
+              <button
+                type="button"
+                onClick={() => shareVia("wa-web")}
+                className={`${cell} text-[#25D366] hover:bg-[#25D366]/10`}
+              >
+                <span className="relative inline-flex">
+                  <WhatsAppSolid size={compact ? 22 : 24} />
+                  <MonitorSolid
+                    size={compact ? 11 : 12}
+                    className="absolute -bottom-0.5 -right-1 rounded-full bg-surface text-ink"
+                  />
+                </span>
+                <span className={label}>{compact ? "WA Web" : "WhatsApp Web"}</span>
+              </button>
+            )}
             <button type="button" onClick={() => shareVia("tg")} className={`${cell} text-[#229ED9] hover:bg-[#229ED9]/10`}>
               <Telegram size={icon} />
               <span className={label}>{compact ? "TG" : "Telegram"}</span>
@@ -1583,7 +1606,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
             </button>
           </div>
           <div className="border-t border-line px-3 py-2 text-center text-[10px] leading-snug text-muted">
-            Facebook, Telegram, IG & TikTok: tempel caption yang disalin. Unggah media dari tombol Download.
+            WhatsApp Web: caption terkirim dulu, media otomatis diunduh untuk dilampirkan
+            menyusul. Facebook, Telegram, IG & TikTok: tempel caption yang disalin.
           </div>
         </div>
       </>

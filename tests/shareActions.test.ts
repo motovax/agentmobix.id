@@ -22,7 +22,7 @@ describe("buildShareText", () => {
 describe("buildChannelShareUrl", () => {
   const caption = "Honda Mobilio\nTDP 20jt";
 
-  for (const channel of ["wa", "x", "threads"] as const) {
+  for (const channel of ["wa", "wa-web", "x", "threads"] as const) {
     test(`${channel} hanya mengirim caption tanpa URL situs`, () => {
       const url = new URL(buildChannelShareUrl(channel, caption));
       expect(url.searchParams.get("text")).toBe(caption);
@@ -43,6 +43,13 @@ describe("buildChannelShareUrl", () => {
       expect(channelNeedsClipboardFirst(channel)).toBe(true);
     });
   }
+
+  test("wa-web membuka WhatsApp Web, bukan deep link wa.me ke aplikasi", () => {
+    const url = new URL(buildChannelShareUrl("wa-web", caption));
+    expect(url.host).toBe("web.whatsapp.com");
+    expect(url.pathname).toBe("/send");
+    expect(buildChannelShareUrl("wa", caption)).toContain("wa.me");
+  });
 
   test("buildOpenGraphShareUrl tetap tersedia untuk preview halaman", () => {
     expect(buildOpenGraphShareUrl("https://agenmobix.id/share?u=toyota-calya-2019")).toBe(
@@ -257,6 +264,15 @@ describe("channelDropsFilesNotice", () => {
 
   test("jamak memakai jumlah media", () => {
     expect(channelDropsFilesNotice("wa", 3)).toContain("3 media");
+  });
+
+  test("wa-web: caption terkirim dulu, media dilampirkan menyusul", () => {
+    const notice = channelDropsFilesNotice("wa-web", 4);
+    expect(notice).toContain("WhatsApp Web");
+    expect(notice).toContain("4 media");
+    expect(notice).toContain("diunduh");
+    // Jangan pakai label channel mentah seperti "WA-WEB".
+    expect(notice).not.toContain("WA-WEB");
   });
 
   test("channel lain tetap memberi peringatan yang sama jelasnya", () => {
