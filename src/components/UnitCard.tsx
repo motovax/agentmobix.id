@@ -1,3 +1,4 @@
+import { VehiclePhoto } from "./VehiclePhoto";
 import { Link } from "wouter";
 import {
   compactFinancingLabel,
@@ -7,7 +8,7 @@ import {
   type CardUnit,
 } from "../lib/mobix";
 import { formatJt } from "../lib/format";
-import { Photo, Badge } from "./ui";
+import { Badge } from "./ui";
 import { Calculator, ShareArrow } from "./icons";
 
 /**
@@ -37,7 +38,7 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
         aria-label={`Siapkan foto dan caption ${unit.title}`}
         className="absolute inset-0 z-[1]"
       />
-      <Photo
+      <VehiclePhoto
         className="aspect-[4/3]"
         src={unit.thumbnail}
         alt={unit.title}
@@ -46,7 +47,7 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
         <div className="absolute left-2 top-2">
           <Badge kind={unit.badge} />
         </div>
-      </Photo>
+      </VehiclePhoto>
       <div className="px-3 pb-3 pt-2.5">
         <div className="mt-0.5 line-clamp-1 text-[13px] font-bold leading-[1.3] text-ink">
           {unit.title}

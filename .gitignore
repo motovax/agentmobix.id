@@ -37,3 +37,6 @@ bun-debug.log*
 
 # Fural sandbox clipboard artifacts
 .fural-clipboard/
+
+# Runtime deteksi plat disalin dari dependency saat dev/build
+public/plate-runtime/

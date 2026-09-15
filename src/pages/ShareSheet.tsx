@@ -1,3 +1,5 @@
+import { blurPlateBlob } from "../lib/plateBlur";
+import { VehiclePhoto } from "../components/VehiclePhoto";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Link, useSearch } from "wouter";
 import { AppShell } from "../components/AppShell";
@@ -8,7 +10,7 @@ import {
   CreditSimulationBox,
   type CreditSimulationResult,
 } from "../components/CreditSimulationBox";
-import { Photo, Skeleton } from "../components/ui";
+import { Skeleton } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
 import {
   ChevronLeft,
@@ -332,7 +334,8 @@ async function buildShareImagesViaBackend(
         crop: "cover",
       });
       if (!blob) return null;
-      return composeBlobToFile(blob, `unit-photo-${index + 1}.jpg`);
+      const protectedPhoto = await blurPlateBlob(blob);
+      return composeBlobToFile(protectedPhoto.blob, `unit-photo-${index + 1}.jpg`);
     }),
   );
 
@@ -419,7 +422,8 @@ async function composeOverlay(
   crop: "cover" | "contain" = "cover",
   fileName = "unit.jpg",
 ): Promise<File> {
-  const bitmap = await createImageBitmap(rawBlob);
+  const protectedPhoto = await blurPlateBlob(rawBlob);
+  const bitmap = await createImageBitmap(protectedPhoto.blob);
   const W = 1280,
     H = 720;
   const canvas = document.createElement("canvas");
@@ -1083,8 +1087,9 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
           const blob = await fetchRawMediaBlob(result.image_url, blobCache.current);
           if (!blob) throw new Error("Foto AI gagal diunduh dari server.");
-          const file = new File([blob], `unit-ai-background-${index + 1}.jpg`, {
-            type: blob.type || "image/jpeg",
+          const protectedPhoto = await blurPlateBlob(blob);
+          const file = new File([protectedPhoto.blob], `unit-ai-background-${index + 1}.jpg`, {
+            type: protectedPhoto.blob.type || "image/jpeg",
           });
           return [media.id, file, mobixMedia(result.image_url) ?? result.image_url] as [string, File, string];
         }),
@@ -1745,7 +1750,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
               </div>
             </div>
           ) : (
-          <Photo
+          <VehiclePhoto
             large
             className="aspect-video"
             src={activeUrl}
@@ -1783,7 +1788,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
                 />
               </div>
             )}
-          </Photo>
+          </VehiclePhoto>
           )}
           {aiBackgroundError && (
             <div
@@ -1889,6 +1894,10 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
           </div>
         </div>
 
+        <p className="mb-3 text-[11px] text-muted">
+          Plat yang terdeteksi otomatis diblur pada foto dan file unduhan. Periksa kembali sebelum dibagikan, terutama plat kecil atau jauh di latar. Video belum diblur.
+        </p>
+
         {/* gallery picker – multi-select */}
         {mediaItems.length > 1 && (
           <div className="mb-[18px]">
@@ -1914,7 +1923,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
                     }`}
                   >
                     {media.kind === "image" ? (
-                      <Photo
+                      <VehiclePhoto
                         className="h-full w-full"
                         src={mobixImage(media.url)}
                         alt=""

@@ -1,3 +1,4 @@
+import { VehiclePhoto } from "./VehiclePhoto";
 import { Link } from "wouter";
 import {
   compactFinancingLabel,
@@ -7,7 +8,7 @@ import {
   type CardUnit,
 } from "../lib/mobix";
 import { formatJt, formatKm } from "../lib/format";
-import { Photo, ThumbBadge } from "./ui";
+import { ThumbBadge } from "./ui";
 
 /** Catalog list row — whole row opens the photo/caption composer by default. */
 export function UnitRow({
@@ -24,14 +25,14 @@ export function UnitRow({
       href={detailHref ?? `/share?u=${encodeURIComponent(unit.slug)}`}
       className="flex gap-3 rounded-2xl border border-line bg-surface p-2.5 text-inherit no-underline"
     >
-      <Photo
+      <VehiclePhoto
         className="aspect-[4/3] w-[118px] flex-shrink-0 rounded-xl"
         src={unit.thumbnail}
         alt={unit.title}
         emptyLabel="Foto belum tersedia"
       >
         <ThumbBadge kind={unit.badge} />
-      </Photo>
+      </VehiclePhoto>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 text-[11px] text-muted">
           <span>Cabang {unit.branch}</span>

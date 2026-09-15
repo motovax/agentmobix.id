@@ -1,3 +1,4 @@
+import { VehiclePhoto } from "../components/VehiclePhoto";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent } from "react";
 import { Splide, SplideSlide } from "@splidejs/react-splide";
@@ -7,7 +8,7 @@ import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
 import { ContactActionMenu } from "../components/FloatingContactCta";
 import { FloatingPicAgentCta } from "../components/FloatingPicAgentCta";
-import { Photo, Skeleton } from "../components/ui";
+import { Skeleton } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
 import { ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
 import {
@@ -917,7 +918,7 @@ export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
               {mediaItems.map((media, index) => (
                 <SplideSlide key={media.id}>
                   {media.kind === "image" ? (
-                    <Photo
+                    <VehiclePhoto
                       large
                       className="h-full w-full"
                       src={mobixImage(media.url, MOBIX_HERO_WIDTH)}
@@ -940,7 +941,7 @@ export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
               ))}
             </Splide>
           ) : (
-            <Photo
+            <VehiclePhoto
               large
               className="aspect-[4/3]"
               alt={unit.nama}
@@ -1002,12 +1003,14 @@ export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
               <Close size={16} />
             </button>
             {activeMedia.kind === "image" ? (
-              <img
+              <div className="w-full" onClick={(event) => event.stopPropagation()}>
+              <VehiclePhoto
                 src={heroSrc}
                 alt={unit.nama}
-                className="max-h-screen max-w-full object-contain"
-                onClick={(e) => e.stopPropagation()}
+                className="h-[85vh] w-full"
+                contain
               />
+              </div>
             ) : (
               <video
                 src={heroSrc}
@@ -1034,7 +1037,7 @@ export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
                   }`}
                 >
                   {media.kind === "image" ? (
-                    <Photo className="h-full w-full" src={mobixImage(media.url)} alt="" />
+                    <VehiclePhoto className="h-full w-full" src={mobixImage(media.url)} alt="" />
                   ) : (
                     <>
                       <video
@@ -1074,7 +1077,7 @@ export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
                       }`}
                     >
                       {media.kind === "image" ? (
-                        <Photo className="h-full w-full" src={mobixImage(media.url)} alt="" />
+                        <VehiclePhoto className="h-full w-full" src={mobixImage(media.url)} alt="" />
                       ) : (
                         <>
                           <video
