@@ -7,9 +7,11 @@ import {
   buildOpenGraphShareUrl,
   buildShareText,
   channelNeedsClipboardFirst,
+  isInAppBrowserUserAgent,
   isShareAbortError,
   pickNativeShareableFiles,
   prefersNativeWebShare,
+  shouldSuggestExternalBrowser,
 } from "../src/lib/shareActions";
 
 describe("buildShareText", () => {
@@ -129,6 +131,80 @@ describe("prefersNativeWebShare", () => {
     } finally {
       globalThis.navigator = original;
     }
+  });
+});
+
+describe("isInAppBrowserUserAgent", () => {
+  const inApp = [
+    ["WhatsApp Android", "Mozilla/5.0 (Linux; Android 13; SM-A536E; wv) AppleWebKit/537.36 Chrome/119.0.0.0 Mobile Safari/537.36 WhatsApp/2.23"],
+    ["WhatsApp iOS", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 WhatsApp/23.24"],
+    ["Instagram", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Instagram 302.0"],
+    ["Facebook", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 [FBAN/FBIOS;FBAV/443.0]"],
+    ["WebView Android polos", "Mozilla/5.0 (Linux; Android 13; Pixel 7; wv) AppleWebKit/537.36 Chrome/119.0.0.0 Mobile Safari/537.36"],
+  ] as const;
+
+  for (const [label, ua] of inApp) {
+    test(`${label} dikenali sebagai in-app browser`, () => {
+      expect(isInAppBrowserUserAgent(ua)).toBe(true);
+    });
+  }
+
+  const normal = [
+    ["Chrome Android", "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/119.0.0.0 Mobile Safari/537.36"],
+    ["Safari iOS", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 Version/17.1 Mobile/15E148 Safari/604.1"],
+    ["Chrome desktop", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/119.0.0.0 Safari/537.36"],
+  ] as const;
+
+  for (const [label, ua] of normal) {
+    test(`${label} bukan in-app browser`, () => {
+      expect(isInAppBrowserUserAgent(ua)).toBe(false);
+    });
+  }
+
+  test("UA kosong tidak dianggap in-app", () => {
+    expect(isInAppBrowserUserAgent("")).toBe(false);
+  });
+});
+
+describe("shouldSuggestExternalBrowser", () => {
+  const WA_UA =
+    "Mozilla/5.0 (Linux; Android 13; SM-A536E; wv) AppleWebKit/537.36 Chrome/119.0.0.0 Mobile Safari/537.36 WhatsApp/2.23";
+
+  function withNavigator(stub: unknown, run: () => void) {
+    const original = globalThis.navigator;
+    // @ts-expect-error test stub
+    globalThis.navigator = stub;
+    try {
+      run();
+    } finally {
+      globalThis.navigator = original;
+    }
+  }
+
+  test("in-app browser tanpa navigator.share memunculkan arahan", () => {
+    withNavigator({ userAgent: WA_UA }, () => {
+      expect(shouldSuggestExternalBrowser()).toBe(true);
+    });
+  });
+
+  // Jangan mengganggu kalau share sheet sebenarnya tersedia: arahan pindah
+  // browser hanya berguna saat foto benar-benar tidak bisa ikut.
+  test("in-app browser yang punya navigator.share tidak diganggu", () => {
+    withNavigator({ userAgent: WA_UA, share: async () => {} }, () => {
+      expect(shouldSuggestExternalBrowser()).toBe(false);
+    });
+  });
+
+  test("browser biasa tanpa share tidak memunculkan arahan", () => {
+    withNavigator(
+      {
+        userAgent:
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/119.0.0.0 Safari/537.36",
+      },
+      () => {
+        expect(shouldSuggestExternalBrowser()).toBe(false);
+      },
+    );
   });
 });
 

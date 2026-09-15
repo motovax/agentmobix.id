@@ -86,6 +86,35 @@ export function prefersNativeWebShare(files: File[] = []): boolean {
   );
 }
 
+/**
+ * In-app browser (WhatsApp, Instagram, Facebook, Telegram) — the mini browser
+ * that opens when a link is tapped inside the chat app instead of in Chrome.
+ *
+ * Matched on the app token *and* on the WebView marker, because these browsers
+ * keep the host app's name in the UA while stripping `navigator.share`. Chrome
+ * and Safari on Android/iOS never carry these tokens.
+ */
+export function isInAppBrowserUserAgent(userAgent: string): boolean {
+  const ua = userAgent || "";
+  if (/\b(WhatsApp|Instagram|FBAN|FBAV|FB_IAB|Line|TelegramBot)\b/i.test(ua)) {
+    return true;
+  }
+  // Android WebView: "; wv)" is the marker Chrome-based WebViews carry.
+  return /Android/i.test(ua) && /;\s*wv\)/i.test(ua);
+}
+
+/**
+ * True when the page is stuck in a browser that cannot open the system share
+ * sheet, so photos can never ride along and the agent should be told to reopen
+ * in Chrome/Safari. Requires the capability to actually be missing — a UA match
+ * alone would nag users on in-app browsers that do support sharing.
+ */
+export function shouldSuggestExternalBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  if (typeof navigator.share === "function") return false;
+  return isInAppBrowserUserAgent(navigator.userAgent || "");
+}
+
 export function canWebShareFiles(files: File[]): boolean {
   if (files.length === 0) return false;
   if (typeof navigator === "undefined" || typeof navigator.share !== "function") {

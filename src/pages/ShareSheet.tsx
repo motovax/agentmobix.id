@@ -85,6 +85,7 @@ import {
   isShareAbortError,
   pickNativeShareableFiles,
   prefersNativeWebShare,
+  shouldSuggestExternalBrowser,
   type ShareChannel,
 } from "../lib/shareActions";
 
@@ -522,6 +523,13 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   const [shareCaptionCopied, setShareCaptionCopied] = useState(false);
   /** Peringatan saat media tidak bisa ikut terkirim lewat tautan web channel. */
   const [shareMediaNotice, setShareMediaNotice] = useState("");
+  /**
+   * Browser dalam aplikasi (WhatsApp dll) tidak punya share sheet sistem, jadi
+   * foto tidak akan pernah ikut. Dihitung sekali saat mount — nilainya tidak
+   * berubah selama halaman hidup.
+   */
+  const [inAppBrowser] = useState(shouldSuggestExternalBrowser);
+  const [pageLinkCopied, setPageLinkCopied] = useState(false);
 
   // multi-select share media
   const [selectedIdxes, setSelectedIdxes] = useState<number[]>([]);
@@ -1127,6 +1135,14 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       return true;
     }
     return false;
+  }
+
+  /** Salin alamat halaman ini agar agen bisa menempelkannya di Chrome/Safari. */
+  async function copyPageLink() {
+    const href = typeof window !== "undefined" ? window.location.href : "";
+    if (!href || !(await copyTextToClipboard(href))) return;
+    setPageLinkCopied(true);
+    window.setTimeout(() => setPageLinkCopied(false), 2500);
   }
 
   function openShareChannels() {
@@ -1782,6 +1798,25 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
                 className="shrink-0 text-danger"
               >
                 <Close size={13} />
+              </button>
+            </div>
+          )}
+          {inAppBrowser && (
+            <div
+              role="status"
+              className="flex items-start gap-2 border-t border-line bg-teal-tint px-3.5 py-2.5 text-[11px] leading-[1.5] text-ink"
+            >
+              <span className="flex-1">
+                Halaman ini dibuka di browser dalam aplikasi, jadi foto tidak bisa
+                langsung ikut terkirim. Buka di Chrome atau Safari supaya foto dan
+                caption terkirim sekaligus.
+              </span>
+              <button
+                type="button"
+                onClick={copyPageLink}
+                className="shrink-0 rounded-lg border border-teal-tint-border bg-surface px-2 py-1 text-[10px] font-bold text-teal-deep"
+              >
+                {pageLinkCopied ? "Tersalin" : "Salin link"}
               </button>
             </div>
           )}
