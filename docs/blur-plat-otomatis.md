@@ -10,7 +10,7 @@ Model YOLOv8n ONNX mendeteksi lokasi plat tanpa membaca nomor. Runtime dan model
 
 Model menerima RGB 640×640 dengan letterbox. Ambang keyakinan 0,3; deteksi duplikat dihapus dengan IoU 0,45; margin memperluas area untuk menutupi tepi plat. Sumber model, revisi, checksum, dan lisensi terdapat pada public/models/README.md.
 
-Saat dev/build, scripts/prepare-plate-assets.mjs menyalin runtime dari dependency terkunci ke public/plate-runtime/v1. Tidak ada unduhan model eksternal saat build atau saat pengguna membuka foto. Unduhan pertama runtime + model sekitar 16 MB; koneksi/perangkat memengaruhi waktu proses awal.
+Saat dev/build, scripts/prepare-plate-assets.mjs menyalin runtime dari dependency terkunci ke public/plate-runtime/v1. Tidak ada unduhan model eksternal saat build atau saat pengguna membuka foto. Unduhan pertama runtime + model sekitar 24 MB; koneksi/perangkat memengaruhi waktu proses awal.
 
 ## Verifikasi
 
@@ -20,6 +20,9 @@ Saat dev/build, scripts/prepare-plate-assets.mjs menyalin runtime dari dependenc
 - Gambar sintetis: plat terdeteksi dan piksel pada area plat berubah; gambar polos menghasilkan nol deteksi dan blob tidak berubah.
 - Uji UI mobile memakai respons detail/foto nyata yang direkam dan layanan pembiayaan dimock: 6 gambar hasil blob tampil, 0 gambar asli unit-file-serve dipasang ke DOM. Fallback komposisi lokal berjalan. Ini bukan tes transaksi share WhatsApp sungguhan.
 - CORS gambar dari origin produksi https://agenmobix.id: HTTP 200, Access-Control-Allow-Origin sesuai.
+
+- Verifikasi produksi Chromium tanpa mock pada https://agenmobix.id/share: 6 gambar blob tampil, tidak ada gambar asli unit-file-serve di DOM, dan tombol download menghasilkan JPEG dengan plat utama diblur.
+- Deployment implementasi commit 1d8e674 berhasil melalui GitHub Pages (run 34940806734). API Coolify mengembalikan 403 saat pemeriksaan; tidak ada aplikasi Coolify lain yang diubah.
 
 ## Batasan
 
