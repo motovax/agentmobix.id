@@ -64,10 +64,19 @@ export function buildShareText(caption: string, link?: string): string {
 /**
  * Prefer native system share sheet on phones/tablets (touch or mobile UA).
  * Desktop browsers often expose navigator.share with poor UX — use channel picker.
+ *
+ * Pass the files about to be shared: touch signals alone misread a touchscreen
+ * laptop as a phone, and desktop Chrome rejects *every* file (jpeg, png, even
+ * `url`) — so the native sheet there silently degrades to a caption-only share
+ * and hides the WhatsApp Web button the device actually needs. When files are
+ * on the table, what the browser can really deliver decides the route.
  */
-export function prefersNativeWebShare(): boolean {
+export function prefersNativeWebShare(files: File[] = []): boolean {
   if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
     return false;
+  }
+  if (files.length > 0) {
+    return canWebShareFiles(files);
   }
   if (typeof navigator.maxTouchPoints === "number" && navigator.maxTouchPoints > 0) {
     return true;

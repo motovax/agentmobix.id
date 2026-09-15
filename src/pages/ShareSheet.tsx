@@ -1150,7 +1150,9 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     title: string,
     caption: string,
   ): Promise<void> | null {
-    if (!prefersNativeWebShare() || files.length === 0) return null;
+    // Teruskan file-nya: browser yang tidak sanggup melampirkan file harus
+    // turun ke channel picker, bukan diam-diam mengirim caption saja.
+    if (!prefersNativeWebShare(files) || files.length === 0) return null;
 
     const shareText = buildShareText(caption, unitLink);
     const shareable = pickNativeShareableFiles(files, title, shareText);
@@ -1594,7 +1596,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
               <WhatsAppSolid size={compact ? 22 : 24} />
               <span className={label}>{compact ? "WA" : "WhatsApp"}</span>
             </button>
-            {!prefersNativeWebShare() && (
+            {!prefersNativeWebShare(composedFiles) && (
               <button
                 type="button"
                 onClick={() => shareVia("wa-web")}

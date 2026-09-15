@@ -132,6 +132,84 @@ describe("prefersNativeWebShare", () => {
   });
 });
 
+describe("prefersNativeWebShare dengan file yang akan dikirim", () => {
+  const file = new File(["x"], "unit.jpg", { type: "image/jpeg" });
+
+  function withNavigator(stub: unknown, run: () => void) {
+    const original = globalThis.navigator;
+    // @ts-expect-error test stub
+    globalThis.navigator = stub;
+    try {
+      run();
+    } finally {
+      globalThis.navigator = original;
+    }
+  }
+
+  // Regresi utama: laptop layar sentuh punya maxTouchPoints > 0 sehingga dikira
+  // HP, padahal Chrome desktop menolak SEMUA file — hasilnya share diam-diam
+  // turun ke caption-saja dan tombol WhatsApp Web ikut disembunyikan.
+  test("laptop layar sentuh yang tak sanggup kirim file bukan jalur native", () => {
+    withNavigator(
+      {
+        share: async () => {},
+        canShare: () => false,
+        maxTouchPoints: 10,
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+      },
+      () => {
+        expect(prefersNativeWebShare([file])).toBe(false);
+        // Tanpa file, sinyal sentuh lama tetap berlaku.
+        expect(prefersNativeWebShare()).toBe(true);
+      },
+    );
+  });
+
+  test("HP yang sanggup kirim file tetap memakai sheet native", () => {
+    withNavigator(
+      {
+        share: async () => {},
+        canShare: (data: ShareData) => Boolean(data.files?.length),
+        maxTouchPoints: 5,
+        userAgent: "Mozilla/5.0 (Linux; Android 14) Mobile",
+      },
+      () => {
+        expect(prefersNativeWebShare([file])).toBe(true);
+      },
+    );
+  });
+
+  test("tablet tanpa UA mobile tetap native selama canShare menerima file", () => {
+    withNavigator(
+      {
+        share: async () => {},
+        canShare: (data: ShareData) => Boolean(data.files?.length),
+        maxTouchPoints: 5,
+        userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+      },
+      () => {
+        expect(prefersNativeWebShare([file])).toBe(true);
+      },
+    );
+  });
+
+  test("browser tanpa canShare tidak dipakai untuk kirim file", () => {
+    withNavigator(
+      { share: async () => {}, maxTouchPoints: 5, userAgent: "Mozilla/5.0 Mobile" },
+      () => {
+        expect(prefersNativeWebShare([file])).toBe(false);
+      },
+    );
+  });
+
+  test("tanpa navigator.share selalu false, berfile maupun tidak", () => {
+    withNavigator({ maxTouchPoints: 5, userAgent: "Android WhatsApp" }, () => {
+      expect(prefersNativeWebShare([file])).toBe(false);
+      expect(prefersNativeWebShare()).toBe(false);
+    });
+  });
+});
+
 describe("buildNativeSharePayload", () => {
   test("returns null when navigator.share is unavailable", () => {
     const original = globalThis.navigator;
