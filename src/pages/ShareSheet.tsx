@@ -1563,19 +1563,17 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         if (caption) void copyShareCaption(caption);
         void navigator.share(payload).catch((error: unknown) => {
           if (isShareAbortError(error)) return;
-          // Sheet native ditolak browser — turun ke web intent + unduh media.
+          // Sheet native ditolak browser — buka channel tanpa mengunduh media.
           setShareMediaNotice(channelDropsFilesNotice(channel, files.length));
-          downloadFiles(files);
           openChannel();
         });
         return;
       }
     }
 
-    // Web intent murni: media tidak ikut, jadi unduh dulu dan katakan apa adanya.
+    // Web intent hanya membawa caption; unduhan media memerlukan klik tombol download.
     if (files.length > 0) {
       setShareMediaNotice(channelDropsFilesNotice(channel, files.length));
-      downloadFiles(files);
     }
 
     // Channel tanpa intent caption saja: salin sebelum membuka aplikasi.

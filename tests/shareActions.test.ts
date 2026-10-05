@@ -440,10 +440,11 @@ describe("channelDropsFilesNotice", () => {
     expect(channelDropsFilesNotice("wa", 0)).toBe("");
   });
 
-  test("WhatsApp: sebut foto tidak ikut dan media sudah diunduh", () => {
+  test("WhatsApp: sebut foto tidak ikut dan arahkan ke unduhan manual", () => {
     const notice = channelDropsFilesNotice("wa", 1);
     expect(notice).toContain("WhatsApp");
-    expect(notice).toContain("diunduh");
+    expect(notice).toContain("Download media siap-posting");
+    expect(notice).not.toContain("sudah diunduh");
     expect(notice.startsWith("Foto")).toBe(true);
   });
 
@@ -455,7 +456,8 @@ describe("channelDropsFilesNotice", () => {
     const notice = channelDropsFilesNotice("wa-web", 4);
     expect(notice).toContain("WhatsApp Web");
     expect(notice).toContain("4 media");
-    expect(notice).toContain("diunduh");
+    expect(notice).toContain("Download media siap-posting");
+    expect(notice).not.toContain("sudah diunduh");
     // Jangan pakai label channel mentah seperti "WA-WEB".
     expect(notice).not.toContain("WA-WEB");
   });
@@ -463,6 +465,7 @@ describe("channelDropsFilesNotice", () => {
   test("channel lain tetap memberi peringatan yang sama jelasnya", () => {
     const notice = channelDropsFilesNotice("x", 2);
     expect(notice).toContain("2 media");
-    expect(notice).toContain("diunduh");
+    expect(notice).toContain("Download media siap-posting");
+    expect(notice).not.toContain("sudah diunduh");
   });
 });

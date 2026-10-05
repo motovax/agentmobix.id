@@ -271,12 +271,12 @@ export function channelDropsFilesNotice(
   if (fileCount === 0) return "";
   const media = fileCount > 1 ? `${fileCount} media` : "Foto";
   if (channel === "wa-web") {
-    return `Caption sudah dikirim ke WhatsApp Web. ${media} sudah diunduh — lanjutkan dengan melampirkannya di chat yang sama.`;
+    return `WhatsApp Web dibuka dengan caption. Untuk melampirkan ${media.toLowerCase()}, gunakan tombol Download media siap-posting lalu lampirkan di chat.`;
   }
   if (channel === "wa") {
-    return `${media} tidak bisa ikut lewat tautan WhatsApp web. Media sudah diunduh — lampirkan manual di chat WhatsApp.`;
+    return `${media} tidak bisa ikut lewat tautan WhatsApp web. Gunakan tombol Download media siap-posting jika ingin melampirkannya di chat WhatsApp.`;
   }
-  return `${media} tidak bisa ikut lewat tautan ${channel.toUpperCase()}. Media sudah diunduh — lampirkan manual.`;
+  return `${media} tidak bisa ikut lewat tautan ${channel.toUpperCase()}. Gunakan tombol Download media siap-posting jika ingin melampirkannya manual.`;
 }
 
 /** Deep links / web intents for channel picker fallback. */
