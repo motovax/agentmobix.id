@@ -1668,8 +1668,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
             </button>
           </div>
           <div className="border-t border-line px-3 py-2 text-center text-[10px] leading-snug text-muted">
-            WhatsApp Web: caption terkirim dulu, media otomatis diunduh untuk dilampirkan
-            menyusul. Facebook, Telegram, IG & TikTok: tempel caption yang disalin.
+            WhatsApp Web: caption terkirim dulu. Untuk melampirkan media, gunakan tombol
+            Download media siap-posting. Facebook, Telegram, IG & TikTok: tempel caption yang disalin.
           </div>
         </div>
       </>
