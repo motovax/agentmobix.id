@@ -26,7 +26,7 @@ export function DaftarAgen() {
       `Rekening komisi: ${bank} ${account.trim()}`,
     ].join("\n");
     window.open(
-      `https://wa.me/6285701959826?text=${encodeURIComponent(message)}`,
+      `https://wa.me/6281119773553?text=${encodeURIComponent(message)}`,
       "_blank",
       "noopener",
     );

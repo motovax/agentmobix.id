@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Calculator, Chat } from "./icons";
 
-const ADMIN_PHONE = "6285701959826";
+const ADMIN_PHONE = "6281119773553";
 
 const DEFAULT_ADMIN_MESSAGE =
   "Halo Admin, mau tanya-tanya soal program agen Mobix dulu boleh? 🙏";
