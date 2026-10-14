@@ -15,30 +15,9 @@ import {
 } from "../src/lib/shareActions";
 
 describe("buildShareText", () => {
-  const unitLink = "https://mobixbydss.id/produk/detail/honda-mobilio-1-5-e-2016";
-
-  test("tanpa argumen tautan, caption dikirim apa adanya", () => {
+  test("membagikan caption saja tanpa menambahkan tautan", () => {
     expect(buildShareText("  Honda Mobilio\nTDP 20jt  ")).toBe("Honda Mobilio\nTDP 20jt");
     expect(buildShareText("  ")).toBe("");
-  });
-
-  test("menempel tautan unit di akhir caption, dipisah baris kosong", () => {
-    expect(buildShareText("Honda Mobilio\nTDP 20jt", unitLink)).toBe(
-      `Honda Mobilio\nTDP 20jt\n\n${unitLink}`,
-    );
-  });
-
-  test("tidak mendobel tautan yang sudah ditulis agen di caption", () => {
-    const caption = `Honda Mobilio\n\n${unitLink}`;
-    expect(buildShareText(caption, unitLink)).toBe(caption);
-  });
-
-  test("caption kosong hanya mengirim tautan, tanpa baris kosong di depan", () => {
-    expect(buildShareText("   ", unitLink)).toBe(unitLink);
-  });
-
-  test("tautan kosong diperlakukan seperti tanpa tautan", () => {
-    expect(buildShareText("Honda Mobilio", "   ")).toBe("Honda Mobilio");
   });
 });
 
@@ -66,16 +45,6 @@ describe("buildChannelShareUrl", () => {
       expect(channelNeedsClipboardFirst(channel)).toBe(true);
     });
   }
-
-  test("tautan unit ikut di caption channel teks", () => {
-    const link = "https://mobixbydss.id/produk/detail/honda-mobilio-1-5-e-2016";
-    for (const channel of ["wa", "wa-web", "x", "threads"] as const) {
-      const url = new URL(buildChannelShareUrl(channel, caption, link));
-      expect(url.searchParams.get("text")).toBe(`${caption}\n\n${link}`);
-      // Tautan tetap di dalam teks, bukan parameter url terpisah.
-      expect(url.searchParams.has("url")).toBe(false);
-    }
-  });
 
   test("wa-web membuka WhatsApp Web, bukan deep link wa.me ke aplikasi", () => {
     const url = new URL(buildChannelShareUrl("wa-web", caption));
