@@ -4,6 +4,7 @@ const API_BASE = import.meta.env.VITE_MOBIX_API_BASE || "https://mobix.motovax.c
 const API_KEY = import.meta.env.VITE_MOBIX_API_KEY || "";
 
 export interface DsfSimResult {
+  leasingQuote?: { leasing: string; minimum_dp: number; cash_price: number; condition?: string; source_row: number };
   hargaKredit: number | null;
   installmentRounded: number;
   totalDownPaymentRounded: number;
@@ -282,7 +283,7 @@ export function getDpMinimRealDP(
   allIn: number | null,
 ): number | null {
   if (allIn === null || !Number.isFinite(allIn) || realOtr <= 0) return null;
-  return Math.max(0, realOtr - allIn);
+  return Math.max(1_000_000, realOtr - allIn);
 }
 
 /**
@@ -299,6 +300,7 @@ export function getDpMinimTdpKonsumen(
   if (dpMinimReal === null || !Number.isFinite(dpMinimReal) || !result) {
     return null;
   }
+  if (result.leasingQuote) return null; // No upfront fee data in the workbook.
   const dsfDp = result.downPaymentRounded || result.downPayment;
   const dsfTdp = result.totalDownPaymentRounded;
   if (
@@ -313,99 +315,64 @@ export function getDpMinimTdpKonsumen(
 }
 
 export interface DpMinimPackage {
-  tdp: number;
   dpReal: number;
   cicilan: number;
   tenor: number;
   dpPercent: number;
+  leasing: string;
 }
 
-/**
- * Fetch paket DP Minim untuk tenor tertentu (default 60).
- * Dipakai caption share default agar di bawah harga selalu ada DP Minim 60.
- * DP Minim Real memakai harga aktual dikurangi pencairan dan refund aktual;
- * TDP kemudian menambahkan komponen biaya dari hasil DSF.
- */
-export async function fetchDpMinimPackage(
-  params: {
-    unitPrice: number;
-    brand?: string;
-    model?: string;
-    year?: number;
-    category?: string;
-    tenor?: number;
-  },
-  signal?: AbortSignal,
-): Promise<DpMinimPackage | null> {
-  const tenor = params.tenor ?? 60;
-  if (!params.unitPrice || params.unitPrice <= 0) return null;
-
-  const rules = getDsfSimulationRules({
-    category: params.category,
-    year: params.year,
-    tenor,
-  });
-  if (!rules.eligible) return null;
-  const effectiveTenor = Math.min(tenor, rules.maxTenorMonths);
-
-  const result = await fetchDpMinimSimulation(
-    { ...params, tenor: effectiveTenor },
-    signal,
-  );
-  const allIn = getDpMinimAllInFromResult(result);
-  const dpReal = getDpMinimRealDP(params.unitPrice, allIn);
-  const tdp = getDpMinimTdpKonsumen(dpReal, result);
-  if (
-    !result ||
-    dpReal === null ||
-    tdp === null ||
-    !Number.isFinite(result.installmentRounded) ||
-    result.installmentRounded <= 0
-  ) {
-    return null;
-  }
-
-  return {
-    tdp,
-    dpReal,
-    cicilan: result.installmentRounded,
-    tenor: effectiveTenor,
-    dpPercent: rules.minDpPercent,
-  };
+export interface DpMinimParams {
+  unitId?: string;
+  unitPrice: number;
+  brand?: string;
+  model?: string;
+  transmission?: string;
+  year?: number;
+  category?: string;
+  tenor: number;
 }
 
-/** Simulasi DP minimum pada harga unit aktual dan DP murni minimum DSF. */
-export function getDpMinimSimulationParams(
-  params: {
-    unitPrice: number;
-    brand?: string;
-    model?: string;
-    year?: number;
-    category?: string;
-    tenor: number;
-  },
-): DsfSimParams | null {
-  if (!params.unitPrice || params.unitPrice <= 0) return null;
-  const rules = getDsfSimulationRules(params);
-  if (!rules.eligible) return null;
-
-  return {
-    ...params,
-    tenor: Math.min(params.tenor, rules.maxTenorMonths),
-    dpPercent: rules.minDpPercent,
-    simulationType: "DP",
-    simulationValue: rules.minDpPercent,
-    paymentType: rules.paymentType,
-  };
+export function getDpMinimSimulationParams(params: DpMinimParams): DpMinimParams | null {
+  if (!params.unitId || params.tenor !== 60 || !Number.isFinite(params.unitPrice) || params.unitPrice <= 0) return null;
+  return params;
 }
 
+/** Fixed 60-month quotes are selected by the backend at the unit's actual cash price. */
 export async function fetchDpMinimSimulation(
-  params: Parameters<typeof getDpMinimSimulationParams>[0],
+  params: DpMinimParams,
   signal?: AbortSignal,
 ): Promise<DsfSimResult | null> {
-  const simulationParams = getDpMinimSimulationParams(params);
-  if (!simulationParams) return null;
-  return simulateKreditWithSignal(simulationParams, signal);
+  if (!getDpMinimSimulationParams(params)) return null;
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (API_KEY) headers.Authorization = `Bearer ${API_KEY}`;
+    const response = await fetch(`${API_BASE}/kalkulator/dp-minim`, {
+      method: "POST", headers, signal,
+      body: JSON.stringify({ unit_id: params.unitId, tenor_months: 60 }),
+    });
+    if (!response.ok) return null;
+    const { data } = await response.json();
+    if (!data || data.tenor_months !== 60 || !Number.isFinite(data.minimum_dp) || data.minimum_dp < 1_000_000 || !Number.isFinite(data.installment) || data.installment <= 0 || !Number.isFinite(data.cash_price) || data.cash_price <= 0) return null;
+    return {
+      hargaKredit: data.cash_price, installmentRounded: data.installment,
+      totalDownPaymentRounded: 0, downPaymentRounded: 0, downPayment: 0,
+      percentDownPayment: 0, totalLoan: 0, rate: "", rateEffectiveTwoDigitPercent: "",
+      adminFee: 0, disclaimer: ["Biaya tambahan dan total bayar awal perlu konfirmasi leasing.", ...(data.condition ? [data.condition] : [])],
+      netDisbursement: data.disbursement, refundSupplierActual: data.refund,
+      allInToSupplier: data.disbursement + data.refund,
+      leasingQuote: data,
+    };
+  } catch { return null; }
+}
+
+export async function fetchDpMinimPackage(
+  params: Omit<DpMinimParams, "tenor"> & { tenor?: number },
+  signal?: AbortSignal,
+): Promise<DpMinimPackage | null> {
+  const result = await fetchDpMinimSimulation({ ...params, tenor: params.tenor ?? 60 }, signal);
+  if (!result?.leasingQuote) return null;
+  return { dpReal: result.leasingQuote.minimum_dp, cicilan: result.installmentRounded, tenor: 60, dpPercent: result.leasingQuote.minimum_dp / result.leasingQuote.cash_price * 100, leasing: result.leasingQuote.leasing };
 }
 
 export interface DsfCreditPriceResult {

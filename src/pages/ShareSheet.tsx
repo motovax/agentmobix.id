@@ -724,7 +724,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
   /** Baris tambahan di bawah Harga/TDP — hanya jika paket utama bukan DP Minim user. */
   const dpMinimExtraLine =
     defaultDpMinim && captionPackage.kind !== "dpminim"
-      ? `TDP ${formatJt(defaultDpMinim.tdp)} • DP Minim ${formatJt(defaultDpMinim.dpReal)} • Cicilan ${formatJt(defaultDpMinim.cicilan)}/bln • Tenor ${defaultDpMinim.tenor} bulan`
+      ? `Leasing ${defaultDpMinim.leasing} • DP Minim ${formatJt(defaultDpMinim.dpReal)} • Cicilan ${formatJt(defaultDpMinim.cicilan)}/bln • Tenor ${defaultDpMinim.tenor} bulan`
       : "";
 
   const packageBlock =
@@ -733,7 +733,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
           .filter(Boolean)
           .join("\n")
       : captionPackage.kind === "dpminim"
-        ? `Harga ${formatRupiah(captionPackage.price)}\nTDP ${formatJt(captionPackage.tdp)}\nDP Minim ${formatJt(captionPackage.dpReal)}\nCicilan ${formatJt(captionPackage.cicilan)}/bln • Tenor ${captionPackage.tenor} bulan`
+        ? `Harga ${formatRupiah(captionPackage.price)}\nDP Minim ${formatJt(captionPackage.dpReal)}\nCicilan ${formatJt(captionPackage.cicilan)}/bln • Tenor ${captionPackage.tenor} bulan`
         : [
             `Harga ${formatRupiah(captionPackage.price)}\nTDP ${formatJt(captionPackage.tdp)} • Cicilan ${formatJt(captionPackage.cicilan)}/bln • Tenor ${captionPackage.tenor} bulan`,
             dpMinimExtraLine,
@@ -848,7 +848,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
 
   // Default caption: fetch paket DP Minim tenor 60 di bawah harga
   useEffect(() => {
-    if (!unit || salesContactRequired) {
+    if (!unit) {
       setDefaultDpMinim(null);
       setDefaultDpMinimLoading(false);
       return;
@@ -865,7 +865,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     setDefaultDpMinimLoading(true);
     fetchDpMinimPackage(
       {
-        unitPrice: price,
+        unitId: unit.id,
+        unitPrice: unit.harga,
         brand: unit.brand,
         model: unit.type,
         year: unit.year,
@@ -1218,11 +1219,11 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     const creditPackage =
       captionPackage.kind === "cash"
         ? defaultDpMinim
-          ? `harga ${formatRupiah(captionPackage.price)}, TDP ${formatJt(defaultDpMinim.tdp)}, DP Minim ${formatJt(defaultDpMinim.dpReal)}, cicilan ${formatJt(defaultDpMinim.cicilan)}/bln tenor ${defaultDpMinim.tenor} bulan`
+          ? `harga ${formatRupiah(captionPackage.price)}, Leasing ${defaultDpMinim.leasing}, DP Minim ${formatJt(defaultDpMinim.dpReal)}, cicilan ${formatJt(defaultDpMinim.cicilan)}/bln tenor ${defaultDpMinim.tenor} bulan`
           : `harga ${formatRupiah(captionPackage.price)}`
         : captionPackage.kind === "dpminim"
           ? `harga ${formatRupiah(captionPackage.price)}, paket DP Minim ${formatJt(captionPackage.tdp)}, cicilan ${installment}/bln tenor ${captionPackage.tenor} bulan`
-          : `harga ${formatRupiah(captionPackage.price)}, TDP ${tdp}, cicilan ${installment}/bln tenor ${captionPackage.tenor} bulan${defaultDpMinim ? `, TDP ${formatJt(defaultDpMinim.tdp)}, DP Minim ${formatJt(defaultDpMinim.dpReal)} tenor ${defaultDpMinim.tenor} bulan` : ""}`;
+          : `harga ${formatRupiah(captionPackage.price)}, TDP ${tdp}, cicilan ${installment}/bln tenor ${captionPackage.tenor} bulan${defaultDpMinim ? `, Leasing ${defaultDpMinim.leasing}, DP Minim ${formatJt(defaultDpMinim.dpReal)} tenor ${defaultDpMinim.tenor} bulan` : ""}`;
     const packageWithPrice = creditPackage;
     const category =
       unit.category && unit.category.length <= 4
@@ -1274,13 +1275,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
     const defaultDpMinimFacts = defaultDpMinim
       ? [
           {
-            line: `TDP ${formatJt(defaultDpMinim.tdp)}`,
-            matches: [
-              `TDP ${formatJt(defaultDpMinim.tdp)}`,
-              ...shortAmountMatches(defaultDpMinim.tdp),
-            ],
-          },
-          {
             line: `DP Minim ${formatJt(defaultDpMinim.dpReal)}`,
             matches: shortAmountMatches(defaultDpMinim.dpReal),
           },
@@ -1300,13 +1294,6 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         : captionPackage.kind === "dpminim"
           ? [
               hargaFact,
-              {
-                line: `TDP ${formatJt(captionPackage.tdp)}`,
-                matches: [
-                  `TDP ${formatJt(captionPackage.tdp)}`,
-                  ...shortAmountMatches(captionPackage.tdp),
-                ],
-              },
               {
                 line: `DP Minim ${formatJt(captionPackage.dpReal)}`,
                 matches: shortAmountMatches(captionPackage.dpReal),
@@ -1373,7 +1360,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         : []),
       ...(defaultDpMinim
         ? [
-            formatJt(defaultDpMinim.tdp),
+            formatJt(defaultDpMinim.dpReal),
             formatJt(defaultDpMinim.dpReal),
             formatJt(defaultDpMinim.cicilan),
             `${defaultDpMinim.tenor} bulan`,
@@ -1410,7 +1397,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         harga_builder: sharePrice,
         harga_kredit:
           captionPackage.kind === "kredit" ? captionPackage.price : undefined,
-        tdp: captionPackage.kind !== "cash" ? pkgTdp : undefined,
+        tdp: captionPackage.kind === "kredit" ? pkgTdp : undefined,
         cicilan: captionPackage.kind !== "cash" ? pkgCicilan : undefined,
         tenor: captionPackage.kind !== "cash" ? pkgTenor : undefined,
         dp:

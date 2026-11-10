@@ -32,7 +32,7 @@ export function DpMinimSummaryCard({
 
       {loading ? (
         <div className="grid grid-cols-2 divide-x divide-teal-tint-border border-t border-teal-tint-border bg-surface/55">
-          {["TDP", "Cicilan / bulan"].map((label) => (
+          {["DP Minim", "Cicilan / bulan"].map((label) => (
             <div key={label} className="px-4 py-3.5">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted">
                 {label}
@@ -47,13 +47,13 @@ export function DpMinimSummaryCard({
           <div className="grid grid-cols-2 divide-x divide-teal-tint-border border-y border-teal-tint-border bg-surface/55">
             <div className="min-w-0 px-4 py-3.5">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-                TDP
+                DP Minim
               </div>
               <div className="mt-1 truncate text-[16px] font-extrabold text-teal-deep">
-                {formatRupiah(packageData.tdp)}
+                {formatRupiah(packageData.dpReal)}
               </div>
               <div className="mt-0.5 truncate text-[10px] font-semibold text-muted">
-                DP Minim {formatRupiah(packageData.dpReal)}
+                Leasing {packageData.leasing}
               </div>
             </div>
             <div className="min-w-0 px-4 py-3.5">
@@ -66,7 +66,7 @@ export function DpMinimSummaryCard({
             </div>
           </div>
           <p className="m-0 px-4 py-2.5 text-[10px] leading-relaxed text-muted">
-            Estimasi paket DSF untuk harga aktif. Syarat dan ketentuan berlaku.
+            Penawaran leasing tenor 60 bulan. Biaya tambahan dan total bayar awal perlu konfirmasi leasing.
           </p>
         </>
       ) : (
