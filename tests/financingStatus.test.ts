@@ -156,16 +156,16 @@ describe("status pembiayaan unit", () => {
     expect(c12.maxTenorMonths).toBe(48);
   });
 
-  test("DP Minim tetap 60 bulan, sementara Smart Pricing unit lama tetap 48 bulan dan mempertahankan CashPriceTarget", async () => {
+  test("mengunci tenor unit lama ke 48 bulan dan tetap mengirim target upping OTR", async () => {
     const currentYear = new Date().getFullYear();
     const params = getDpMinimSimulationParams({
-      unitId: "unit-1",
       unitPrice: 150_000_000,
       category: "SUV",
       year: currentYear - 11,
       tenor: 60,
     });
-    expect(params?.tenor).toBe(60);
+    expect(params?.tenor).toBe(48);
+    expect(params?.simulationValue).toBe(20);
 
     const originalFetch = globalThis.fetch;
     let payload: Record<string, unknown> | null = null;

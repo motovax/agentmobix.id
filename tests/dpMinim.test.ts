@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-  fetchDpMinimSimulation,
   getDpMinimAllInFromResult,
   getDpMinimRealDP,
   getDpMinimSimulationParams,
@@ -29,31 +28,38 @@ function dsfResult(overrides: Partial<DsfSimResult> = {}): DsfSimResult {
 }
 
 describe("formula DP Minim dari pencairan aktual DSF", () => {
-  test("DP Minim hanya 60 bulan dan membutuhkan ID unit", () => {
-    const base = { unitId: "unit-1", unitPrice: 225_000_000, tenor: 60 };
-    expect(getDpMinimSimulationParams(base)?.tenor).toBe(60);
-    for (const tenor of [12, 36, 48]) expect(getDpMinimSimulationParams({ ...base, tenor })).toBeNull();
-    expect(getDpMinimSimulationParams({ ...base, unitId: undefined })).toBeNull();
+  test("tenor 60, 48, dan 36 memakai harga aktual dan DP murni minimum", () => {
+    for (const tenor of [60, 48, 36]) {
+      const params = getDpMinimSimulationParams({
+        unitPrice: 180_000_000,
+        brand: "Mitsubishi",
+        model: "Xpander GLS",
+        year: 2022,
+        category: "MPV",
+        tenor,
+      });
+
+      expect(params?.unitPrice).toBe(180_000_000);
+      expect(params?.tenor).toBe(tenor);
+      expect(params?.dpPercent).toBe(15);
+      expect(params?.simulationType).toBe("DP");
+      expect(params?.simulationValue).toBe(15);
+      expect(params?.paymentType).toBe("ADDB");
+    }
   });
 
-  test("memakai hasil leasing backend tanpa DSF atau mengarang TDP", async () => {
-    const originalFetch = globalThis.fetch;
-    let payload: unknown;
-    let url = "";
-    globalThis.fetch = (async (input, init) => {
-      url = String(input); payload = JSON.parse(String(init?.body));
-      return new Response(JSON.stringify({ data: { leasing: "BFI", cash_price: 225_000_000, disbursement: 255_000_000, refund: 13_000_000, minimum_dp: 1_000_000, installment: 8_050_000, tenor_months: 60, source_row: 5 } }));
-    }) as typeof fetch;
-    try {
-      const result = await fetchDpMinimSimulation({ unitId: "unit-1", unitPrice: 225_000_000, tenor: 60 });
-      expect(url).toEndWith("/kalkulator/dp-minim");
-      expect(payload).toEqual({ unit_id: "unit-1", tenor_months: 60 });
-      expect(result?.leasingQuote?.leasing).toBe("BFI");
-      expect(result?.installmentRounded).toBe(8_050_000);
-      expect(getDpMinimTdpKonsumen(1_000_000, result)).toBeNull();
-      globalThis.fetch = (async () => new Response("{}", { status: 422 })) as typeof fetch;
-      expect(await fetchDpMinimSimulation({ unitId: "unit-1", unitPrice: 225_000_000, tenor: 60 })).toBeNull();
-    } finally { globalThis.fetch = originalFetch; }
+  test("unit usia 11-14 tahun memakai DP 20% dan tenor maksimal 48 bulan", () => {
+    const params = getDpMinimSimulationParams({
+      unitPrice: 150_000_000,
+      year: new Date().getFullYear() - 11,
+      category: "SUV",
+      tenor: 60,
+    });
+
+    expect(params?.tenor).toBe(48);
+    expect(params?.dpPercent).toBe(20);
+    expect(params?.simulationValue).toBe(20);
+    expect(params?.paymentType).toBe("ADDB");
   });
 
   test("pencairan dan refund selalu memakai netDisbursement + refundSupplierActual", () => {
@@ -89,7 +95,7 @@ describe("formula DP Minim dari pencairan aktual DSF", () => {
   });
 
   test("DP Minim Real tidak negatif jika All In di atas harga", () => {
-    expect(getDpMinimRealDP(100_000_000, 120_000_000)).toBe(1_000_000);
+    expect(getDpMinimRealDP(100_000_000, 120_000_000)).toBe(0);
   });
 
   test("contoh B1743DFX: TDP menambahkan biaya DSF ke DP Minim Real", () => {

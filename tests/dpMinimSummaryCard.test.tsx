@@ -3,11 +3,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { DpMinimSummaryCard } from "../src/components/DpMinimSummaryCard";
 
 describe("DpMinimSummaryCard", () => {
-  test("menampilkan leasing, DP minimum dan cicilan 60 bulan tanpa TDP rekaan", () => {
+  test("menampilkan TDP, cicilan, dan tenor paket DP minimum", () => {
     const html = renderToStaticMarkup(
       <DpMinimSummaryCard
         packageData={{
-          leasing: "BFI",
+          tdp: 18_942_000,
           dpReal: 12_500_000,
           cicilan: 3_250_000,
           tenor: 60,
@@ -17,11 +17,11 @@ describe("DpMinimSummaryCard", () => {
     );
 
     expect(html).toContain("DP Minim");
-    expect(html).toContain("Leasing BFI");
+    expect(html).toContain("TDP");
     expect(html).toContain("DP Minim");
     expect(html).not.toContain("TDP DP Minim");
     expect(html).not.toContain("DP Minim Real");
-    expect(html).not.toContain("Rp 18.942.000");
+    expect(html).toContain("Rp 18.942.000");
     expect(html).toContain("Rp 12.500.000");
     expect(html).toContain("Rp 3.250.000");
     expect(html).toContain("60 bulan");
