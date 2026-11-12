@@ -40,7 +40,7 @@ const SIM_TABS: { id: SimTab; label: string }[] = [
   { id: "syariah", label: "Syariah" },
 ];
 
-const DP_MINIM_TABLE_TENORS: Tenor[] = [60, 48, 36];
+const DP_MINIM_TABLE_TENORS: Tenor[] = [60];
 
 type DpMinimRow = { tenor: Tenor; result: DsfSimResult | null };
 
@@ -117,13 +117,7 @@ export function CreditSimulationBox({
     () => TENOR_OPTIONS.filter((value) => value <= dsfRules.maxTenorMonths),
     [dsfRules.maxTenorMonths],
   );
-  const dpMinimTableTenors = useMemo(
-    () =>
-      DP_MINIM_TABLE_TENORS.filter(
-        (value) => value <= dsfRules.maxTenorMonths,
-      ),
-    [dsfRules.maxTenorMonths],
-  );
+  const dpMinimTableTenors = DP_MINIM_TABLE_TENORS;
   const currencyFormatter = new Intl.NumberFormat("id-ID");
 
   const creditPriceForBounds = price;
@@ -174,7 +168,7 @@ export function CreditSimulationBox({
   const tdpSimulationAmount = tdpAmount > 0 ? tdpAmount : defaultTdpAmount;
   const monthlySimulationAmount =
     monthlyAmount > 0 ? monthlyAmount : defaultMonthlyAmount;
-  const simPending = financingEligible && price > 0 && simResult === null && !simError;
+  const simPending = (simTab === "dpminim" || financingEligible) && price > 0 && simResult === null && !simError;
   const simCreditPrice =
     typeof simResult?.hargaKredit === "number" &&
     Number.isFinite(simResult.hargaKredit) &&
@@ -196,20 +190,18 @@ export function CreditSimulationBox({
       ? simResult.adminFee
       : 5500000;
   const dpMinimAllIn = getDpMinimAllInFromResult(simResult);
-  const dpMinimRealDP = getDpMinimRealDP(price, dpMinimAllIn);
+  const dpMinimRealDP = simResult?.leasingQuote?.minimum_dp ?? getDpMinimRealDP(price, dpMinimAllIn);
   const dpMinimTdpKonsumen = getDpMinimTdpKonsumen(dpMinimRealDP, simResult);
-  const dpMinimSisaCair =
-    dpMinimAllIn !== null && price > 0 ? Math.max(0, dpMinimAllIn - price) : null;
   const shareDp = simTab === "dpminim" ? dpMinimRealDP : displayDp;
   const shareDpPercent =
     simTab === "dpminim" && shareDp !== null && price > 0
       ? (shareDp / price) * 100
       : displayDpPercent;
-  const shareTdp = simTab === "dpminim" ? dpMinimTdpKonsumen : displayTdp;
+  const shareTdp = simTab === "dpminim" ? null : displayTdp;
   const canShareSimulation =
     shareDp !== null &&
     displayMonthly !== null &&
-    shareTdp !== null &&
+    (simTab === "dpminim" || shareTdp !== null) &&
     creditPriceForDisplay !== null;
   const shareTenor = simTab === "dpminim" ? dpMinimInstallmentCount(tenor) : tenor;
 
@@ -357,6 +349,8 @@ export function CreditSimulationBox({
   }, [
     financingEligible,
     price,
+    unit.id,
+    unit.harga,
     unit.brand,
     unit.type,
     unit.year,
@@ -366,7 +360,7 @@ export function CreditSimulationBox({
   ]);
 
   useEffect(() => {
-    if (!financingEligible || !price) {
+    if ((simTab !== "dpminim" && !financingEligible) || !price) {
       setSimResult(null);
       setSimLoading(false);
       setSimError(false);
@@ -382,7 +376,8 @@ export function CreditSimulationBox({
       const result = isDpMinim
         ? await fetchDpMinimSimulation(
             {
-              unitPrice: price,
+              unitId: unit.id,
+              unitPrice: unit.harga,
               tenor,
               brand: unit.brand,
               model: unit.type,
@@ -422,6 +417,8 @@ export function CreditSimulationBox({
   }, [
     financingEligible,
     price,
+    unit.id,
+    unit.harga,
     unit.brand,
     unit.type,
     unit.year,
@@ -436,7 +433,7 @@ export function CreditSimulationBox({
   ]);
 
   useEffect(() => {
-    if (!financingEligible || simTab !== "dpminim" || !price) {
+    if (simTab !== "dpminim" || !price) {
       setDpMinimRows(null);
       setDpMinimTableLoading(false);
       return;
@@ -450,7 +447,8 @@ export function CreditSimulationBox({
         dpMinimTableTenors.map((rowTenor) =>
           fetchDpMinimSimulation(
             {
-              unitPrice: price,
+              unitId: unit.id,
+              unitPrice: unit.harga,
               tenor: rowTenor,
               brand: unit.brand,
               model: unit.type,
@@ -478,6 +476,8 @@ export function CreditSimulationBox({
     financingEligible,
     simTab,
     price,
+    unit.id,
+    unit.harga,
     unit.brand,
     unit.type,
     unit.year,
@@ -546,6 +546,7 @@ export function CreditSimulationBox({
   function handleSimTabChange(nextTab: SimTab) {
     if (nextTab === simTab) return;
     setSimTab(nextTab);
+    if (nextTab === "dpminim") setTenor(60);
     if (nextTab === "syariah") return;
     setSimResult(null);
     setSimError(false);
@@ -627,7 +628,7 @@ export function CreditSimulationBox({
     setSimRunKey((value) => value + 1);
   }
 
-  const summaryText = salesContactRequired
+  const summaryText = simTab === "dpminim" ? `DP Minim · ${simResult?.leasingQuote?.leasing ?? "Penawaran belum tersedia"} · 60 bulan` : salesContactRequired
     ? "Tanya sales untuk opsi pembiayaan"
     : `Reguler · DP ${Math.round(displayDpPercent)}% · ${tenor} bln · Cicilan ${displayMonthly ? formatRupiah(displayMonthly) : "Menghitung..."}/bln`;
 
@@ -643,7 +644,7 @@ export function CreditSimulationBox({
           <span className="flex items-center gap-2 text-[15px] font-extrabold text-ink">
             Simulasi kredit
             <span className="rounded-[7px] bg-teal-tint px-2 py-[3px] text-[11px] font-bold text-teal-deep">
-              {canShareSimulation ? "Bisa di-share" : "Menunggu DSF"}
+              {canShareSimulation ? "Bisa di-share" : simTab === "dpminim" ? "Penawaran leasing" : "Menunggu DSF"}
             </span>
           </span>
           <span className="mt-1 block truncate text-[12px] font-semibold text-muted">
@@ -658,7 +659,7 @@ export function CreditSimulationBox({
       </button>
 
       {simulationOpen &&
-        (salesContactRequired ? (
+        (salesContactRequired && simTab !== "dpminim" ? (
           <div className="p-3">
             <div className="rounded-[18px] border border-[#E8C98B] bg-[#FFF8E8] p-4">
               <div className="inline-flex rounded-full bg-[#F7DFAC] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#7A4700]">
@@ -670,6 +671,7 @@ export function CreditSimulationBox({
               <p className="m-0 mt-1.5 text-[12px] leading-[1.6] text-mid">
                 {unit.pembiayaan.message || "Pembiayaan DSF tidak tersedia untuk unit ini."}
               </p>
+              <button type="button" onClick={() => handleSimTabChange("dpminim")} className="mt-3 rounded-lg bg-ink px-4 py-2 text-sm font-bold text-surface">Cek DP Minim 60 bulan</button>
               <div className="mt-3 space-y-2 rounded-[12px] bg-white/70 p-3 text-[12px]">
                 {["Harga Kredit", "TDP", "Cicilan"].map((label) => (
                   <div key={label} className="flex items-center justify-between gap-3">
@@ -698,7 +700,7 @@ export function CreditSimulationBox({
                   Simulasi Hitung Kredit
                 </div>
                 <span className="rounded-[7px] bg-teal-tint px-2 py-[3px] text-[11px] font-bold text-teal-deep">
-                  {canShareSimulation ? "Bisa di-share" : "Menunggu DSF"}
+                  {canShareSimulation ? "Bisa di-share" : simTab === "dpminim" ? "Penawaran leasing" : "Menunggu DSF"}
                 </span>
               </div>
 
@@ -869,15 +871,14 @@ export function CreditSimulationBox({
               {simTab === "dpminim" && (
                 <>
                   <div className="mb-3.5 rounded-xl bg-field px-3.5 py-3 text-[11px] leading-[1.5] text-mid">
-                    DP Minim dihitung dari harga aktif dikurangi pencairan murni dan refund
-                    aktual DSF. Pilih tenor untuk melihat hasilnya.
+                    DP Minim dari penawaran BCA, MUF, atau BFI paling kecil; hasil DP di bawah Rp1 juta menjadi Rp5 juta (hasil Rp1 juta atau lebih tetap) dan hanya 60 bulan. Biaya tambahan perlu konfirmasi leasing.
                   </div>
                   <div className="mb-3.5 overflow-hidden rounded-[14px] border border-line">
                     {dpMinimTableTenors.map((rowTenor) => {
                       const row = dpMinimRows?.find((r) => r.tenor === rowTenor);
                       const res = row?.result ?? null;
                       const rowAllIn = getDpMinimAllInFromResult(res);
-                      const rowDp = getDpMinimRealDP(price, rowAllIn);
+                      const rowDp = res?.leasingQuote?.minimum_dp ?? getDpMinimRealDP(price, rowAllIn);
                       const rowTdp = getDpMinimTdpKonsumen(rowDp, res);
                       const pending = dpMinimTableLoading && !res;
                       const isActive = rowTenor === tenor;
@@ -899,6 +900,7 @@ export function CreditSimulationBox({
                             </div>
                           </div>
                           <div className="space-y-0.5">
+                            {res?.leasingQuote && <div className="text-xs font-bold">Leasing {res.leasingQuote.leasing}</div>}
                             <div className="flex items-center justify-between gap-2 text-[11px]">
                               <span className="font-semibold text-muted">Pencairan + Refund</span>
                               <span className="font-bold text-ink">
@@ -920,7 +922,7 @@ export function CreditSimulationBox({
                               </span>
                             </div>
                             <div className="flex items-center justify-between gap-2 text-[11px]">
-                              <span className="font-semibold text-muted">TDP DP Minim</span>
+                              <span className="font-semibold text-muted">Total bayar awal</span>
                               <span className="text-[13px] font-extrabold text-teal-deep">
                                 {pending
                                   ? "..."
@@ -931,7 +933,7 @@ export function CreditSimulationBox({
                             </div>
                             {rowDp !== null && (
                               <div className="text-[10px] font-semibold text-muted">
-                                DP Minim Real {formatRupiah(rowDp)}
+                                DP Minim {formatRupiah(rowDp)}
                               </div>
                             )}
                           </div>
@@ -960,7 +962,7 @@ export function CreditSimulationBox({
                       {simTab === "dpminim" ? "Jumlah angsuran" : "Tenor (bulan)"}
                     </div>
                     <div className="grid grid-cols-5 gap-1.5">
-                      {availableDsfTenors.map((t) => {
+                      {(simTab === "dpminim" ? DP_MINIM_TABLE_TENORS : availableDsfTenors).map((t) => {
                         const isActive = t === tenor;
                         return (
                           <button
@@ -1017,7 +1019,7 @@ export function CreditSimulationBox({
                         Maaf, ada kendala sistem
                       </div>
                       <div className="mt-1 text-[11px] leading-[1.5] text-muted">
-                        Hasil simulasi belum tersedia dari DSF. Coba hitung ulang.
+                        {simTab === "dpminim" ? "Penawaran DP Minim belum tersedia untuk kendaraan ini." : "Hasil simulasi belum tersedia dari DSF. Coba hitung ulang."}
                       </div>
                       <button
                         type="button"
@@ -1034,7 +1036,7 @@ export function CreditSimulationBox({
                           Maaf, ada kendala sistem
                         </div>
                         <div className="mt-1 text-[11px] leading-[1.5] text-muted">
-                          Data refund belum tersedia dari DSF. Coba hitung ulang simulasi.
+                          Penawaran DP Minim belum tersedia untuk kombinasi kendaraan ini.
                         </div>
                         <button
                           type="button"
@@ -1046,6 +1048,8 @@ export function CreditSimulationBox({
                       </div>
                     ) : (
                       <div className="mt-2.5 space-y-2.5 border-t border-line pt-2.5">
+                        {simResult?.leasingQuote && <p className="text-sm font-bold">Leasing {simResult.leasingQuote.leasing}</p>}
+                        {simResult?.disclaimer.map(line => <p key={line} className="text-xs text-muted">{line}</p>)}
                         <div className="flex items-center justify-between gap-3">
                           <div className="text-[12px] font-semibold text-mid">Cair All In</div>
                           <div className="text-right text-[13px] font-extrabold text-ink">
@@ -1054,7 +1058,7 @@ export function CreditSimulationBox({
                         </div>
                         <div className="flex items-center justify-between gap-3">
                           <div className="text-[12px] font-semibold text-mid">
-                            TDP DP Minim
+                            Total bayar awal
                           </div>
                           <div className="text-right text-[15px] font-extrabold text-teal-deep">
                             {dpMinimTdpKonsumen !== null
@@ -1064,19 +1068,10 @@ export function CreditSimulationBox({
                         </div>
                         {dpMinimRealDP !== null && (
                           <div className="-mt-1 text-right text-[10px] font-semibold text-muted">
-                            DP Minim Real {formatRupiah(dpMinimRealDP)}
+                            DP Minim {formatRupiah(dpMinimRealDP)}
                           </div>
                         )}
-                        {dpMinimSisaCair !== null && dpMinimSisaCair > 0 && (
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="text-[12px] font-semibold text-mid">
-                              Sisa Cair (Dana Tunai)
-                            </div>
-                            <div className="text-right text-[13px] font-extrabold text-teal-deep">
-                              {formatRupiah(dpMinimSisaCair)}
-                            </div>
-                          </div>
-                        )}
+
                         <div className="flex items-center justify-between gap-3">
                           <div className="text-[12px] font-semibold text-mid">Cicilan/Bulan</div>
                           <div className="text-right text-[13px] font-extrabold text-ink">
@@ -1135,7 +1130,7 @@ export function CreditSimulationBox({
               )}
               <p className="m-0 mt-2 text-[11px] text-muted">
                 {simTab === "dpminim"
-                  ? "TDP DP Minim = DP Minim Real + komponen biaya TDP DSF. DP Minim Real = harga aktif − (pencairan murni + refund aktual DSF). Syarat dan ketentuan berlaku; komisi bersifat estimasi."
+                  ? "DP Minim hasil DP di bawah Rp1 juta menjadi Rp5 juta (hasil Rp1 juta atau lebih tetap), hanya 60 bulan. Biaya tambahan dan total bayar awal perlu konfirmasi leasing."
                   : "Simulasi, syarat & ketentuan berlaku. Komisi bersifat estimasi."}
               </p>
             </div>
