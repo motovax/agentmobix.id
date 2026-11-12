@@ -1,10 +1,33 @@
 import { useEffect, useState } from "react";
+import { formatRupiah } from "./format";
 
 const API_BASE = import.meta.env.VITE_MOBIX_API_BASE || "https://mobix.motovax.com";
 const API_KEY = import.meta.env.VITE_MOBIX_API_KEY || "";
 
+export interface DpMinimOffer {
+  leasing: "BCA" | "MUF" | "BFI";
+  available: boolean;
+  minimum_dp: number | null;
+  installment: number | null;
+  reason?: string;
+  condition?: string;
+}
+
+export interface DpMinimQuoteResult {
+  leasing: string;
+  minimum_dp: number;
+  installment: number;
+  cash_price: number;
+  condition?: string;
+  source_row: number;
+  tenor_months: 60;
+  installment_unit: "per_month";
+  offers: DpMinimOffer[];
+  notes: string[];
+}
+
 export interface DsfSimResult {
-  leasingQuote?: { leasing: string; minimum_dp: number; cash_price: number; condition?: string; source_row: number };
+  leasingQuote?: DpMinimQuoteResult;
   hargaKredit: number | null;
   installmentRounded: number;
   totalDownPaymentRounded: number;
@@ -316,6 +339,8 @@ export function getDpMinimTdpKonsumen(
 }
 
 export interface DpMinimPackage {
+  offers: DpMinimOffer[];
+  notes: string[];
   dpReal: number;
   cicilan: number;
   tenor: number;
@@ -355,11 +380,17 @@ export async function fetchDpMinimSimulation(
     if (!response.ok) return null;
     const { data } = await response.json();
     if (!data || data.tenor_months !== 60 || !Number.isFinite(data.minimum_dp) || data.minimum_dp < 1_000_000 || !Number.isFinite(data.installment) || data.installment <= 0 || !Number.isFinite(data.cash_price) || data.cash_price <= 0) return null;
+    if (data.installment_unit !== "per_month" || !Array.isArray(data.offers) || data.offers.length !== 3 || !Array.isArray(data.notes) || data.notes.length !== 3 || !data.notes.every((note: unknown) => typeof note === "string")) return null;
+    for (const [index, leasing] of ["BCA", "MUF", "BFI"].entries()) {
+      const offer = data.offers[index];
+      if (!offer || offer.leasing !== leasing || typeof offer.available !== "boolean") return null;
+      if (offer.available ? (!Number.isFinite(offer.minimum_dp) || offer.minimum_dp < 1_000_000 || !Number.isFinite(offer.installment) || offer.installment <= 0) : (offer.minimum_dp !== null || offer.installment !== null || typeof offer.reason !== "string" || !offer.reason)) return null;
+    }
     return {
       hargaKredit: data.cash_price, installmentRounded: data.installment,
       totalDownPaymentRounded: 0, downPaymentRounded: 0, downPayment: 0,
       percentDownPayment: 0, totalLoan: 0, rate: "", rateEffectiveTwoDigitPercent: "",
-      adminFee: 0, disclaimer: ["Biaya tambahan dan total bayar awal perlu konfirmasi leasing.", ...(data.condition ? [data.condition] : [])],
+      adminFee: 0, disclaimer: [...data.notes, ...(data.condition ? [data.condition] : [])],
       netDisbursement: data.disbursement, refundSupplierActual: data.refund,
       allInToSupplier: data.disbursement + data.refund,
       leasingQuote: data,
@@ -373,7 +404,7 @@ export async function fetchDpMinimPackage(
 ): Promise<DpMinimPackage | null> {
   const result = await fetchDpMinimSimulation({ ...params, tenor: params.tenor ?? 60 }, signal);
   if (!result?.leasingQuote) return null;
-  return { dpReal: result.leasingQuote.minimum_dp, cicilan: result.installmentRounded, tenor: 60, dpPercent: result.leasingQuote.minimum_dp / result.leasingQuote.cash_price * 100, leasing: result.leasingQuote.leasing };
+  return { offers: result.leasingQuote.offers, notes: result.leasingQuote.notes, dpReal: result.leasingQuote.minimum_dp, cicilan: result.installmentRounded, tenor: 60, dpPercent: result.leasingQuote.minimum_dp / result.leasingQuote.cash_price * 100, leasing: result.leasingQuote.leasing };
 }
 
 export interface DsfCreditPriceResult {
@@ -493,4 +524,15 @@ export function useDsfSim(price: number, title: string, year?: number) {
   }, [price, title, year]);
 
   return result;
+}
+
+/** Customer-facing DP Minim copy shared by captions and the three-leasing UI. */
+export function formatDpMinimOffers(offers: DpMinimOffer[], notes: string[]): string {
+  return ["DP Minim", ...offers.flatMap((offer, index) => [
+    `${index + 1}. ${offer.leasing}`,
+    `DP Minim : ${offer.available && offer.minimum_dp !== null ? formatRupiah(offer.minimum_dp) : "Tidak tersedia"}`,
+    `Angsuran : ${offer.available && offer.installment !== null ? formatRupiah(offer.installment) + "/bulan" : "Tidak tersedia"}`,
+    ...(!offer.available && offer.reason ? [offer.reason] : []),
+    ...(offer.condition ? [`Syarat: ${offer.condition}`] : []), "",
+  ]), ...notes].join("\n");
 }

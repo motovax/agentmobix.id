@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { offers, notes } from "./fixtures/dpMinim";
 import {
   fetchDpMinimSimulation,
   getDpMinimAllInFromResult,
@@ -42,13 +43,15 @@ describe("formula DP Minim dari pencairan aktual DSF", () => {
     let url = "";
     globalThis.fetch = (async (input, init) => {
       url = String(input); payload = JSON.parse(String(init?.body));
-      return new Response(JSON.stringify({ data: { leasing: "BFI", cash_price: 225_000_000, disbursement: 255_000_000, refund: 13_000_000, minimum_dp: 5_000_000, installment: 8_050_000, tenor_months: 60, source_row: 5 } }));
+      return new Response(JSON.stringify({ data: { leasing: "BFI", cash_price: 225_000_000, disbursement: 255_000_000, refund: 13_000_000, minimum_dp: 5_000_000, installment: 8_050_000, tenor_months: 60, source_row: 5, offers, notes, installment_unit: "per_month" } }));
     }) as typeof fetch;
     try {
       const result = await fetchDpMinimSimulation({ unitId: "unit-1", unitPrice: 225_000_000, tenor: 60 });
       expect(url).toEndWith("/kalkulator/dp-minim");
       expect(payload).toEqual({ unit_id: "unit-1", tenor_months: 60 });
       expect(result?.leasingQuote?.leasing).toBe("BFI");
+      expect(result?.leasingQuote?.offers).toEqual(offers);
+      expect(result?.leasingQuote?.notes).toEqual(notes);
       expect(result?.installmentRounded).toBe(8_050_000);
       expect(getDpMinimTdpKonsumen(1_000_000, result)).toBeNull();
       globalThis.fetch = (async () => new Response("{}", { status: 422 })) as typeof fetch;
@@ -124,4 +127,13 @@ describe("formula DP Minim dari pencairan aktual DSF", () => {
     expect(getDpMinimTdpKonsumen(null, result)).toBeNull();
     expect(getDpMinimTdpKonsumen(23_063_019, null)).toBeNull();
   });
+});
+
+test("caption DP Minim menyertakan semua leasing dan catatan yang sama", async () => {
+ const {formatDpMinimOffers}=await import("../src/lib/dsf");
+ const copy=formatDpMinimOffers(offers,notes);
+ expect(copy).toContain("1. BCA\nDP Minim : Rp 5.000.000\nAngsuran : Rp 6.170.000/bulan");
+ expect(copy).toContain("2. MUF\nDP Minim : Rp 4.400.000");
+ expect(copy).toContain("3. BFI");expect(copy.match(/\/bulan/g)?.length).toBe(3);
+ expect(copy.endsWith(notes.join("\n"))).toBe(true);
 });

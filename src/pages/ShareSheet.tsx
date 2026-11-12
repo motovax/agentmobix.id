@@ -73,6 +73,7 @@ import {
 } from "../lib/shareCaption";
 import {
   fetchDpMinimPackage,
+  formatDpMinimOffers,
   type DpMinimPackage,
 } from "../lib/dsf";
 import {
@@ -721,11 +722,8 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       ? paymentValue
       : captionPackage.tdp;
 
-  /** Baris tambahan di bawah Harga/TDP — hanya jika paket utama bukan DP Minim user. */
-  const dpMinimExtraLine =
-    defaultDpMinim && captionPackage.kind !== "dpminim"
-      ? `Leasing ${defaultDpMinim.leasing} • DP Minim ${formatJt(defaultDpMinim.dpReal)} • Cicilan ${formatJt(defaultDpMinim.cicilan)}/bln • Tenor ${defaultDpMinim.tenor} bulan`
-      : "";
+  const dpMinimOfferText = defaultDpMinim ? formatDpMinimOffers(defaultDpMinim.offers, defaultDpMinim.notes) : "";
+  const dpMinimExtraLine = captionPackage.kind !== "dpminim" ? dpMinimOfferText : "";
 
   const packageBlock =
     captionPackage.kind === "cash"
@@ -733,7 +731,7 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
           .filter(Boolean)
           .join("\n")
       : captionPackage.kind === "dpminim"
-        ? `Harga ${formatRupiah(captionPackage.price)}\nDP Minim ${formatJt(captionPackage.dpReal)}\nCicilan ${formatJt(captionPackage.cicilan)}/bln • Tenor ${captionPackage.tenor} bulan`
+        ? `Harga ${formatRupiah(captionPackage.price)}\n${dpMinimOfferText || "Penawaran DP Minim belum tersedia."}`
         : [
             `Harga ${formatRupiah(captionPackage.price)}\nTDP ${formatJt(captionPackage.tdp)} • Cicilan ${formatJt(captionPackage.cicilan)}/bln • Tenor ${captionPackage.tenor} bulan`,
             dpMinimExtraLine,
@@ -1216,14 +1214,9 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       captionPackage.kind === "cash" ? shareTenor : captionPackage.tenor;
     const tdp = formatJt(pkgTdp);
     const installment = formatJt(pkgCicilan);
-    const creditPackage =
-      captionPackage.kind === "cash"
-        ? defaultDpMinim
-          ? `harga ${formatRupiah(captionPackage.price)}, Leasing ${defaultDpMinim.leasing}, DP Minim ${formatJt(defaultDpMinim.dpReal)}, cicilan ${formatJt(defaultDpMinim.cicilan)}/bln tenor ${defaultDpMinim.tenor} bulan`
-          : `harga ${formatRupiah(captionPackage.price)}`
-        : captionPackage.kind === "dpminim"
-          ? `harga ${formatRupiah(captionPackage.price)}, paket DP Minim ${formatJt(captionPackage.tdp)}, cicilan ${installment}/bln tenor ${captionPackage.tenor} bulan`
-          : `harga ${formatRupiah(captionPackage.price)}, TDP ${tdp}, cicilan ${installment}/bln tenor ${captionPackage.tenor} bulan${defaultDpMinim ? `, Leasing ${defaultDpMinim.leasing}, DP Minim ${formatJt(defaultDpMinim.dpReal)} tenor ${defaultDpMinim.tenor} bulan` : ""}`;
+    const creditPackage = captionPackage.kind === "kredit"
+      ? `harga ${formatRupiah(captionPackage.price)}, TDP ${tdp}, cicilan ${installment}/bln tenor ${captionPackage.tenor} bulan\n${dpMinimOfferText}`
+      : `harga ${formatRupiah(captionPackage.price)}\n${dpMinimOfferText}`;
     const packageWithPrice = creditPackage;
     const category =
       unit.category && unit.category.length <= 4
@@ -1272,41 +1265,12 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
         formatRupiah(captionPrice).replace(/^Rp\s*/i, ""),
       ],
     };
-    const defaultDpMinimFacts = defaultDpMinim
-      ? [
-          {
-            line: `DP Minim ${formatJt(defaultDpMinim.dpReal)}`,
-            matches: shortAmountMatches(defaultDpMinim.dpReal),
-          },
-          {
-            line: `Cicilan ${formatJt(defaultDpMinim.cicilan)}/bln`,
-            matches: shortAmountMatches(defaultDpMinim.cicilan),
-          },
-          {
-            line: `Tenor ${defaultDpMinim.tenor} bulan`,
-            matches: [`${defaultDpMinim.tenor} bulan`],
-          },
-        ]
-      : [];
+    const defaultDpMinimFacts = dpMinimOfferText ? [{line: dpMinimOfferText, matches: [dpMinimOfferText]}] : [];
     const requiredPackageFacts =
       captionPackage.kind === "cash"
         ? [hargaFact, ...defaultDpMinimFacts]
         : captionPackage.kind === "dpminim"
-          ? [
-              hargaFact,
-              {
-                line: `DP Minim ${formatJt(captionPackage.dpReal)}`,
-                matches: shortAmountMatches(captionPackage.dpReal),
-              },
-              {
-                line: `Cicilan ${installment}/bln`,
-                matches: shortAmountMatches(captionPackage.cicilan),
-              },
-              {
-                line: `Tenor ${captionPackage.tenor} bulan`,
-                matches: [`${captionPackage.tenor} bulan`],
-              },
-            ]
+          ? [hargaFact, ...defaultDpMinimFacts]
           : [
               hargaFact,
               { line: `TDP ${tdp}`, matches: shortAmountMatches(captionPackage.tdp) },
