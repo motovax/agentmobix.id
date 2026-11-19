@@ -5,7 +5,7 @@ import { BottomNav } from "../components/BottomNav";
 import { FloatingContactCta } from "../components/FloatingContactCta";
 import { UnitRow } from "../components/UnitRow";
 import { Chat, Search } from "../components/icons";
-import { Photo, Skeleton, SkeletonRow } from "../components/ui";
+import { Photo, Skeleton, SkeletonRow, UnitStatusBadge } from "../components/ui";
 import {
   fetchUnits,
   fetchCategories,
@@ -73,6 +73,9 @@ function RecCard({ unit }: { unit: CardUnit }) {
         </span>
       </Photo>
       <div className="px-2.5 pb-2.5 pt-2">
+        <div className="mb-1 min-h-[18px]">
+          <UnitStatusBadge status={unit.stockStatus} />
+        </div>
         <div className="mb-1 line-clamp-2 text-[12.5px] font-bold leading-[1.25] text-ink">
           {unit.title}
         </div>
