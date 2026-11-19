@@ -10,7 +10,7 @@ import {
   CreditSimulationBox,
   type CreditSimulationResult,
 } from "../components/CreditSimulationBox";
-import { Skeleton } from "../components/ui";
+import { Skeleton, UnitStatusBadge } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
 import {
   ChevronLeft,
@@ -1809,6 +1809,9 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
               </div>
             ) : (
               <>
+                <div className="mb-2 pr-9 empty:hidden">
+                  <UnitStatusBadge status={unit.status} />
+                </div>
                 <textarea
                   value={captionText}
                   onChange={(event) => setCaptionText(event.target.value)}
