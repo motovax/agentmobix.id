@@ -14,9 +14,11 @@ import { ThumbBadge, UnitStatusBadge } from "./ui";
 export function UnitRow({
   unit,
   detailHref,
+  showStockStatus = false,
 }: {
   unit: CardUnit;
   detailHref?: string;
+  showStockStatus?: boolean;
 }) {
   const financingAvailable = hasAvailableFinancing(unit.pembiayaan);
   const salesContactRequired = requiresSalesContact(unit.pembiayaan);
@@ -32,12 +34,10 @@ export function UnitRow({
         emptyLabel="Foto belum tersedia"
       >
         <ThumbBadge kind={unit.badge} />
-        <div className="absolute bottom-1.5 left-1.5">
-          <UnitStatusBadge status={unit.stockStatus} />
-        </div>
       </VehiclePhoto>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted">
+          {showStockStatus && <UnitStatusBadge status={unit.stockStatus} />}
           <span>Cabang {unit.branch}</span>
           {unit.plateNo && (
             <>

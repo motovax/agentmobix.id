@@ -523,7 +523,7 @@ export function Beranda() {
                   <SkeletonRow key={`search-skeleton-${index}`} />
                 ))}
               {recItems.map((unit) => (
-                <UnitRow key={unit.id} unit={unit} />
+                <UnitRow key={unit.id} unit={unit} showStockStatus />
               ))}
               {!recLoading && recError && recItems.length === 0 && (
                 <div className="rounded-2xl border border-line bg-surface px-4 py-8 text-center text-[13px] text-muted">

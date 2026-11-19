@@ -433,6 +433,7 @@ export function Katalog() {
           !error &&
           items.map((u) => (
             <UnitRow
+              showStockStatus
               key={u.id}
               unit={u}
               detailHref={`/share?u=${encodeURIComponent(u.slug)}`}

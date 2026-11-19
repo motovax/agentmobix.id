@@ -95,7 +95,6 @@ export interface VideoItem {
 }
 
 export interface ProductDetail {
-  status?: UnitStockStatus;
   id: string;
   nama: string;
   slug: string;
