@@ -71,11 +71,9 @@ function RecCard({ unit }: { unit: CardUnit }) {
         <span className="absolute right-2 top-2 rounded-full bg-ink/75 px-2 py-1 text-[10px] font-bold text-surface">
           {unit.year}
         </span>
+        <UnitStatusBadge status={unit.stockStatus} />
       </Photo>
       <div className="px-2.5 pb-2.5 pt-2">
-        <div className="mb-1 min-h-[18px]">
-          <UnitStatusBadge status={unit.stockStatus} />
-        </div>
         <div className="mb-1 line-clamp-2 text-[12.5px] font-bold leading-[1.25] text-ink">
           {unit.title}
         </div>
