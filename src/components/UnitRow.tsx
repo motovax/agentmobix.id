@@ -34,10 +34,10 @@ export function UnitRow({
         emptyLabel="Foto belum tersedia"
       >
         <ThumbBadge kind={unit.badge} />
+        {showStockStatus && <UnitStatusBadge status={unit.stockStatus} />}
       </VehiclePhoto>
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted">
-          {showStockStatus && <UnitStatusBadge status={unit.stockStatus} />}
+        <div className="flex items-center gap-1.5 text-[11px] text-muted">
           <span>Cabang {unit.branch}</span>
           {unit.plateNo && (
             <>

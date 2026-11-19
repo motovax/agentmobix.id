@@ -200,13 +200,15 @@ export function ThumbBadge({ kind }: { kind: UnitBadge }) {
 export function UnitStatusBadge({ status }: { status?: UnitStockStatus }) {
   if (status !== "UNIT READY" && status !== "BOOKED") return null;
 
-  const colors = status === "UNIT READY"
-    ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
-    : "bg-amber-50 text-amber-900 ring-amber-200";
+  const ready = status === "UNIT READY";
 
   return (
-    <span className={`inline-flex whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-bold leading-tight ring-1 ring-inset ${colors}`}>
-      {status}
+    <span className={`absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold leading-none text-white ${ready ? "bg-emerald-700" : "bg-amber-800"}`}>
+      <span
+        aria-hidden="true"
+        className={`h-1.5 w-1.5 rounded-full ${ready ? "bg-emerald-300" : "bg-amber-300"}`}
+      />
+      {ready ? "Unit Ready" : "Booked"}
     </span>
   );
 }
