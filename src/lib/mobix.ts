@@ -50,7 +50,10 @@ export interface ProductFinancing {
   max_vehicle_age_years: number | null;
 }
 
+export type UnitStockStatus = "UNIT READY" | "BOOKED";
+
 export interface ProductListItem {
+  status?: UnitStockStatus;
   id: string;
   nama: string;
   slug: string;
@@ -92,6 +95,7 @@ export interface VideoItem {
 }
 
 export interface ProductDetail {
+  status?: UnitStockStatus;
   id: string;
   nama: string;
   slug: string;
@@ -838,6 +842,7 @@ export interface CardUnit {
   year: number;
   transmisi: string;
   badge: UnitBadge;
+  stockStatus?: UnitStockStatus;
   thumbnail: string | undefined;
   komisiLabel: string;
 }
@@ -860,6 +865,7 @@ export function toCardUnit(item: ProductListItem): CardUnit {
     year: item.year,
     transmisi: prettyTransmisi(item.transmisi),
     badge: deriveBadge(item),
+    stockStatus: item.status,
     thumbnail: mobixImage(item.thumbnail_depan?.trim() || item.thumbnail),
     komisiLabel: (item.aging ?? 0) > 60 ? "+Rp 2 juta" : "Mulai dari 2jt",
   };

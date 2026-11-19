@@ -8,7 +8,7 @@ import {
   type CardUnit,
 } from "../lib/mobix";
 import { formatJt } from "../lib/format";
-import { Badge } from "./ui";
+import { Badge, UnitStatusBadge } from "./ui";
 import { Calculator, ShareArrow } from "./icons";
 
 /**
@@ -46,6 +46,9 @@ export function UnitCard({ unit }: { unit: CardUnit }) {
       >
         <div className="absolute left-2 top-2">
           <Badge kind={unit.badge} />
+        </div>
+        <div className="absolute bottom-2 left-2">
+          <UnitStatusBadge status={unit.stockStatus} />
         </div>
       </VehiclePhoto>
       <div className="px-3 pb-3 pt-2.5">

@@ -10,7 +10,7 @@ import {
   CreditSimulationBox,
   type CreditSimulationResult,
 } from "../components/CreditSimulationBox";
-import { Skeleton } from "../components/ui";
+import { Skeleton, UnitStatusBadge } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
 import {
   ChevronLeft,
@@ -1677,6 +1677,9 @@ export const ShareSheet = forwardRef<ShareSheetHandle, ShareSheetProps>(function
       <div className={`min-h-[560px] bg-surface-2 px-4 ${embedded ? "pb-24 pt-[18px]" : "pb-[120px] pt-[18px]"}`}>
         {/* shareable preview */}
         <div className="relative mb-[18px] overflow-hidden rounded-[18px] border border-line bg-surface">
+          <div className="pointer-events-none absolute left-3 top-3 z-10">
+            <UnitStatusBadge status={unit?.status} />
+          </div>
           {activeMedia?.kind === "video" ? (
             <div className="relative aspect-video bg-black">
               <video

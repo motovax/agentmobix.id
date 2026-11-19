@@ -8,7 +8,7 @@ import {
   type CardUnit,
 } from "../lib/mobix";
 import { formatJt, formatKm } from "../lib/format";
-import { ThumbBadge } from "./ui";
+import { ThumbBadge, UnitStatusBadge } from "./ui";
 
 /** Catalog list row — whole row opens the photo/caption composer by default. */
 export function UnitRow({
@@ -32,6 +32,9 @@ export function UnitRow({
         emptyLabel="Foto belum tersedia"
       >
         <ThumbBadge kind={unit.badge} />
+        <div className="absolute bottom-1.5 left-1.5">
+          <UnitStatusBadge status={unit.stockStatus} />
+        </div>
       </VehiclePhoto>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 text-[11px] text-muted">

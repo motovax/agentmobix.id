@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import type { UnitBadge } from "../lib/mobix";
+import type { UnitBadge, UnitStockStatus } from "../lib/mobix";
 import { Camera } from "./icons";
 
 /**
@@ -193,6 +193,20 @@ export function ThumbBadge({ kind }: { kind: UnitBadge }) {
       className={`absolute left-1.5 top-1.5 rounded-[7px] px-[7px] py-0.5 text-[9px] font-bold ${cls}`}
     >
       {label}
+    </span>
+  );
+}
+
+export function UnitStatusBadge({ status }: { status?: UnitStockStatus }) {
+  if (status !== "UNIT READY" && status !== "BOOKED") return null;
+
+  const colors = status === "UNIT READY"
+    ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
+    : "bg-amber-50 text-amber-900 ring-amber-200";
+
+  return (
+    <span className={`inline-flex whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-bold leading-tight ring-1 ring-inset ${colors}`}>
+      {status}
     </span>
   );
 }
