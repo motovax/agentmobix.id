@@ -197,13 +197,19 @@ export function ThumbBadge({ kind }: { kind: UnitBadge }) {
   );
 }
 
-export function UnitStatusBadge({ status }: { status?: UnitStockStatus }) {
+export function UnitStatusBadge({
+  status,
+  overPhoto = false,
+}: {
+  status?: UnitStockStatus;
+  overPhoto?: boolean;
+}) {
   if (status !== "UNIT READY" && status !== "BOOKED") return null;
 
   const ready = status === "UNIT READY";
 
   return (
-    <span className={`absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold leading-none text-white ${ready ? "bg-emerald-700" : "bg-amber-800"}`}>
+    <span className={`${overPhoto ? "absolute bottom-1.5 left-1.5" : ""} inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold leading-none text-white ${ready ? "bg-emerald-700" : "bg-amber-800"}`}>
       <span
         aria-hidden="true"
         className={`h-1.5 w-1.5 rounded-full ${ready ? "bg-emerald-300" : "bg-amber-300"}`}

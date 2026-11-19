@@ -9,7 +9,7 @@ import { AppShell } from "../components/AppShell";
 import { AppBar } from "../components/AppBar";
 import { ContactActionMenu } from "../components/FloatingContactCta";
 import { FloatingPicAgentCta } from "../components/FloatingPicAgentCta";
-import { Skeleton } from "../components/ui";
+import { Skeleton, UnitStatusBadge } from "../components/ui";
 import { UnitRow } from "../components/UnitRow";
 import { ChevronLeft, ShareArrow, Check, Close, Play } from "../components/icons";
 import {
@@ -1038,8 +1038,9 @@ export function UnitDetail({ unitSlug }: { unitSlug?: string } = {}) {
 
         {/* TITLE BLOCK */}
         <div className="px-[18px] pt-1">
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-              <span className="rounded-md bg-field px-1.5 py-0.5 text-[11px] font-medium text-muted">
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            <UnitStatusBadge status={unit.status} />
+            <span className="rounded-md bg-field px-1.5 py-0.5 text-[11px] font-medium text-muted">
               Cabang: {titleCase(unit.lokasi || "Mobix")}
             </span>
             {unit.posisi && titleCase(unit.posisi) !== titleCase(unit.lokasi || "") && (
